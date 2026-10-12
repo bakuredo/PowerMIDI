@@ -69,6 +69,34 @@ public class InstrumentDefinitionsTests
         Assert.False(Defs.Resolve("XG", 0, 0, 0, 0, 0).Drum);
     }
 
+    // A sound that is not in the list of the mode is flagged (shown in red in the mixer), with its likely fallback as name.
+    [Fact]
+    public void Sounds_missing_from_the_list_are_flagged()
+    {
+        Assert.False(Defs.Resolve("GS", 0, 0, 0, 1, 0).Missing);
+        int gsMsb = Enumerable.Range(1, 126).First(msb => !Defs.GsVoices.ContainsKey((1, msb, 0)));
+        var gs = Defs.Resolve("GS", 0, 0, gsMsb, 1, 0);
+        Assert.True(gs.Missing);
+        Assert.Equal("Piano 1", gs.Name);
+        int gsKit = Enumerable.Range(1, 126).First(pc => !Defs.GsDrums.ContainsKey((InstrumentDefinitions.DefaultGsMap, pc)));
+        Assert.True(Defs.Resolve("GS", 9, gsKit, 0, 0, 1).Missing);
+        Assert.False(Defs.Resolve("GS", 9, 0, 0, 0, 1).Missing);
+
+        Assert.False(Defs.Resolve("XG", 0, 0, 0, 0, 0).Missing);
+        int xgLsb = Enumerable.Range(1, 126).First(lsb => !Defs.XgVoices.ContainsKey((0, lsb, 0)));
+        Assert.True(Defs.Resolve("XG", 0, 0, 0, xgLsb, 0).Missing);
+
+        Assert.False(Defs.Resolve("GM2", 0, 0, InstrumentDefinitions.Gm2MelodicMsb, 0, 0).Missing);
+        int gm2Lsb = Enumerable.Range(1, 126).First(lsb => !Defs.Gm2Voices.ContainsKey((lsb, 0)));
+        Assert.True(Defs.Resolve("GM2", 0, 0, InstrumentDefinitions.Gm2MelodicMsb, gm2Lsb, 0).Missing);
+
+        Assert.False(Defs.Resolve("GM", 0, 40, 0, 0, 0).Missing);
+        Assert.False(Defs.Resolve("GM", 9, 0, 0, 0, 0).Missing);
+        Assert.True(Defs.Resolve("GM", 9, 16, 0, 0, 0).Missing);      // a kit of a larger standard on the GM drum channel
+
+        Assert.False(Defs.Resolve("MT-32", 0, 127, 0, 0, 0).Missing);
+    }
+
     // In GM, the drum channel only offers the GM kit, not those of the GS maps.
     [Fact]
     public void Choices_of_a_gm_drum_channel_are_the_gm_kits()

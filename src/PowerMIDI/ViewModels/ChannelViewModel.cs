@@ -142,6 +142,10 @@ public sealed class ChannelViewModel : ObservableObject
     InstrumentState instrumentState;
     public InstrumentState InstrumentState { get => instrumentState; internal set => Set(ref instrumentState, value); }
 
+    // The sound asked for is not in the list of the mode (name shown in red: the likely fallback of the module).
+    bool isInstrumentMissing;
+    public bool IsInstrumentMissing { get => isInstrumentMissing; internal set => Set(ref isInstrumentMissing, value); }
+
     string instrumentToolTip;
     public string InstrumentToolTip { get => instrumentToolTip; internal set => Set(ref instrumentToolTip, value); }
 

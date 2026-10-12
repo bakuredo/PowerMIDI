@@ -168,7 +168,7 @@ public sealed class MixerViewModel : ObservableObject
         if (ch.ListShown) { ch.ListShown = false; force = true; }   // list closed since it was last opened
         var key = $"{Standard}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
                   $"{ChannelMixer.RhythmPart[c]}/{ChannelMixer.RhythmOverride[c]}/{ChannelMixer.Override[c]}/" +
-                  $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}";
+                  $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}/{HasCustomPatches}";
         if (!force && key == ch.InstrumentKey) return;
         ch.InstrumentKey = key;
 
@@ -194,6 +194,10 @@ public sealed class MixerViewModel : ObservableObject
         }
         else (name, state, tooltip) = (currentInfo.Name, InstrumentState.File, $"{currentInfo.Detail}{sharedText}");
 
+        // MT-32 file that redefines its sounds: the programs no longer match the factory names.
+        bool customPatch = Standard == "MT-32" && HasCustomPatches && ChannelMixer.Used[c] && !currentInfo.Drum;
+        if (customPatch) tooltip += " · custom patches: the name may be wrong";
+
         var display = new InstrumentChoice { Text = name, IsDisplay = true };
         Update(ch, () =>
         {
@@ -201,6 +205,7 @@ public sealed class MixerViewModel : ObservableObject
             ch.InstrumentItems = new[] { display };
             ch.SelectedInstrument = display;
             ch.InstrumentState = state;
+            ch.IsInstrumentMissing = state != InstrumentState.Unused && (currentInfo.Missing || customPatch);
             ch.InstrumentToolTip = tooltip;
         });
     }

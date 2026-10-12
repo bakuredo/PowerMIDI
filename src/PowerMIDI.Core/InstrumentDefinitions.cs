@@ -21,8 +21,9 @@ public sealed class EffectTypeDef
     public Dictionary<int, EffectParamDef> Params = new();   // by address
 }
 
-// Instrument shown in the mixer: name, details for the tooltip, drum kit or not.
-public sealed record InstrumentInfo(string Name, string Detail, bool Drum);
+// Instrument shown in the mixer: name, details for the tooltip, drum kit or not. Missing: the sound asked for is
+// not in the list of the mode; the name is then the one the module most likely falls back to.
+public sealed record InstrumentInfo(string Name, string Detail, bool Drum, bool Missing = false);
 
 // Entry of an instrument list. IsReset: "back to the file's instrument"; IsDisplay: closed-list placeholder;
 // AssignPart: "assign the channel to a GS part" (0 = normal part, 1 / 2 = drum part 1 / 2);
@@ -326,7 +327,7 @@ public sealed class InstrumentDefinitions
         if (standard == "MT-32" && Mt32Voices.Count > 0)
         {
             if (rhythm > 0) return new InstrumentInfo($"Drums · {Mt32Drums.GetValueOrDefault(0, "Rhythm")}", "MT-32 · rhythm part", true);
-            return new InstrumentInfo(Mt32Voices.GetValueOrDefault(program, $"Patch {program + 1}"), $"MT-32 · PC {program + 1}", false);
+            return new InstrumentInfo(Mt32Voices.GetValueOrDefault(program, $"Patch {program + 1}"), $"MT-32 · PC {program + 1}", false, !Mt32Voices.ContainsKey(program));
         }
 
         // GM2 (GM2.xml): MSB 120 = drum kit, MSB 121 + LSB = melodic sound and its variation; with another
@@ -337,7 +338,7 @@ public sealed class InstrumentDefinitions
             {
                 var note = "";
                 if (!Gm2Drums.TryGetValue(program, out var kit)) { Gm2Drums.TryGetValue(0, out kit); note = " · kit missing, Standard Kit"; }
-                return new InstrumentInfo($"Drums · {kit}", $"GM2 · {pcText}{note}", true);
+                return new InstrumentInfo($"Drums · {kit}", $"GM2 · {pcText}{note}", true, note != "");
             }
             int variation = msb == Gm2MelodicMsb ? lsb : 0;
             var vnote = "";
@@ -346,7 +347,7 @@ public sealed class InstrumentDefinitions
                 Gm2Voices.TryGetValue((0, program), out name);
                 vnote = " · variation missing, base sound";
             }
-            return new InstrumentInfo(name ?? GmProgramName(program), $"GM2 · {pcText}{vnote}", false);
+            return new InstrumentInfo(name ?? GmProgramName(program), $"GM2 · {pcText}{vnote}", false, vnote != "");
         }
 
         if (standard == "XG" && XgVoices.Count > 0)
@@ -355,7 +356,7 @@ public sealed class InstrumentDefinitions
             {
                 var note = "";
                 if (!XgDrums.TryGetValue((msb, program), out var kit)) { XgDrums.TryGetValue((msb, 0), out kit); note = " · kit missing, base kit"; }
-                return new InstrumentInfo($"Drums · {kit}", $"XG · {pcText}{note}", true);
+                return new InstrumentInfo($"Drums · {kit}", $"XG · {pcText}{note}", true, note != "");
             }
             var vnote = "";
             if (!XgVoices.TryGetValue((msb, lsb, program), out var name))
@@ -364,7 +365,7 @@ public sealed class InstrumentDefinitions
                 if (!XgVoices.TryGetValue((msb, 0, program), out name)) XgVoices.TryGetValue((0, 0, program), out name);
                 vnote = " · variation missing, base voice";
             }
-            return new InstrumentInfo(name ?? GmProgramName(program), $"XG · {pcText}{vnote}", false);
+            return new InstrumentInfo(name ?? GmProgramName(program), $"XG · {pcText}{vnote}", false, vnote != "");
         }
 
         if (standard is "GS" or "None" && GsVoices.Count > 0)
@@ -378,7 +379,7 @@ public sealed class InstrumentDefinitions
             {
                 var note = "";
                 if (!GsDrums.TryGetValue((map, program), out var kit)) { GsDrums.TryGetValue((map, 0), out kit); note = " · kit missing, STANDARD"; }
-                return new InstrumentInfo($"Drums · {kit}", $"{label} · {mapText} · {pcText}{note}", true);
+                return new InstrumentInfo($"Drums · {kit}", $"{label} · {mapText} · {pcText}{note}", true, note != "");
             }
             // Missing variation: like the Sound Canvas, fall back to the base sound of the same
             // family (MSB rounded down to a multiple of 8), then to the capital tone (MSB 0).
@@ -388,11 +389,13 @@ public sealed class InstrumentDefinitions
                 if (!GsVoices.TryGetValue((map, msb - msb % 8, program), out name)) GsVoices.TryGetValue((map, 0, program), out name);
                 vnote = " · variation missing, capital tone";
             }
-            return new InstrumentInfo(name ?? GmProgramName(program), $"{label} · {mapText} · {pcText}{vnote}", false);
+            return new InstrumentInfo(name ?? GmProgramName(program), $"{label} · {mapText} · {pcText}{vnote}", false, vnote != "");
         }
 
         // GM / GM2, or missing definition files: General MIDI names, drums on channel 10.
-        return new InstrumentInfo(GmInstrumentName(channel, program), $"GM · {pcText}", channel == 9);
+        // GM has one drum kit: another program on channel 10 is a kit of a larger standard.
+        bool gmMissing = channel == 9 ? GmDrums.Count > 0 && !GmDrums.ContainsKey(program) : GmVoices.Count > 0 && !GmVoices.ContainsKey(program);
+        return new InstrumentInfo(GmInstrumentName(channel, program), $"GM · {pcText}{(gmMissing ? " · not in the GM list" : "")}", channel == 9, gmMissing);
     }
 
     // Instruments offered for a channel, sorted by program then bank. Cached per (standard, type, map).

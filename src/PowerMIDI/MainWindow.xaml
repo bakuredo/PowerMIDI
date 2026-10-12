@@ -260,6 +260,8 @@
                         <Setter Property="Foreground" Value="{DynamicResource OnLightFixedBrush}"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
                       </DataTrigger>
+                      <!-- Sound not in the list of the mode (last: wins over the colors above). -->
+                      <DataTrigger Binding="{Binding IsInstrumentMissing}" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightMissingBrush}"/></DataTrigger>
                     </Style.Triggers>
                   </Style>
                 </ComboBox.Style>
