@@ -10,18 +10,18 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 
 ## Features
 
-- **Player**: playback speed, transposition and playing a channel with computer keyboard ! (click on a channel number in Mixer page)
-- **Playlist**: files and folders, drag and drop, repeat modes...
+- **Player**: Playback speed, transposition and playing a channel with computer keyboard ! (click on a channel number in Mixer page)
+- **Playlist**: Files and folders, drag and drop, repeat modes...
 - **Modes**: GM, GM2, GS, XG and MT-32, detected from file or forced, with matching reset and an option to
   drop messages of other modes.
-- **Mixer**: instrument, mute, activity and one controller slider per channel (modulation, volume, pan, reverb,
+- **Mixer**: Mute/Solo, activity and one controller slider per channel (modulation, volume, pan, reverb,
   chorus, delay / variation, filter and envelope settings), with instrument names for each mode.
 - **Effects**: Reverb, chorus, delay, EQ and EFX in GS mode - Reverb, chorus, variation in XG - Reverb
   in MT-32 - Reverb and chorus in GM2.
 - **Saving**: Changed settings (in blue) are written into a copy of MIDI file, for whole track or at a position
   of track (Insert mode).
 - **File loops markers**: `loopStart` / `loopEnd`, `[` / `]` markers and CC111 are followed.
-- **Color themes**: built-in XAML themes; can be edited !
+- **Color themes**: Built-in XAML themes; can be edited !
 
 
 ## Next-Steps
