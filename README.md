@@ -49,10 +49,10 @@ dotnet publish -c Release
 | Folder | Contents |
 | --- | --- |
 | `src/PowerMIDI.Core` | MIDI logic: modes, mixer state, effects, file editing, module definitions |
-| `src/PowerMIDI` | Windows application (WPF, MVVM) |
+| `src/PowerMIDI` | Windows application |
 | `src/PowerMIDI.Console` | Console player |
 | `src/PowerMIDI.Tests` | Tests that need no MIDI port |
-| `instruments` | Module definition files (instrument names, drum kits, effect parameters) |
+| `instruments` | Module definition files |
 | `samples` | MIDI files for trying program |
 
 ## Credits
