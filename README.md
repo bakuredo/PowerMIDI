@@ -20,7 +20,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
   in MT-32 - Reverb and chorus in GM2.
 - **Saving**: Changed settings (in blue) are written into a copy of MIDI file, for whole track or at a position
   of track (Insert mode).
-- **Video game loops**: `loopStart` / `loopEnd` markers, `[` / `]` markers and CC111 are followed.
+- **File loops markers**: `loopStart` / `loopEnd`, `[` / `]` markers and CC111 are followed.
 - **Color themes**: built-in XAML themes; can be edited !
 
 
@@ -48,8 +48,8 @@ dotnet publish -c Release
 
 | Folder | Contents |
 | --- | --- |
-| `src/PowerMIDI.Core` | MIDI logic: modes, mixer state, effects, file editing, module definitions |
 | `src/PowerMIDI` | Windows application |
+| `src/PowerMIDI.Core` | MIDI logic: modes, mixer state, effects, file editing, module definitions |
 | `src/PowerMIDI.Console` | Console player |
 | `src/PowerMIDI.Tests` | Tests that need no MIDI port |
 | `instruments` | Module definition files |
