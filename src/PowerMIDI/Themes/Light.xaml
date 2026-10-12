@@ -1,0 +1,31 @@
+<!-- Light theme. Same keys as Dark.xaml; see Themes.cs. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Surfaces -->
+  <SolidColorBrush x:Key="WindowBrush" Color="#F1F2F5"/>
+  <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF"/>
+  <SolidColorBrush x:Key="LineBrush" Color="#C6CAD2"/>
+  <SolidColorBrush x:Key="ButtonBrush" Color="#E6E9EE"/>
+  <SolidColorBrush x:Key="HeaderBrush" Color="#ECEEF2"/>
+  <SolidColorBrush x:Key="TabHoverBrush" Color="#F3F5F8"/>
+  <SolidColorBrush x:Key="TabSelectedBrush" Color="#FFFFFF"/>
+  <SolidColorBrush x:Key="InactiveBrush" Color="#B4B9C3"/>
+  <!-- Text -->
+  <SolidColorBrush x:Key="TextBrush" Color="#1E1F24"/>
+  <SolidColorBrush x:Key="TextSoftBrush" Color="#4A4E59"/>
+  <SolidColorBrush x:Key="TextMutedBrush" Color="#6A6F7C"/>
+  <!-- Text placed directly on the window (labels of the top bar, status line) -->
+  <SolidColorBrush x:Key="WindowTextBrush" Color="#1E1F24"/>
+  <SolidColorBrush x:Key="WindowTextMutedBrush" Color="#6A6F7C"/>
+  <!-- States: value fixed by hand, activity / solo / loop, mute, insertion markers and keyboard channel, warnings -->
+  <SolidColorBrush x:Key="FixedBrush" Color="#1F5FBF"/>
+  <SolidColorBrush x:Key="GreenBrush" Color="#2E9E3F"/>
+  <SolidColorBrush x:Key="MuteBrush" Color="#D03535"/>
+  <SolidColorBrush x:Key="AccentBrush" Color="#D9980F"/>
+  <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
+  <SolidColorBrush x:Key="WarningBrush" Color="#A8650A"/>
+  <!-- On the light surfaces Windows draws in both themes (lists, hovered or pressed buttons, selected rows) -->
+  <SolidColorBrush x:Key="OnLightTextBrush" Color="#1E1E1E"/>
+  <SolidColorBrush x:Key="OnLightDisabledBrush" Color="#8A8A8A"/>
+  <SolidColorBrush x:Key="OnLightFixedBrush" Color="#1F5FBF"/>
+</ResourceDictionary>

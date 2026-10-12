@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>PowerMIDI</RootNamespace>
+    <AssemblyName>PowerMIDI</AssemblyName>
+    <!-- Shown in the title bar ("PowerMIDI 1.0"). -->
+    <Version>1.0.0</Version>
+    <Product>PowerMIDI</Product>
+    <Authors>Bakuredo</Authors>
+    <Copyright>Copyright (C) 2026 Bakuredo</Copyright>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <Description>MIDI file player and editor for the Roland SC-8850 (GM / GM2 / GS / XG / MT-32).</Description>
+    <!-- Icon of the program (Explorer), built from ..\..\Icon.svg; also the window's (resource). -->
+    <ApplicationIcon>PowerMIDI.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="PowerMIDI.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PowerMIDI.Core\PowerMIDI.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <!-- Module definition files in the Domino format (..\..\instruments), copied next to the program. -->
+  <ItemGroup>
+    <None Include="..\..\instruments\*.xml" Link="instruments\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Color themes: compiled into the program, and copied next to it (themes folder) where they can be edited
+       or completed (see Themes.cs). -->
+  <ItemGroup>
+    <ThemeFile Include="Themes\*.xaml" />
+  </ItemGroup>
+  <Target Name="CopyThemes" AfterTargets="Build">
+    <Copy SourceFiles="@(ThemeFile)" DestinationFolder="$(OutDir)themes" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishThemes" AfterTargets="Publish">
+    <Copy SourceFiles="@(ThemeFile)" DestinationFolder="$(PublishDir)themes" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

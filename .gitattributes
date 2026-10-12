@@ -1,0 +1,6 @@
+# Text files: line endings normalized in the repository
+* text=auto
+
+# Binary files
+*.mid binary
+*.ico binary

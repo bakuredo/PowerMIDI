@@ -1,0 +1,21 @@
+<Project>
+
+  <!-- Publishing (dotnet publish -c Release, from this folder): one exe per program in ..\publish, for
+       64-bit Windows, using the installed .NET Desktop Runtime; no debug symbols. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <PublishDir>$(MSBuildThisFileDirectory)..\publish\</PublishDir>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <!-- DryWetMIDI also ships its macOS native library: not needed on Windows. -->
+  <Target Name="RemoveMacNativeLibraries" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.dylib'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

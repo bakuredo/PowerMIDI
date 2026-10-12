@@ -1,0 +1,27 @@
+# Build output
+bin/
+obj/
+/publish/
+
+# IDE and user files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Personal settings and working files
+PowerMIDI.ini
+/tests-local/
+
+# Music files (not distributed with the source), except the samples
+*.mid
+*.midi
+*.kar
+*.rmi
+!/samples/*.mid
+
+# Former PowerShell version (not maintained, not published)
+/*.ps1
+/PowerMIDI.cmd
+/lib/

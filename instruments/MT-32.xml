@@ -1,0 +1,814 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Based on the XML files of Domino http://takabosoft.com/ -->
+<ModuleData Name="MT-32 / CM-32L" Folder="Roland" Priority="1" FileCreator="PowerMIDI" FileVersion="1.00">
+	<ExclusiveEventDefault Data="F0H 41H 10H 16H 12H F7H" />
+	<RhythmTrackDefault Gate="1" />
+	<InstrumentList>
+		<Map Name="001-016">
+			<PC Name="Acou Piano1" PC="1">
+				<Bank Name="Acou Piano1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Acou Piano2" PC="2">
+				<Bank Name="Acou Piano2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Acou Piano3" PC="3">
+				<Bank Name="Acou Piano3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Piano1" PC="4">
+				<Bank Name="Elec Piano1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Piano2" PC="5">
+				<Bank Name="Elec Piano2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Piano3" PC="6">
+				<Bank Name="Elec Piano3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Piano4" PC="7">
+				<Bank Name="Elec Piano4" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Honkytonk" PC="8">
+				<Bank Name="Honkytonk" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Org 1" PC="9">
+				<Bank Name="Elec Org 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Org 2" PC="10">
+				<Bank Name="Elec Org 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Org 3" PC="11">
+				<Bank Name="Elec Org 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Org 4" PC="12">
+				<Bank Name="Elec Org 4" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Pipe Org 1" PC="13">
+				<Bank Name="Pipe Org 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Pipe Org 2" PC="14">
+				<Bank Name="Pipe Org 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Pipe Org 3" PC="15">
+				<Bank Name="Pipe Org 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Accordion" PC="16">
+				<Bank Name="Accordion" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+		<Map Name="017-032">
+			<PC Name="Harpsi 1" PC="17">
+				<Bank Name="Harpsi 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Harpsi 2" PC="18">
+				<Bank Name="Harpsi 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Harpsi 3" PC="19">
+				<Bank Name="Harpsi 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Clavi 1" PC="20">
+				<Bank Name="Clavi 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Clavi 2" PC="21">
+				<Bank Name="Clavi 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Clavi 3" PC="22">
+				<Bank Name="Clavi 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Celesta 1" PC="23">
+				<Bank Name="Celesta 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Celesta 2" PC="24">
+				<Bank Name="Celesta 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Brass 1" PC="25">
+				<Bank Name="Syn Brass 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Brass 2" PC="26">
+				<Bank Name="Syn Brass 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Brass 3" PC="27">
+				<Bank Name="Syn Brass 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Brass 4" PC="28">
+				<Bank Name="Syn Brass 4" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Bass 1" PC="29">
+				<Bank Name="Syn Bass 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Bass 2" PC="30">
+				<Bank Name="Syn Bass 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Bass 3" PC="31">
+				<Bank Name="Syn Bass 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Bass 4" PC="32">
+				<Bank Name="Syn Bass 4" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+		<Map Name="033-048">
+			<PC Name="Fantasy" PC="33">
+				<Bank Name="Fantasy" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Harmo Pan" PC="34">
+				<Bank Name="Harmo Pan" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Chorale" PC="35">
+				<Bank Name="Chorale" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Glasses" PC="36">
+				<Bank Name="Glasses" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Soundtrack" PC="37">
+				<Bank Name="Soundtrack" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Atmosphere" PC="38">
+				<Bank Name="Atmosphere" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Warm Bell" PC="39">
+				<Bank Name="Warm Bell" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Funny Vox" PC="40">
+				<Bank Name="Funny Vox" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Echo Bell" PC="41">
+				<Bank Name="Echo Bell" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Ice Rain" PC="42">
+				<Bank Name="Ice Rain" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Oboe 2001" PC="43">
+				<Bank Name="Oboe 2001" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Echo Pan" PC="44">
+				<Bank Name="Echo Pan" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Doctor Solo" PC="45">
+				<Bank Name="Doctor Solo" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="School Daze" PC="46">
+				<Bank Name="School Daze" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Bellsinger" PC="47">
+				<Bank Name="Bellsinger" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Square Wave" PC="48">
+				<Bank Name="Square Wave" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+		<Map Name="049-064">
+			<PC Name="Str Sect 1" PC="49">
+				<Bank Name="Str Sect 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Str Sect 2" PC="50">
+				<Bank Name="Str Sect 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Str Sect 3" PC="51">
+				<Bank Name="Str Sect 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Pizzicato" PC="52">
+				<Bank Name="Pizzicato" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Violin 1" PC="53">
+				<Bank Name="Violin 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Violin 2" PC="54">
+				<Bank Name="Violin 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Cello 1" PC="55">
+				<Bank Name="Cello 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Cello 2" PC="56">
+				<Bank Name="Cello 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Contrabass" PC="57">
+				<Bank Name="Contrabass" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Harp 1" PC="58">
+				<Bank Name="Harp 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Harp 2" PC="59">
+				<Bank Name="Harp 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Guitar 1" PC="60">
+				<Bank Name="Guitar 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Guitar 2" PC="61">
+				<Bank Name="Guitar 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Gtr 1" PC="62">
+				<Bank Name="Elec Gtr 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Gtr 2" PC="63">
+				<Bank Name="Elec Gtr 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Sitar" PC="64">
+				<Bank Name="Sitar" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+		<Map Name="065-080">
+			<PC Name="Acou Bass 1" PC="65">
+				<Bank Name="Acou Bass 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Acou Bass 2" PC="66">
+				<Bank Name="Acou Bass 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Bass 1" PC="67">
+				<Bank Name="Elec Bass 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Bass 2" PC="68">
+				<Bank Name="Elec Bass 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Slap Bass 1" PC="69">
+				<Bank Name="Slap Bass 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Slap Bass 2" PC="70">
+				<Bank Name="Slap Bass 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Fretless 1" PC="71">
+				<Bank Name="Fretless 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Fretless 2" PC="72">
+				<Bank Name="Fretless 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Flute 1" PC="73">
+				<Bank Name="Flute 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Flute 2" PC="74">
+				<Bank Name="Flute 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Piccolo 1" PC="75">
+				<Bank Name="Piccolo 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Piccolo 2" PC="76">
+				<Bank Name="Piccolo 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Recorder" PC="77">
+				<Bank Name="Recorder" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Pan Pipes" PC="78">
+				<Bank Name="Pan Pipes" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Sax 1" PC="79">
+				<Bank Name="Sax 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Sax 2" PC="80">
+				<Bank Name="Sax 2" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+		<Map Name="081-096">
+			<PC Name="Sax 3" PC="81">
+				<Bank Name="Sax 3" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Sax 4" PC="82">
+				<Bank Name="Sax 4" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Clarinet 1" PC="83">
+				<Bank Name="Clarinet 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Clarinet 2" PC="84">
+				<Bank Name="Clarinet 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Oboe" PC="85">
+				<Bank Name="Oboe" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Engl Horn" PC="86">
+				<Bank Name="Engl Horn" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Bassoon" PC="87">
+				<Bank Name="Bassoon" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Harmonica" PC="88">
+				<Bank Name="Harmonica" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Trumpet 1" PC="89">
+				<Bank Name="Trumpet 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Trumpet 2" PC="90">
+				<Bank Name="Trumpet 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Trombone 1" PC="91">
+				<Bank Name="Trombone 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Trombone 2" PC="92">
+				<Bank Name="Trombone 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Fr Horn 1" PC="93">
+				<Bank Name="Fr Horn 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Fr Horn 2" PC="94">
+				<Bank Name="Fr Horn 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Tuba" PC="95">
+				<Bank Name="Tuba" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Brs Sect 1" PC="96">
+				<Bank Name="Brs Sect 1" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+		<Map Name="097-112">
+			<PC Name="Brs Sect 2" PC="97">
+				<Bank Name="Brs Sect 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Vibe 1" PC="98">
+				<Bank Name="Vibe 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Vibe 2" PC="99">
+				<Bank Name="Vibe 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Syn Mallet" PC="100">
+				<Bank Name="Syn Mallet" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Windbell" PC="101">
+				<Bank Name="Windbell" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Glock" PC="102">
+				<Bank Name="Glock" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Tube Bell" PC="103">
+				<Bank Name="Tube Bell" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Xylophone" PC="104">
+				<Bank Name="Xylophone" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Marimba" PC="105">
+				<Bank Name="Marimba" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Koto" PC="106">
+				<Bank Name="Koto" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Sho" PC="107">
+				<Bank Name="Sho" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Shakuhachi" PC="108">
+				<Bank Name="Shakuhachi" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Whistle 1" PC="109">
+				<Bank Name="Whistle 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Whistle 2" PC="110">
+				<Bank Name="Whistle 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Bottleblow" PC="111">
+				<Bank Name="Bottleblow" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Breathpipe" PC="112">
+				<Bank Name="Breathpipe" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+		<Map Name="113-128">
+			<PC Name="Timpani" PC="113">
+				<Bank Name="Timpani" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Melodic Tom" PC="114">
+				<Bank Name="Melodic Tom" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Deep Snare" PC="115">
+				<Bank Name="Deep Snare" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Perc 1" PC="116">
+				<Bank Name="Elec Perc 1" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Elec Perc 2" PC="117">
+				<Bank Name="Elec Perc 2" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Taiko" PC="118">
+				<Bank Name="Taiko" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Taiko Rim" PC="119">
+				<Bank Name="Taiko Rim" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Cymbal" PC="120">
+				<Bank Name="Cymbal" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Castanets" PC="121">
+				<Bank Name="Castanets" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Triangle" PC="122">
+				<Bank Name="Triangle" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Orche Hit" PC="123">
+				<Bank Name="Orche Hit" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Telephone" PC="124">
+				<Bank Name="Telephone" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Bird Tweet" PC="125">
+				<Bank Name="Bird Tweet" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="OneNote Jam" PC="126">
+				<Bank Name="OneNote Jam" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Water Bell" PC="127">
+				<Bank Name="Water Bell" MSB="0" LSB="0" />
+			</PC>
+			<PC Name="Jungle Tune" PC="128">
+				<Bank Name="Jungle Tune" MSB="0" LSB="0" />
+			</PC>
+		</Map>
+	</InstrumentList>
+	<DrumSetList>
+		<Map Name="MT-32 Rhythm">
+			<PC Name="Rhythm (MT-32 / CM-32L)" PC="1">
+				<Bank Name="Rhythm (MT-32 / CM-32L)" MSB="0" LSB="0">
+					<Tone Name="Acou BD" Key="35" />
+					<Tone Name="Acou BD" Key="36" />
+					<Tone Name="Rim Shot" Key="37" />
+					<Tone Name="Acou SD" Key="38" />
+					<Tone Name="Hand Clap" Key="39" />
+					<Tone Name="Elec SD" Key="40" />
+					<Tone Name="Acou Low Tom" Key="41" />
+					<Tone Name="Closed HH" Key="42" />
+					<Tone Name="Acou Low Tom" Key="43" />
+					<Tone Name="Open HH 2" Key="44" />
+					<Tone Name="Acou Mid Tom" Key="45" />
+					<Tone Name="Open HH 1" Key="46" />
+					<Tone Name="Acou Mid Tom" Key="47" />
+					<Tone Name="Acou Hi Tom" Key="48" />
+					<Tone Name="Crash Cym" Key="49" />
+					<Tone Name="Acou Hi Tom" Key="50" />
+					<Tone Name="Ride Cym" Key="51" />
+					<Tone Name="Tambourine" Key="54" />
+					<Tone Name="Cowbell" Key="56" />
+					<Tone Name="High Bongo" Key="60" />
+					<Tone Name="Low Bongo" Key="61" />
+					<Tone Name="Mt High Conga" Key="62" />
+					<Tone Name="High Conga" Key="63" />
+					<Tone Name="Low Conga" Key="64" />
+					<Tone Name="High Timbale" Key="65" />
+					<Tone Name="Low Timbale" Key="66" />
+					<Tone Name="High Agogo" Key="67" />
+					<Tone Name="Low Agogo" Key="68" />
+					<Tone Name="Cabasa" Key="69" />
+					<Tone Name="Maracas" Key="70" />
+					<Tone Name="Smba Whis S" Key="71" />
+					<Tone Name="Smba Whis L" Key="72" />
+					<Tone Name="Quijada" Key="73" />
+					<Tone Name="Claves" Key="75" />
+					<Tone Name="Laughing (CM-32L)" Key="76" />
+					<Tone Name="Scream (CM-32L)" Key="77" />
+					<Tone Name="Punch (CM-32L)" Key="78" />
+					<Tone Name="HeartBt. (CM-32L)" Key="79" />
+					<Tone Name="Ft.step1 (CM-32L)" Key="80" />
+					<Tone Name="Ft.step2 (CM-32L)" Key="81" />
+					<Tone Name="Applause (CM-32L)" Key="82" />
+					<Tone Name="Creaking (CM-32L)" Key="83" />
+					<Tone Name="Door (CM-32L)" Key="84" />
+					<Tone Name="Scratch (CM-32L)" Key="85" />
+					<Tone Name="Windchim (CM-32L)" Key="86" />
+					<Tone Name="CarEngin (CM-32L)" Key="87" />
+					<Tone Name="Car-Stop (CM-32L)" Key="88" />
+					<Tone Name="Car-Pass (CM-32L)" Key="89" />
+					<Tone Name="CarCrash (CM-32L)" Key="90" />
+					<Tone Name="Siren (CM-32L)" Key="91" />
+					<Tone Name="Train (CM-32L)" Key="92" />
+					<Tone Name="Jetplane (CM-32L)" Key="93" />
+					<Tone Name="Helcpter (CM-32L)" Key="94" />
+					<Tone Name="Starship (CM-32L)" Key="95" />
+					<Tone Name="Gun Shot (CM-32L)" Key="96" />
+					<Tone Name="MachnGun (CM-32L)" Key="97" />
+					<Tone Name="Lasergun (CM-32L)" Key="98" />
+					<Tone Name="Explsion (CM-32L)" Key="99" />
+					<Tone Name="Dog (CM-32L)" Key="100" />
+					<Tone Name="Gallop (CM-32L)" Key="101" />
+					<Tone Name="Birds (CM-32L)" Key="102" />
+					<Tone Name="Rain (CM-32L)" Key="103" />
+					<Tone Name="Thunder (CM-32L)" Key="104" />
+					<Tone Name="Wind (CM-32L)" Key="105" />
+					<Tone Name="Seashore (CM-32L)" Key="106" />
+					<Tone Name="Stream (CM-32L)" Key="107" />
+					<Tone Name="Bubble (CM-32L)" Key="108" />
+				</Bank>
+			</PC>
+		</Map>
+	</DrumSetList>
+	<ControlChangeMacroList>
+		<Table ID="1">
+			<Entry Label="  0  OFF" Value="0" />
+			<Entry Label="127   ON" Value="127" />
+		</Table>
+		<Table ID="4">
+			<Entry Label="  0  -64" Value="0" />
+			<Entry Label="  1  -63" Value="1" />
+			<Entry Label="  2  -62" Value="2" />
+			<Entry Label="  3  -61" Value="3" />
+			<Entry Label="  4  -60" Value="4" />
+			<Entry Label="  5  -59" Value="5" />
+			<Entry Label="  6  -58" Value="6" />
+			<Entry Label="  7  -57" Value="7" />
+			<Entry Label="  8  -56" Value="8" />
+			<Entry Label="  9  -55" Value="9" />
+			<Entry Label=" 10  -54" Value="10" />
+			<Entry Label=" 11  -53" Value="11" />
+			<Entry Label=" 12  -52" Value="12" />
+			<Entry Label=" 13  -51" Value="13" />
+			<Entry Label=" 14  -50" Value="14" />
+			<Entry Label=" 15  -49" Value="15" />
+			<Entry Label=" 16  -48" Value="16" />
+			<Entry Label=" 17  -47" Value="17" />
+			<Entry Label=" 18  -46" Value="18" />
+			<Entry Label=" 19  -45" Value="19" />
+			<Entry Label=" 20  -44" Value="20" />
+			<Entry Label=" 21  -43" Value="21" />
+			<Entry Label=" 22  -42" Value="22" />
+			<Entry Label=" 23  -41" Value="23" />
+			<Entry Label=" 24  -40" Value="24" />
+			<Entry Label=" 25  -39" Value="25" />
+			<Entry Label=" 26  -38" Value="26" />
+			<Entry Label=" 27  -37" Value="27" />
+			<Entry Label=" 28  -36" Value="28" />
+			<Entry Label=" 29  -35" Value="29" />
+			<Entry Label=" 30  -34" Value="30" />
+			<Entry Label=" 31  -33" Value="31" />
+			<Entry Label=" 32  -32" Value="32" />
+			<Entry Label=" 33  -31" Value="33" />
+			<Entry Label=" 34  -30" Value="34" />
+			<Entry Label=" 35  -29" Value="35" />
+			<Entry Label=" 36  -28" Value="36" />
+			<Entry Label=" 37  -27" Value="37" />
+			<Entry Label=" 38  -26" Value="38" />
+			<Entry Label=" 39  -25" Value="39" />
+			<Entry Label=" 40  -24" Value="40" />
+			<Entry Label=" 41  -23" Value="41" />
+			<Entry Label=" 42  -22" Value="42" />
+			<Entry Label=" 43  -21" Value="43" />
+			<Entry Label=" 44  -20" Value="44" />
+			<Entry Label=" 45  -19" Value="45" />
+			<Entry Label=" 46  -18" Value="46" />
+			<Entry Label=" 47  -17" Value="47" />
+			<Entry Label=" 48  -16" Value="48" />
+			<Entry Label=" 49  -15" Value="49" />
+			<Entry Label=" 50  -14" Value="50" />
+			<Entry Label=" 51  -13" Value="51" />
+			<Entry Label=" 52  -12" Value="52" />
+			<Entry Label=" 53  -11" Value="53" />
+			<Entry Label=" 54  -10" Value="54" />
+			<Entry Label=" 55   -9" Value="55" />
+			<Entry Label=" 56   -8" Value="56" />
+			<Entry Label=" 57   -7" Value="57" />
+			<Entry Label=" 58   -6" Value="58" />
+			<Entry Label=" 59   -5" Value="59" />
+			<Entry Label=" 60   -4" Value="60" />
+			<Entry Label=" 61   -3" Value="61" />
+			<Entry Label=" 62   -2" Value="62" />
+			<Entry Label=" 63   -1" Value="63" />
+			<Entry Label=" 64    0" Value="64" />
+			<Entry Label=" 65   +1" Value="65" />
+			<Entry Label=" 66   +2" Value="66" />
+			<Entry Label=" 67   +3" Value="67" />
+			<Entry Label=" 68   +4" Value="68" />
+			<Entry Label=" 69   +5" Value="69" />
+			<Entry Label=" 70   +6" Value="70" />
+			<Entry Label=" 71   +7" Value="71" />
+			<Entry Label=" 72   +8" Value="72" />
+			<Entry Label=" 73   +9" Value="73" />
+			<Entry Label=" 74  +10" Value="74" />
+			<Entry Label=" 75  +11" Value="75" />
+			<Entry Label=" 76  +12" Value="76" />
+			<Entry Label=" 77  +13" Value="77" />
+			<Entry Label=" 78  +14" Value="78" />
+			<Entry Label=" 79  +15" Value="79" />
+			<Entry Label=" 80  +16" Value="80" />
+			<Entry Label=" 81  +17" Value="81" />
+			<Entry Label=" 82  +18" Value="82" />
+			<Entry Label=" 83  +19" Value="83" />
+			<Entry Label=" 84  +20" Value="84" />
+			<Entry Label=" 85  +21" Value="85" />
+			<Entry Label=" 86  +22" Value="86" />
+			<Entry Label=" 87  +23" Value="87" />
+			<Entry Label=" 88  +24" Value="88" />
+			<Entry Label=" 89  +25" Value="89" />
+			<Entry Label=" 90  +26" Value="90" />
+			<Entry Label=" 91  +27" Value="91" />
+			<Entry Label=" 92  +28" Value="92" />
+			<Entry Label=" 93  +29" Value="93" />
+			<Entry Label=" 94  +30" Value="94" />
+			<Entry Label=" 95  +31" Value="95" />
+			<Entry Label=" 96  +32" Value="96" />
+			<Entry Label=" 97  +33" Value="97" />
+			<Entry Label=" 98  +34" Value="98" />
+			<Entry Label=" 99  +35" Value="99" />
+			<Entry Label="100  +36" Value="100" />
+			<Entry Label="101  +37" Value="101" />
+			<Entry Label="102  +38" Value="102" />
+			<Entry Label="103  +39" Value="103" />
+			<Entry Label="104  +40" Value="104" />
+			<Entry Label="105  +41" Value="105" />
+			<Entry Label="106  +42" Value="106" />
+			<Entry Label="107  +43" Value="107" />
+			<Entry Label="108  +44" Value="108" />
+			<Entry Label="109  +45" Value="109" />
+			<Entry Label="110  +46" Value="110" />
+			<Entry Label="111  +47" Value="111" />
+			<Entry Label="112  +48" Value="112" />
+			<Entry Label="113  +49" Value="113" />
+			<Entry Label="114  +50" Value="114" />
+			<Entry Label="115  +51" Value="115" />
+			<Entry Label="116  +52" Value="116" />
+			<Entry Label="117  +53" Value="117" />
+			<Entry Label="118  +54" Value="118" />
+			<Entry Label="119  +55" Value="119" />
+			<Entry Label="120  +56" Value="120" />
+			<Entry Label="121  +57" Value="121" />
+			<Entry Label="122  +58" Value="122" />
+			<Entry Label="123  +59" Value="123" />
+			<Entry Label="124  +60" Value="124" />
+			<Entry Label="125  +61" Value="125" />
+			<Entry Label="126  +62" Value="126" />
+			<Entry Label="127  +63" Value="127" />
+		</Table>
+		<Table ID="10">
+			<Entry Label="0 Room" Value="0" />
+			<Entry Label="1 Hall" Value="1" />
+			<Entry Label="2 Plate" Value="2" />
+			<Entry Label="3 Tap Delay" Value="3" />
+		</Table>
+		<Folder Name="[000-127] CC">
+			<CCM ID="1" Name="001 Modulation" Color="#0000CC" Sync="Last">
+				<Value />
+				<Data>@CC 1 #VL</Data>
+				<Memo>Vibrato depth.</Memo>
+			</CCM>
+			<CCM ID="7" Name="007 Volume" Color="#000099" Sync="Last">
+				<Value Default="100" />
+				<Data>@CC 7 #VL</Data>
+				<Memo>Part volume.</Memo>
+			</CCM>
+			<CCM ID="10" Name="010 Panpot" Color="#CC0099" Sync="Last">
+				<Value Default="64" TableID="4" />
+				<Data>@CC 10 #VL</Data>
+				<Memo>Stereo position, 64 = center. On an original MT-32 the direction is reversed compared with GM / GS.</Memo>
+			</CCM>
+			<CCM ID="11" Name="011 Expression" Color="#660099" Sync="Last">
+				<Value Default="127" />
+				<Data>@CC 11 #VL</Data>
+				<Memo>Volume relative to CC7 Volume.</Memo>
+			</CCM>
+			<CCM ID="64" Name="064 Hold Pedal" Color="#333333">
+				<Value TableID="1" />
+				<Data>@CC 64 #VL</Data>
+				<Memo>Sustain while ON (64-127).</Memo>
+			</CCM>
+			<CCM ID="121" Name="121 Reset All Controllers" Color="#333333">
+				<Value>
+					<Entry Label="  0   ON" Value="0" />
+				</Value>
+				<Data>@CC 121 #VL</Data>
+				<Memo>Resets modulation, expression, hold pedal and pitch bend.</Memo>
+			</CCM>
+			<CCM ID="123" Name="123 All Notes Off" Color="#333333">
+				<Value>
+					<Entry Label="  0   ON" Value="0" />
+				</Value>
+				<Data>@CC 123 #VL</Data>
+				<Memo>Releases all notes.</Memo>
+			</CCM>
+		</Folder>
+		<Folder Name="[128-] Other messages">
+			<CCM ID="130" Name="130 Pitch Bend" Color="#800000" Sync="Last">
+				<Value Min="-8192" Max="8191" Offset="8192" />
+				<Data>@PB #VH #VL</Data>
+				<Memo>Pitch change; the range is set by the patch (12 semitones by default).</Memo>
+			</CCM>
+			<CCM ID="140" Name="140 MT-32 Reset" Color="#000000">
+				<Data>@SYSEX F0H 41H 10H 16H 12H 7FH 00H 00H 00H 01H F7H</Data>
+				<Memo>All parameters reset: the module goes back to its power-on state. Leave time before the next message.</Memo>
+			</CCM>
+			<CCM ID="141" Name="141 Master Volume" Color="#CC00FF" Sync="Last">
+				<Value Default="100" Max="100" />
+				<Data>@SYSEX F0H 41H 10H 16H 12H [ 10H 00H 16H #VL ] F7H</Data>
+				<Memo>System area 10 00 16: master volume, 0-100.</Memo>
+			</CCM>
+			<CCM ID="142" Name="142 Reverb Mode" Color="#006666">
+				<Value Default="0" TableID="10" />
+				<Data>@SYSEX F0H 41H 10H 16H 12H [ 10H 00H 01H #VL ] F7H</Data>
+				<Memo>System area 10 00 01: Room, Hall, Plate or Tap Delay (the only effect of the MT-32).</Memo>
+			</CCM>
+			<CCM ID="143" Name="143 Reverb Time" Color="#006666">
+				<Value Default="5" Max="7" />
+				<Data>@SYSEX F0H 41H 10H 16H 12H [ 10H 00H 02H #VL ] F7H</Data>
+				<Memo>System area 10 00 02: 0-7.</Memo>
+			</CCM>
+			<CCM ID="144" Name="144 Reverb Level" Color="#006666">
+				<Value Default="3" Max="7" />
+				<Data>@SYSEX F0H 41H 10H 16H 12H [ 10H 00H 03H #VL ] F7H</Data>
+				<Memo>System area 10 00 03: 0-7.</Memo>
+			</CCM>
+			<CCM ID="255" Name="255 Rest" Color="#6600CC">
+				<Data></Data>
+				<Memo>Rest: removed when exporting a standard MIDI file. Use it to space events.</Memo>
+			</CCM>
+		</Folder>
+	</ControlChangeMacroList>
+	<TemplateList>
+		<Folder Name="Track init">
+			<Template ID="0" Name="Controllers">
+				<CC ID="10" />
+				<CC ID="7" Value="100" />
+				<CC ID="11" Value="127" />
+				<CC ID="1" />
+				<CC ID="64" />
+				<Memo></Memo>
+			</Template>
+		</Folder>
+	</TemplateList>
+	<DefaultData>
+		<Track Mode="Conductor">
+			<Tempo Tick="0" Tempo="120.0" Step="0" />
+			<Mark Name="Setup" />
+			<TimeSignature TimeSignature="4/4" />
+			<Tempo Tick="1920" Tempo="120.0" />
+			<Mark Name="Start" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="System Setup" Ch="2">
+			<Comment Text="---- MT-32 Reset --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="140" Step="240" />
+			<Comment Text="---- Reverb --------------------------------------------------" Step="0" />
+			<CC ID="142" Step="4" />
+			<CC ID="143" Step="4" />
+			<CC ID="144" Step="4" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="2" Current="1">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="3">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="4">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="5">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="6">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="7">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="8">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="9">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+		<Track Name="" CH="10" Mode="Rhythm">
+			<Comment Text="---- CH Setup --------------------------------------------------" Tick="0" Step="0" />
+			<CC ID="255" Step="252" />
+			<CC ID="121" Step="1" />
+			<PC MSB="0" LSB="0" PC="1" Mode="Auto" Step="3" />
+			<Template ID="0" Step="1" />
+			<CC ID="255" Tick="1920" />
+			<EOT Tick="1920" />
+		</Track>
+	</DefaultData>
+</ModuleData>
