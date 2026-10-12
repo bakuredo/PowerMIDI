@@ -7,14 +7,14 @@ using PowerMIDI.Core;
 namespace PowerMIDI.ViewModels;
 
 // Effects tab: GS Reverb / Chorus / Delay / EQ / EFX, XG Reverb / Chorus / Variation.
-// Index = the one in ChannelMixer.EffectAddresses. Blocks 0-2: GS (SysEx 40 01 xx); blocks 3-5: XG (02 01 xx);
+// Index = the one in GsXgEffects.Addresses. Blocks 0-2: GS (SysEx 40 01 xx); blocks 3-5: XG (02 01 xx);
 // block 6: GS EFX of the SC-88Pro / SC-8850 (40 03 xx, and 40 4x 22 for the EFX on each channel);
 // block 7: GS EQ of the SC-88 and later (40 02 xx, and 40 4x 20 for the EQ on each channel).
-// The values live in ChannelMixer (shared with the playback thread); this view model shows them and fixes
+// The values live in GsXgEffects, Mt32Effects and Gm2Effects (shared with the playback thread); this view model shows them and fixes
 // the ones the user changes.
 public sealed class EffectsViewModel : ObservableObject
 {
-    public static int EffectCount => ChannelMixer.EffectAddresses.Length;
+    public static int EffectCount => GsXgEffects.Addresses.Length;
     const int EfxTypeParam = 42;      // 42: EFX type; 43-65: its parameters and sends
     const int EfxChannelFirst = 66;   // 66-81: EFX on channels 1 to 16
     const int VarTypeParam = 35;      // 35: XG Variation type
@@ -166,10 +166,10 @@ public sealed class EffectsViewModel : ObservableObject
         // by index (type first). Parameters added at the end of the list thus land in their block.
         var blockOrder = new[] { 0, 1, 2, 7, 6, 3, 4, 5 };
         var blocks = new Dictionary<int, EffectBlockViewModel>();
-        foreach (int fx in Enumerable.Range(0, EffectCount).OrderBy(fx => Array.IndexOf(blockOrder, ChannelMixer.EffectBlock[fx])).ThenBy(fx => fx))
+        foreach (int fx in Enumerable.Range(0, EffectCount).OrderBy(fx => Array.IndexOf(blockOrder, GsXgEffects.Block[fx])).ThenBy(fx => fx))
         {
-            int b = ChannelMixer.EffectBlock[fx];
-            var group = ChannelMixer.IsXgEffect(fx) ? xgBlocks : gsBlocks;
+            int b = GsXgEffects.Block[fx];
+            var group = GsXgEffects.IsXg(fx) ? xgBlocks : gsBlocks;
             if (!blocks.TryGetValue(b, out var block))
             {
                 block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : "Channels" };
@@ -184,7 +184,7 @@ public sealed class EffectsViewModel : ObservableObject
                 continue;
             }
             EffectParamViewModel p = choices.TryGetValue(fx, out var list) ? new EffectListViewModel(this, fx, list)
-                                   : new EffectSliderViewModel(this, fx) { Minimum = ChannelMixer.EffectMin[fx], Maximum = ChannelMixer.EffectMax[fx] };
+                                   : new EffectSliderViewModel(this, fx) { Minimum = GsXgEffects.Min[fx], Maximum = GsXgEffects.Max[fx] };
             p.Label = Labels[fx];
             block.Params.Add(p);
             parameters[fx] = p;
@@ -275,7 +275,7 @@ public sealed class EffectsViewModel : ObservableObject
     {
         if (fx >= Gm2Base) Gm2Effects.Set(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base, value);
         else if (fx >= Mt32Base) Mt32Effects.Set(ChannelMixer.Mt32Mode ? output() : null, fx - Mt32Base, value);
-        else ChannelMixer.SetEffect(output(), fx, value);
+        else GsXgEffects.Set(output(), fx, value);
         Refresh();
     }
 
@@ -283,7 +283,7 @@ public sealed class EffectsViewModel : ObservableObject
     {
         if (fx >= Gm2Base) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base);
         else if (fx >= Mt32Base) Mt32Effects.Clear(ChannelMixer.Mt32Mode ? output() : null, fx - Mt32Base);
-        else ChannelMixer.ClearEffect(output(), fx);
+        else GsXgEffects.Clear(output(), fx);
         Refresh();
     }
 
@@ -293,7 +293,7 @@ public sealed class EffectsViewModel : ObservableObject
         var device = output();
         foreach (bool macroFirst in new[] { true, false })
             for (int fx = 0; fx < EffectCount; fx++)
-                if (ChannelMixer.IsEffectFixed(fx) && ChannelMixer.IsMacro(fx) == macroFirst) ChannelMixer.ClearEffect(device, fx);
+                if (GsXgEffects.IsFixed(fx) && GsXgEffects.IsType(fx) == macroFirst) GsXgEffects.Clear(device, fx);
         for (int p = 0; p < Mt32Effects.Count; p++)
             if (Mt32Effects.IsFixed(p)) Mt32Effects.Clear(ChannelMixer.Mt32Mode ? device : null, p);
         foreach (bool typeFirst in new[] { true, false })
@@ -308,7 +308,7 @@ public sealed class EffectsViewModel : ObservableObject
     {
         bool had = false;
         for (int fx = 0; fx < EffectCount; fx++)
-            if (ChannelMixer.IsEffectFixed(fx)) { ChannelMixer.ClearEffect(null, fx); had = true; }
+            if (GsXgEffects.IsFixed(fx)) { GsXgEffects.Clear(null, fx); had = true; }
         for (int p = 0; p < Mt32Effects.Count; p++)
             if (Mt32Effects.IsFixed(p)) { Mt32Effects.Clear(null, p); had = true; }
         for (int p = 0; p < Gm2Effects.Count; p++)
@@ -323,10 +323,10 @@ public sealed class EffectsViewModel : ObservableObject
     // GS effects without definitions). TypeDef null: type unknown to the Domino definitions.
     (EffectTypeDef TypeDef, EffectParamDef Def)? GetTypedParam(int fx)
     {
-        if (ChannelMixer.IsMacro(fx) || !ChannelMixer.EffectTypeDependent[fx]) return null;
+        if (GsXgEffects.IsType(fx) || !GsXgEffects.TypeDependent[fx]) return null;
         Dictionary<int, EffectTypeDef> types;
         int typeParam;
-        switch (ChannelMixer.EffectBlock[fx])
+        switch (GsXgEffects.Block[fx])
         {
             case 3: types = defs.XgReverbTypes; typeParam = 24; break;
             case 4: types = defs.XgChorusTypes; typeParam = 28; break;
@@ -334,9 +334,9 @@ public sealed class EffectsViewModel : ObservableObject
             case 6: types = defs.EfxTypes; typeParam = EfxTypeParam; break;
             default: return null;
         }
-        int code = ChannelMixer.EffectValue(typeParam);
+        int code = GsXgEffects.Value(typeParam);
         var typeDef = code >= 0 && types.TryGetValue(code, out var t) ? t : null;
-        var def = typeDef != null && typeDef.Params.TryGetValue(ChannelMixer.EffectAddresses[fx], out var d) ? d : null;
+        var def = typeDef != null && typeDef.Params.TryGetValue(GsXgEffects.Addresses[fx], out var d) ? d : null;
         return (typeDef, def);
     }
 
@@ -421,7 +421,7 @@ public sealed class EffectsViewModel : ObservableObject
             return $"{(fx >= EqChannelFirst ? "EQ" : "EFX")} channel {ButtonChannel(fx) + 1}: {(value == 1 ? "on" : "off")}";
         var name = GetTypedParam(fx) is (_, { } def) ? def.Name : Labels[fx];
         var text = GetTypedParam(fx) is (_, { } d) ? FormatEfxParam(d, value) : FormatEffectValue(fx, value);
-        return $"{BlockNames[ChannelMixer.EffectBlock[fx]]} {name}: {text}";
+        return $"{BlockNames[GsXgEffects.Block[fx]]} {name}: {text}";
     }
 
     public string DescribeMt32(int p, int value)
@@ -514,7 +514,7 @@ public sealed class EffectsViewModel : ObservableObject
         }
     }
 
-    // Updates every parameter from ChannelMixer: fixed value (blue), from the file, or "auto" (gray).
+    // Updates every parameter from GsXgEffects: fixed value (blue), from the file, or "auto" (gray).
     // A parameter is only updated if something changed (the EFX / XG types change the name and range of theirs).
     public void Refresh()
     {
@@ -523,13 +523,13 @@ public sealed class EffectsViewModel : ObservableObject
         for (int fx = 0; fx < EffectCount; fx++)
         {
             var p = parameters[fx];
-            int v = ChannelMixer.EffectValue(fx);
-            bool isFixed = ChannelMixer.IsEffectFixed(fx);
-            var key = $"{v}/{isFixed}/{ChannelMixer.EffectValue(EfxTypeParam)}/{ChannelMixer.EffectValue(VarTypeParam)}/" +
-                      $"{ChannelMixer.EffectValue(24)}/{ChannelMixer.EffectValue(28)}";
+            int v = GsXgEffects.Value(fx);
+            bool isFixed = GsXgEffects.IsFixed(fx);
+            var key = $"{v}/{isFixed}/{GsXgEffects.Value(EfxTypeParam)}/{GsXgEffects.Value(VarTypeParam)}/" +
+                      $"{GsXgEffects.Value(24)}/{GsXgEffects.Value(28)}";
             if (key == p.Key) continue;
             p.Key = key;
-            int fileValue = ChannelMixer.EffectFileValue(fx);
+            int fileValue = GsXgEffects.FileValue(fx);
 
             p.Updating = true;
             try
@@ -552,8 +552,8 @@ public sealed class EffectsViewModel : ObservableObject
                     def = paramDef;
                     typed.IsVisible = typeDef == null || def != null;
                     typed.Label = def != null ? def.Name : Labels[fx];
-                    typed.Minimum = def?.Min ?? ChannelMixer.EffectMin[fx];
-                    typed.Maximum = def?.Max ?? ChannelMixer.EffectMax[fx];
+                    typed.Minimum = def?.Min ?? GsXgEffects.Min[fx];
+                    typed.Maximum = def?.Max ?? GsXgEffects.Max[fx];
                     if (v < 0 && def != null) v = def.Default;   // value set by the type: we know it
                 }
 

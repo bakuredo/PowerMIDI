@@ -8,8 +8,8 @@ public enum ValueState { File, Fixed, Auto }
 
 public sealed record EffectChoice(string Text, int Value);
 
-// One effect parameter (index e in ChannelMixer.EffectAddresses). Setters called by the view fix the value;
-// EffectsViewModel.Refresh updates the properties from ChannelMixer without calling it back (see Updating).
+// One effect parameter (index e in GsXgEffects.Addresses). Setters called by the view fix the value;
+// EffectsViewModel.Refresh updates the properties from GsXgEffects without calling it back (see Updating).
 public abstract class EffectParamViewModel : ObservableObject
 {
     protected readonly EffectsViewModel effects;

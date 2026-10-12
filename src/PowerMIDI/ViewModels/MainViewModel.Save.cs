@@ -30,7 +30,7 @@ public sealed partial class MainViewModel
         var source = settingsFile ?? current?.Path;
         if (source == null) { Status = "No current track to save."; return false; }
         int controllers = MixerViewModel.ControllerCount, effectCount = EffectsViewModel.EffectCount;
-        bool hasEffects = Enumerable.Range(0, effectCount).Any(ChannelMixer.IsEffectFixed);
+        bool hasEffects = Enumerable.Range(0, effectCount).Any(GsXgEffects.IsFixed);
         var channels = Enumerable.Range(0, 16)
             .Where(c => ChannelMixer.Override[c] || ChannelMixer.RhythmOverride[c] >= 0 ||
                         Enumerable.Range(0, controllers).Any(k => ChannelMixer.IsFixed(k, c))).ToList();
@@ -80,7 +80,7 @@ public sealed partial class MainViewModel
         // Effects fixed in the Effects tab.
         var applyFx = new bool[effectCount];
         var fxValues = new int[effectCount];
-        for (int fx = 0; fx < effectCount; fx++) { applyFx[fx] = ChannelMixer.IsEffectFixed(fx); fxValues[fx] = ChannelMixer.EffectFixedValue(fx); }
+        for (int fx = 0; fx < effectCount; fx++) { applyFx[fx] = GsXgEffects.IsFixed(fx); fxValues[fx] = GsXgEffects.FixedValue(fx); }
         if (hasEffects) report.Add(MidiFileEditor.ApplyEffects(midi, applyFx, fxValues));
         if (mt32) report.Add(MidiFileEditor.WriteMt32Reverb(midi));
         if (gm2) report.Add(MidiFileEditor.WriteGm2Effects(midi));
@@ -127,7 +127,7 @@ public sealed partial class MainViewModel
                 if (ChannelMixer.IsFixed(k, c)) parts.Add($"c{k}/{c}={ChannelMixer.FixedValue(k, c)}");
         }
         for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
-            if (ChannelMixer.IsEffectFixed(fx)) parts.Add($"e{fx}={ChannelMixer.EffectFixedValue(fx)}");
+            if (GsXgEffects.IsFixed(fx)) parts.Add($"e{fx}={GsXgEffects.FixedValue(fx)}");
         for (int p = 0; p < Mt32Effects.Count; p++)
             if (Mt32Effects.IsFixed(p)) parts.Add($"m{p}={Mt32Effects.FixedValue(p)}");
         for (int p = 0; p < Gm2Effects.Count; p++)

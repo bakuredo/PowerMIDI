@@ -263,7 +263,7 @@ public static class MidiFileEditor
                              shift > 0 ? ", track shifted by one quarter note to make room for reset" : "");
     }
 
-    // Fixed GS / XG effects (index = ChannelMixer.EffectAddresses): file's SysEx that write these
+    // Fixed GS / XG effects (index = GsXgEffects.Addresses): file's SysEx that write these
     // parameters are removed (or corrected if they also write other parameters), then each fixed
     // value is inserted once after reset, each block's type before its parameters.
     public static string ApplyEffects(MidiFile file, bool[] apply, int[] values)
@@ -299,7 +299,7 @@ public static class MidiFileEditor
                 var d = sysEx != null ? sysEx.Data : null;
                 var macroBlocks = new List<int>();
                 bool gs = false; int count = 0;
-                var bytes = d != null ? ChannelMixer.EffectBytes(d, out gs, out count) : null;
+                var bytes = d != null ? GsXgEffects.ValueBytes(d, out gs, out count) : null;
                 if (bytes != null)
                 {
                     int fixedCount = 0;
@@ -307,13 +307,13 @@ public static class MidiFileEditor
                     foreach (var b in bytes)
                     {
                         int e = b[1];
-                        if (apply[e]) { data[b[0]] = ChannelMixer.EffectByte(e, b[2], values[e]); fixedCount++; }
-                        if (ChannelMixer.IsMacro(e) && !macroBlocks.Contains(ChannelMixer.EffectBlock[e])) macroBlocks.Add(ChannelMixer.EffectBlock[e]);
+                        if (apply[e]) { data[b[0]] = GsXgEffects.ValueByte(e, b[2], values[e]); fixedCount++; }
+                        if (GsXgEffects.IsType(e) && !macroBlocks.Contains(GsXgEffects.Block[e])) macroBlocks.Add(GsXgEffects.Block[e]);
                     }
                     if (fixedCount == count) { removed++; continue; }   // only writes fixed parameters
                     if (fixedCount > 0)
                     {
-                        if (gs) ChannelMixer.FixGsChecksum(data);
+                        if (gs) MidiTools.FixRolandChecksum(data);
                         t = new TimedEvent(new NormalSysExEvent(data), t.Time);
                         corrected++;
                     }
@@ -323,9 +323,9 @@ public static class MidiFileEditor
                 // so fixed ones are reinserted right after it.
                 foreach (int block in macroBlocks)
                     for (int e = 0; e < apply.Length; e++)
-                        if (apply[e] && ChannelMixer.EffectBlock[e] == block && !ChannelMixer.IsMacro(e))
+                        if (apply[e] && GsXgEffects.Block[e] == block && !GsXgEffects.IsType(e))
                         {
-                            items.Add(new Item { Event = new TimedEvent(ChannelMixer.EffectEvent(e, values[e]), t.Time),
+                            items.Add(new Item { Event = new TimedEvent(GsXgEffects.ParamEvent(e, values[e]), t.Time),
                                                  Priority = 2, Index = items.Count });
                             reinserted++;
                         }
@@ -334,11 +334,11 @@ public static class MidiFileEditor
             if (k == resetChunk)
             {
                 long time = resetTime < 0 ? 0 : resetTime + tpqn / 8;
-                for (int block = 0; block < ChannelMixer.EffectBlocks; block++)
+                for (int block = 0; block < GsXgEffects.Blocks; block++)
                     for (int pass = 0; pass < 2; pass++)          // type first, then parameters
                         for (int e = 0; e < apply.Length; e++)
-                            if (apply[e] && ChannelMixer.EffectBlock[e] == block && ChannelMixer.IsMacro(e) == (pass == 0))
-                                items.Add(new Item { Event = new TimedEvent(ChannelMixer.EffectEvent(e, values[e]), time),
+                            if (apply[e] && GsXgEffects.Block[e] == block && GsXgEffects.IsType(e) == (pass == 0))
+                                items.Add(new Item { Event = new TimedEvent(GsXgEffects.ParamEvent(e, values[e]), time),
                                                      Priority = 1, Index = items.Count });
             }
 

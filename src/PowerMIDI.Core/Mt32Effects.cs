@@ -81,7 +81,7 @@ public static class Mt32Effects
         d.Add(0);
         d.Add(0xF7);
         var bytes = d.ToArray();
-        ChannelMixer.FixGsChecksum(bytes);   // same checksum (address + data) as GS
+        MidiTools.FixRolandChecksum(bytes);   // same checksum (address + data) as GS
         return new NormalSysExEvent(bytes);
     }
 
@@ -139,7 +139,7 @@ public static class Mt32Effects
             data ??= (byte[])d.Clone();
             data[position] = (byte)fixedValue[param];
         }
-        if (data != null) ChannelMixer.FixGsChecksum(data);
+        if (data != null) MidiTools.FixRolandChecksum(data);
         return data;
     }
 

@@ -50,6 +50,14 @@ public static class MidiTools
     public static ProgramChangeEvent Pc(int channel, int program) =>
         new((SevenBitNumber)(byte)program) { Channel = (FourBitNumber)(byte)channel };
 
+    // Recomputes the Roland checksum of a DT1 SysEx (GS, MT-32): address and data bytes.
+    public static void FixRolandChecksum(byte[] data)
+    {
+        int sum = 0;
+        for (int i = 4; i < data.Length - 2; i++) sum += data[i];
+        data[data.Length - 2] = (byte)((128 - sum % 128) % 128);
+    }
+
     public static void SendPanic(IOutputDevice device)
     {
         for (int ch = 0; ch < 16; ch++)

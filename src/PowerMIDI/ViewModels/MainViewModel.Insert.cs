@@ -301,10 +301,10 @@ public sealed partial class MainViewModel
         foreach (bool macros in new[] { true, false })
             for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
             {
-                if (ChannelMixer.IsMacro(fx) != macros || !ChannelMixer.IsEffectFixed(fx)) continue;
-                int v = ChannelMixer.EffectFixedValue(fx);
+                if (GsXgEffects.IsType(fx) != macros || !GsXgEffects.IsFixed(fx)) continue;
+                int v = GsXgEffects.FixedValue(fx);
                 if (s.FxFixed[fx] && s.FxValue[fx] == v) continue;
-                events.Add((-1, ChannelMixer.EffectEvent(fx, v)));
+                events.Add((-1, GsXgEffects.ParamEvent(fx, v)));
                 texts.Add(Effects.DescribeEffect(fx, v));
             }
         for (int p = 0; p < Mt32Effects.Count; p++)
@@ -356,7 +356,7 @@ public sealed partial class MainViewModel
                     (s.CcFixed[k, c], s.CcValue[k, c]) = (ChannelMixer.IsFixed(k, c), ChannelMixer.FixedValue(k, c));
             }
             for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
-                (s.FxFixed[fx], s.FxValue[fx]) = (ChannelMixer.IsEffectFixed(fx), ChannelMixer.EffectFixedValue(fx));
+                (s.FxFixed[fx], s.FxValue[fx]) = (GsXgEffects.IsFixed(fx), GsXgEffects.FixedValue(fx));
             for (int p = 0; p < Mt32Effects.Count; p++) (s.Mt32Fixed[p], s.Mt32Value[p]) = (Mt32Effects.IsFixed(p), Mt32Effects.FixedValue(p));
             for (int p = 0; p < Gm2Effects.Count; p++) (s.Gm2Fixed[p], s.Gm2Value[p]) = (Gm2Effects.IsFixed(p), Gm2Effects.FixedValue(p));
             return s;
@@ -388,10 +388,10 @@ public sealed partial class MainViewModel
             foreach (bool macros in new[] { true, false })
                 for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
                 {
-                    if (ChannelMixer.IsMacro(fx) != macros) continue;
-                    if (ChannelMixer.IsEffectFixed(fx) == FxFixed[fx] && (!FxFixed[fx] || ChannelMixer.EffectFixedValue(fx) == FxValue[fx])) continue;
-                    if (FxFixed[fx]) ChannelMixer.SetEffect(device, fx, FxValue[fx]);
-                    else ChannelMixer.ClearEffect(device, fx);
+                    if (GsXgEffects.IsType(fx) != macros) continue;
+                    if (GsXgEffects.IsFixed(fx) == FxFixed[fx] && (!FxFixed[fx] || GsXgEffects.FixedValue(fx) == FxValue[fx])) continue;
+                    if (FxFixed[fx]) GsXgEffects.Set(device, fx, FxValue[fx]);
+                    else GsXgEffects.Clear(device, fx);
                 }
             for (int p = 0; p < Mt32Effects.Count; p++)
             {
