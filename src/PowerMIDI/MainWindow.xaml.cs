@@ -20,9 +20,9 @@ public partial class MainWindow : Window, IMainView
     public MainWindow(string[] paths)
     {
         InitializeComponent();
-        // Title with the version of the program (<Version> in PowerMIDI.csproj): "PowerMIDI 1.0".
+        // Title with the version of the program (<Version> in PowerMIDI.csproj): "PowerMIDI 1.0.1", or "PowerMIDI 1.1" for 1.1.0.
         var version = typeof(MainWindow).Assembly.GetName().Version;
-        Title = $"PowerMIDI {version.Major}.{version.Minor}";
+        Title = $"PowerMIDI {version.Major}.{version.Minor}" + (version.Build > 0 ? $".{version.Build}" : "");
         AboutTitle.Text = Title;
         // Position bar: a click on the track is handled by the slider itself (IsMoveToPointEnabled), so handlers set
         // in XAML would miss it; without IsSeeking, the timer would put the bar back before the button is released.
