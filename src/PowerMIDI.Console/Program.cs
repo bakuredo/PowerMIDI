@@ -1,4 +1,4 @@
-// PowerMIDI (console) — MIDI file player for the Roland SC-8850 (GM / GM2 / GS / XG / MT-32), based on DryWetMIDI.
+// PowerMIDI (console) — MIDI file player for sound modules (GM / GM2 / GS / XG / MT-32), based on DryWetMIDI.
 // - Detects each file's standard (XG, GS, MT-32, GM2, GM) from its SysEx.
 // - Sends the matching reset before each track, and a "panic" between tracks.
 // - Plays a file or a whole folder (playlist).

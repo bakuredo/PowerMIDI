@@ -8,7 +8,8 @@ namespace PowerMIDI.ViewModels;
 // Loop of video game tracks (markers loopStart / loopEnd or [ / ], or CC111; see MidiTools.GetLoop):
 // - repeat track: the loop plays forever (the intro once);
 // - otherwise: the loop plays one more time, then the track goes on to its end (next track or stop).
-// The playback library loops without gap: PlaybackEnd = loop end, Loop = true, and PlaybackStart = loop start, set
+// The playback library loops without gap: PlaybackEnd = loop end + 1 tick (see ApplyLoopMode), Loop = true, and
+// PlaybackStart = loop start, set
 // once the intro has played (set before, the playback would start there and skip the intro).
 public sealed partial class MainViewModel
 {

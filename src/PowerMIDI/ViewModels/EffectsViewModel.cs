@@ -126,7 +126,7 @@ public sealed class EffectsViewModel : ObservableObject
     readonly EffectParamViewModel[] parameters = new EffectParamViewModel[EffectCount];
     readonly List<EffectBlockViewModel> gsBlocks = new(), xgBlocks = new(), mt32Blocks = new();
 
-    // MT-32 page: parameter p of Mt32Effects has the index Mt32Base + p (the GS / XG ones are 0..125).
+    // MT-32 page: parameter p of Mt32Effects has the index Mt32Base + p (the GS / XG ones are 0..145).
     const int Mt32Base = 1000;
     readonly EffectParamViewModel[] mt32Params = new EffectParamViewModel[Mt32Effects.Count];
 

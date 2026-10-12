@@ -671,7 +671,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     void TogglePlayPause()
     {
-        // Insert mode: releasing Insert inserts the settings and resumes; Play does nothing meanwhile.
+        // Insert mode: releasing Insert inserts the settings (playback stays paused); Play does nothing meanwhile.
         if (insertMode) { Status = "Insert mode: release Insert to insert the settings (Stop: cancel)."; return; }
         switch (state)
         {

@@ -114,10 +114,10 @@
   <TextBlock DockPanel.Dock="Bottom" Margin="2,8,0,0" Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12"
              Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
 
-  <!-- Right panel: Mixer (16 channels) and Effects (Reverb / Chorus / Delay GS) tabs -->
-  <Border x:Name="MixerBorder" DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
+  <!-- Right panel: Mixer (16 channels), Effects (those of the current mode) and About tabs -->
+  <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
           BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="6">
-    <TabControl x:Name="RightTabs" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}">
+    <TabControl Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}">
     <TabItem Header="Mixer" DataContext="{Binding Mixer}" d:DataContext="{d:DesignInstance vm:MixerViewModel}">
     <DockPanel>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
@@ -130,7 +130,7 @@
                    Visibility="{Binding HasCustomPatches, Converter={StaticResource BoolToVisibility}}"
                    ToolTip="This file redefines MT-32 sounds: the names shown may not match what is heard."/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
-        <ComboBox x:Name="CtrlBox" Width="180" HorizontalAlignment="Left" SelectedIndex="{Binding ShownMenuIndex}"
+        <ComboBox Width="180" HorizontalAlignment="Left" SelectedIndex="{Binding ShownMenuIndex}"
                   ToolTip="Controller set by the sliders">
           <!-- Order of the menu: see MixerViewModel.MenuOrder -->
           <ComboBoxItem Content="Modulation (CC1)"
@@ -489,7 +489,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <!-- The other blocks (Delay, EFX, Variation; the MT-32 reverb alone) at full width. -->
+          <!-- The other blocks (GS EFX, XG Variation; the MT-32 reverb alone) at full width. -->
           <ItemsControl ItemsSource="{Binding OtherBlocks}"/>
         </StackPanel>
       </ScrollViewer>

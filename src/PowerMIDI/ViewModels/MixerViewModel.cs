@@ -156,7 +156,6 @@ public sealed class MixerViewModel : ObservableObject
             ch.Value = position;
             ch.ValueText = text;
             ch.IsFixed = isFixed;
-            // One short sentence (how to fix a value or go back to the file's is explained at the bottom of the tab).
             ch.SliderToolTip = isFixed ? $"{name} fixed at {text} (file: {FormatShownValue(k, fileValue)})" : $"{name} from the file: {text}";
         });
     }

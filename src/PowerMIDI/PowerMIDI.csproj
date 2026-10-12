@@ -14,7 +14,7 @@
     <Authors>Bakuredo</Authors>
     <Copyright>Copyright (C) 2026 Bakuredo</Copyright>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
-    <Description>MIDI file player and editor for the Roland SC-8850 (GM / GM2 / GS / XG / MT-32).</Description>
+    <Description>MIDI file player and editor for sound modules (GM / GM2 / GS / XG / MT-32).</Description>
     <!-- Icon of the program (Explorer), built from ..\..\Icon.svg; also the window's (resource). -->
     <ApplicationIcon>PowerMIDI.ico</ApplicationIcon>
   </PropertyGroup>

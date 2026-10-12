@@ -1,17 +1,18 @@
-using System;
 using System.Collections.Generic;
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
 using Melanchall.DryWetMidi.Interaction;
-using Melanchall.DryWetMidi.Multimedia;
 
 namespace PowerMIDI.Core;
 
-// Writes instruments and volumes chosen in interface into a MIDI file:
-// - instrument: all bank selects (CC0, CC32) and all Program Changes of channel
-//   are removed;
-// - volume: all CC7 of channel are removed;
-// then chosen value is inserted once, right after GS/XG/GM reset at start.
+// Writes the settings chosen in the interface into a MIDI file:
+// - instrument of a channel: all its bank selects (CC0, CC32) and Program Changes are removed;
+// - fixed controller of a channel (volume, pan, sends…): all its events of that controller are removed;
+// - drum part of a channel (GS): its Use for Rhythm Part messages are removed;
+// then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
+// - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
+// - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
+//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects).
 public static class MidiFileEditor
 {
     // GS Reset, XG System On, GM / GM2 On or MT-32 Reset.

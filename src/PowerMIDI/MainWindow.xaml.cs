@@ -6,7 +6,7 @@ using PowerMIDI.ViewModels;
 
 namespace PowerMIDI;
 
-// PowerMIDI — graphical MIDI player for the Roland SC-8850: GM / GM2 / GS / XG / MT-32.
+// PowerMIDI — MIDI file player and editor for sound modules: GM / GM2 / GS / XG / MT-32.
 // The logic is in the view models (ViewModels\); the window only provides what is purely visual:
 // dialog boxes, drag and drop, keyboard shortcuts, the position bar and its own position and size
 // (saved with the other settings in PowerMIDI.ini, next to the program).
