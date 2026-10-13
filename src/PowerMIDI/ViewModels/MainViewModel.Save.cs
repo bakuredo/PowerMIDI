@@ -71,7 +71,7 @@ public sealed partial class MainViewModel
         }
 
         // Re-read from disk: the original file is never modified in memory or during playback.
-        var midi = MidiFile.Read(source);
+        var midi = MidiTools.ReadFile(source);
         var report = new List<string>();
         // Insertions (Insert button) first: the settings fixed for the whole track then replace them like the file's.
         if (insertions.Count > 0)
@@ -94,7 +94,7 @@ public sealed partial class MainViewModel
             var drop = clean ? MidiTools.GetOtherModeManufacturers(forceMode) : Array.Empty<int>();
             report.Add($"{MidiFileEditor.ForceReset(midi, reset, drop)} (mode {forceMode})");
         }
-        midi.Write(target, true);
+        MidiTools.WriteFile(midi, target);
 
         savedSignature = GetSettingsSignature();
         lastSavedTarget = target;

@@ -313,7 +313,7 @@ public sealed partial class MainViewModel : ObservableObject
                 string std = "?", dur = "unreadable";
                 try
                 {
-                    var midi = MidiFile.Read(f);
+                    var midi = MidiTools.ReadFile(f);
                     std = MidiTools.GetStandard(midi);
                     dur = MidiTools.FormatTime(MidiTools.GetDuration(midi));
                 }

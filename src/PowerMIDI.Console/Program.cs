@@ -91,7 +91,7 @@ try
         var file = files[index];
         var action = "next";
         MidiFile midi;
-        try { midi = MidiFile.Read(file); }
+        try { midi = MidiTools.ReadFile(file); }
         catch (Exception ex)
         {
             WriteColor($"\n[{index + 1}/{files.Count}] {Path.GetFileName(file)}: unreadable ({ex.Message})", ConsoleColor.Red);

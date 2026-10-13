@@ -49,7 +49,7 @@ public sealed partial class MainViewModel
     // The track to play: the file, with the insertions if it is the one they belong to.
     MidiFile ReadTrackFile(string path)
     {
-        var midi = MidiFile.Read(path);
+        var midi = MidiTools.ReadFile(path);
         if (path == settingsFile && insertions.Count > 0) MidiInsertions.Apply(midi, insertions);
         return midi;
     }
@@ -102,7 +102,7 @@ public sealed partial class MainViewModel
         long tick = CurrentTick();
         if (playback != null) { playback.Stop(); playback.Dispose(); playback = null; }
 
-        var midi = MidiFile.Read(target);
+        var midi = MidiTools.ReadFile(target);
         var item = new PlaylistItem
         {
             Name = Path.GetFileName(target), Path = Path.GetFullPath(target),

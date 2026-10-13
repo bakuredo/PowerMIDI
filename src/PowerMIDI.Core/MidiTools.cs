@@ -1,3 +1,4 @@
+using System.Text;
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
 using Melanchall.DryWetMidi.Interaction;
@@ -240,6 +241,37 @@ public static class MidiTools
         return events;
     }
 
+    // ---------- Texts of a file (title, copyright, comments) ----------
+    // A MIDI file does not say how its texts are encoded. They are read and written byte for byte (Latin-1: one
+    // character per byte), so that a saved file keeps them as they were, and decoded for display only (DecodeText).
+    static readonly Encoding ByteEncoding = Encoding.Latin1;
+
+    public static MidiFile ReadFile(string path) => MidiFile.Read(path, new ReadingSettings { TextEncoding = ByteEncoding });
+
+    public static void WriteFile(MidiFile file, string path) =>
+        file.Write(path, true, settings: new WritingSettings { TextEncoding = ByteEncoding });
+
+    static readonly Encoding ShiftJis = GetCodePage(932), Windows1252 = GetCodePage(1252);
+
+    static Encoding GetCodePage(int codePage)
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return Encoding.GetEncoding(codePage, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
+    }
+
+    // Text of a file (read by ReadFile) as it was meant: UTF-8 if its bytes are valid UTF-8; Shift-JIS (Japanese
+    // files) if they are valid Shift-JIS with a lead byte 81-9F, which Western text hardly has; otherwise
+    // Windows-1252 (accented letters).
+    public static string DecodeText(string raw)
+    {
+        if (string.IsNullOrEmpty(raw) || raw.All(c => c < 0x80) || raw.Any(c => c > 0xFF)) return raw;
+        var bytes = ByteEncoding.GetBytes(raw);
+        try { return new UTF8Encoding(false, true).GetString(bytes); } catch (DecoderFallbackException) { }
+        if (bytes.Any(b => b >= 0x81 && b <= 0x9F))
+            try { return ShiftJis.GetString(bytes); } catch (DecoderFallbackException) { }
+        try { return Windows1252.GetString(bytes); } catch (DecoderFallbackException) { return raw; }
+    }
+
     // Title and descriptive texts of a file (null / empty if it has none).
     // Title: name of the first track (Sequence / Track Name, the usual convention), otherwise the karaoke
     // "@T" text. Texts: the Text events placed before the first note (credits, comments), not the lyrics
@@ -247,7 +279,7 @@ public static class MidiTools
     public static (string Title, string Copyright, IReadOnlyList<string> Texts) GetInfo(MidiFile file)
     {
         var chunks = file.GetTrackChunks().ToList();
-        string title = chunks.FirstOrDefault()?.Events.OfType<SequenceTrackNameEvent>().FirstOrDefault()?.Text?.Trim();
+        string title = DecodeText(chunks.FirstOrDefault()?.Events.OfType<SequenceTrackNameEvent>().FirstOrDefault()?.Text)?.Trim();
         string copyright = null;
         var texts = new List<(long Time, string Text)>();
         long firstNote = long.MaxValue;
@@ -260,8 +292,8 @@ public static class MidiTools
                 switch (e)
                 {
                     case NoteOnEvent on when on.Velocity > 0: firstNote = Math.Min(firstNote, time); break;
-                    case CopyrightNoticeEvent c when copyright == null && !string.IsNullOrWhiteSpace(c.Text): copyright = c.Text.Trim(); break;
-                    case TextEvent t when !string.IsNullOrWhiteSpace(t.Text): texts.Add((time, t.Text.Trim())); break;
+                    case CopyrightNoticeEvent c when copyright == null && !string.IsNullOrWhiteSpace(c.Text): copyright = DecodeText(c.Text).Trim(); break;
+                    case TextEvent t when !string.IsNullOrWhiteSpace(t.Text): texts.Add((time, DecodeText(t.Text).Trim())); break;
                 }
             }
         }
