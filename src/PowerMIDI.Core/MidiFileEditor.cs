@@ -268,6 +268,13 @@ public static class MidiFileEditor
     // value is inserted once after reset, each block's type before its parameters.
     public static string ApplyEffects(MidiFile file, bool[] apply, int[] values)
     {
+        // Fixed type of the XG insertion effect of a parameter (-1: the type is not fixed, or not an insertion parameter).
+        int InsertionType(int e)
+        {
+            if (!GsXgEffects.IsInsertion(e)) return -1;
+            int type = GsXgEffects.InsertionType(e);
+            return apply[type] ? values[type] : -1;
+        }
         int tpqn = 480;
         var division = file.TimeDivision as TicksPerQuarterNoteTimeDivision;
         if (division != null) tpqn = division.TicksPerQuarterNote;
@@ -325,7 +332,7 @@ public static class MidiFileEditor
                     for (int e = 0; e < apply.Length; e++)
                         if (apply[e] && GsXgEffects.Block[e] == block && !GsXgEffects.IsType(e))
                         {
-                            items.Add(new Item { Event = new TimedEvent(GsXgEffects.ParamEvent(e, values[e]), t.Time),
+                            items.Add(new Item { Event = new TimedEvent(GsXgEffects.ParamEvent(e, values[e], InsertionType(e)), t.Time),
                                                  Priority = 2, Index = items.Count });
                             reinserted++;
                         }
@@ -338,7 +345,7 @@ public static class MidiFileEditor
                     for (int pass = 0; pass < 2; pass++)          // type first, then parameters
                         for (int e = 0; e < apply.Length; e++)
                             if (apply[e] && GsXgEffects.Block[e] == block && GsXgEffects.IsType(e) == (pass == 0))
-                                items.Add(new Item { Event = new TimedEvent(GsXgEffects.ParamEvent(e, values[e]), time),
+                                items.Add(new Item { Event = new TimedEvent(GsXgEffects.ParamEvent(e, values[e], InsertionType(e)), time),
                                                      Priority = 1, Index = items.Count });
             }
 

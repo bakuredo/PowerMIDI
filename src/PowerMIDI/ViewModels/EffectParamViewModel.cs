@@ -134,7 +134,7 @@ public sealed class EffectBlockViewModel : ObservableObject
     public string Title { get; init; }
     public bool IsFirst { get; set; }   // at the top of the tab (no space above its title)
     public bool ShowTitle { get; init; } = true;   // false: the block is a page of the tab strip, which names it
-    public string TabTitle => Title.Split(" (")[0];   // on its button of the tab strip (the full title in its tooltip)
+    public string TabTitle { get; init; }          // on its button of the tab strip (the full title in its tooltip)
     // Page shown (blocks of a tab strip, see EffectsViewModel.Tabs): pressing its button selects it; the button of
     // the page shown stays pressed.
     internal Action Selected;

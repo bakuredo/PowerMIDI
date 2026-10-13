@@ -10,6 +10,7 @@ namespace PowerMIDI.ViewModels;
 // Index = the one in GsXgEffects.Addresses. Blocks 0-2: GS (SysEx 40 01 xx); blocks 3-5: XG (02 01 xx);
 // block 6: GS EFX of the SC-88Pro / SC-8850 (40 03 xx, and 40 4x 22 for the EFX on each channel);
 // block 7: GS EQ of the SC-88 and later (40 02 xx, and 40 4x 20 for the EQ on each channel).
+// blocks 8-11: XG insertion effects 1 to 4 of the MU100 and later (03 0x xx), not offered with the MU Basic voice map.
 // The values live in GsXgEffects, Mt32Effects and Gm2Effects (shared with the playback thread); this view model shows them and fixes
 // the ones the user changes.
 public sealed class EffectsViewModel : ObservableObject
@@ -23,7 +24,7 @@ public sealed class EffectsViewModel : ObservableObject
     const int EqChannelFirst = 130;   // 130-145: GS EQ on channels 1 to 16
 
     static readonly string[] BlockNames = { "Reverb", "Chorus", "Delay", "Reverb", "Chorus", "Variation", "EFX (SC-88Pro / SC-8850)",
-                                            "EQ (SC-88 and later)" };
+                                            "EQ (SC-88 and later)", "Insertion 1", "Insertion 2", "Insertion 3", "Insertion 4" };
     static readonly string[] Labels = new[]
         {
             "Type", "Character", "Pre-LPF", "Level", "Time", "Delay feedback", "Pre-delay",                 // GS Reverb
@@ -41,6 +42,8 @@ public sealed class EffectsViewModel : ObservableObject
         .Concat(Enumerable.Range(4, 13).Select(i => $"Param. {i}"))    // XG Chorus (1-3 = rate, depth, feedback)
         .Concat(new[] { "Low freq", "Low gain", "High freq", "High gain" })   // GS EQ
         .Concat(Enumerable.Range(1, 16).Select(i => $"Channel {i}"))   // GS EQ per channel
+        .Concat(Enumerable.Range(0, GsXgEffects.InsCount).SelectMany(_ =>                           // XG Insertion 1-4
+            new[] { "Type", "Part" }.Concat(Enumerable.Range(1, 16).Select(i => $"Param. {i}"))))
         .ToArray();
 
     static readonly int[] PanParams = { 26, 30, 37 };   // XG pan: L63..C..R63
@@ -48,7 +51,7 @@ public sealed class EffectsViewModel : ObservableObject
     static readonly int[] EqGainParams = { EqFirst + 1, EqFirst + 3 };   // GS EQ gains: 52..76 = -12..+12 dB
 
     // Channel buttons of a block: EFX (66-81) or EQ (130-145) on channels 1 to 16; -1: not a channel button.
-    static int ButtonChannel(int fx) => fx >= EqChannelFirst ? fx - EqChannelFirst
+    static int ButtonChannel(int fx) => fx >= GsXgEffects.InsFirst ? -1 : fx >= EqChannelFirst ? fx - EqChannelFirst
                                       : fx >= EfxChannelFirst && fx < VarParamFirst ? fx - EfxChannelFirst : -1;
 
     static int Xg(int msb, int lsb) => msb * 128 + lsb;
@@ -169,10 +172,18 @@ public sealed class EffectsViewModel : ObservableObject
         if (defs.XgReverbTypes.Count > 0) choices[24] = TypeChoices(defs.XgReverbTypes);
         if (defs.XgChorusTypes.Count > 0) choices[28] = TypeChoices(defs.XgChorusTypes);
         if (defs.XgVariationTypes.Count > 0) choices[VarTypeParam] = TypeChoices(defs.XgVariationTypes);
+        // XG insertion effects: the Variation types (code 00:00 is not a type there: the list has "Thru", 40:00),
+        // and the part they are inserted on.
+        for (int n = 0; n < GsXgEffects.InsCount; n++)
+        {
+            int type = GsXgEffects.InsFirst + n * GsXgEffects.InsSize;
+            choices[type] = choices[VarTypeParam].Where(c => c.Value != 0).ToList();
+            choices[type + 1] = choices[41];
+        }
 
-        // Display order: GS (Reverb, Chorus, Delay, EQ, EFX) then XG (Reverb, Chorus, Variation); within each block,
+        // Display order: GS (Reverb, Chorus, Delay, EQ, EFX) then XG (Reverb, Chorus, Variation, Insertion 1-4); within each block,
         // by index (type first). Parameters added at the end of the list thus land in their block.
-        var blockOrder = new[] { 0, 1, 2, 7, 6, 3, 4, 5 };
+        var blockOrder = new[] { 0, 1, 2, 7, 6, 3, 4, 5, 8, 9, 10, 11 };
         var blocks = new Dictionary<int, EffectBlockViewModel>();
         foreach (int fx in Enumerable.Range(0, EffectCount).OrderBy(fx => Array.IndexOf(blockOrder, GsXgEffects.Block[fx])).ThenBy(fx => fx))
         {
@@ -180,7 +191,8 @@ public sealed class EffectsViewModel : ObservableObject
             var group = GsXgEffects.IsXg(fx) ? xgBlocks : gsBlocks;
             if (!blocks.TryGetValue(b, out var block))
             {
-                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : "Channels", ShowTitle = false };
+                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : "Channels", ShowTitle = false,
+                                                   TabTitle = b >= GsXgEffects.InsBlockFirst ? $"Ins {b - GsXgEffects.InsBlockFirst + 1}" : BlockNames[b].Split(" (")[0] };
                 blocks[b] = block;
                 group.Add(block);
             }
@@ -199,7 +211,7 @@ public sealed class EffectsViewModel : ObservableObject
         }
 
         // XG: parameter 10 of every type (Dry/Wet Balance) is shown before its other parameters.
-        foreach (var (block, dryWet, first) in new[] { (3, 0x0B, 0x02), (4, 0x2B, 0x22), (5, 0x54, 0x42) })
+        foreach (var (block, dryWet, first) in new[] { (3, 0x0B, 0x02), (4, 0x2B, 0x22), (5, 0x54, 0x42), (8, 0x0B, 0x02), (9, 0x0B, 0x02), (10, 0x0B, 0x02), (11, 0x0B, 0x02) })
         {
             int Fx(int address) => Enumerable.Range(0, EffectCount).First(fx => GsXgEffects.Block[fx] == block && GsXgEffects.Addresses[fx] == address);
             var list = blocks[block].Params;
@@ -289,9 +301,21 @@ public sealed class EffectsViewModel : ObservableObject
     public IEnumerable<EffectBlockViewModel> OtherBlocks => HasTabs ? new[] { selectedTabs[Blocks] } : Blocks.Skip(SideBlockCount);
 
     // GS and XG: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX;
-    // XG: Reverb, Chorus, Variation).
+    // XG: Reverb, Chorus, Variation, Ins 1 to 4).
     public bool HasTabs => Mode is "GS" or "XG";
-    public IReadOnlyList<EffectBlockViewModel> Tabs => HasTabs ? Blocks : NoBlocks;
+    public IReadOnlyList<EffectBlockViewModel> Tabs =>
+        !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgBlocks.Take(XgBlocksWithoutInsertion).ToList() : Blocks;
+    // The XG insertion effects are not offered with the MU Basic voice map: an XG Level 1 module has none.
+    const int XgBlocksWithoutInsertion = 3;
+    bool showInsertion = true;
+    void RefreshTabs()
+    {
+        bool show = ChannelMixer.VoiceMap != ChannelMixer.VoiceMapBasic;
+        if (show == showInsertion) return;
+        showInsertion = show;
+        if (!show && xgBlocks.IndexOf(selectedTabs[xgBlocks]) >= XgBlocksWithoutInsertion) xgBlocks[0].IsSelected = true;
+        OnPropertyChanged(nameof(Tabs));
+    }
     readonly Dictionary<IReadOnlyList<EffectBlockViewModel>, EffectBlockViewModel> selectedTabs = new();
 
     public string Title => Mode switch
@@ -370,11 +394,16 @@ public sealed class EffectsViewModel : ObservableObject
             case 4: types = defs.XgChorusTypes; typeParam = 28; break;
             case 5: types = defs.XgVariationTypes; typeParam = VarTypeParam; break;
             case 6: types = defs.EfxTypes; typeParam = EfxTypeParam; break;
+            case >= GsXgEffects.InsBlockFirst: types = defs.XgVariationTypes; typeParam = GsXgEffects.InsertionType(fx); break;
             default: return null;
         }
         int code = GsXgEffects.Value(typeParam);
         var typeDef = code >= 0 && types.TryGetValue(code, out var t) ? t : null;
-        var def = typeDef != null && typeDef.Params.TryGetValue(GsXgEffects.Addresses[fx], out var d) ? d : null;
+        // An insertion effect has the parameters of the Variation types: its parameters 1-10 (02..0B) are theirs at
+        // 42, 44 … 54, its parameters 11-16 (20..25) theirs at 70..75.
+        int address = GsXgEffects.Addresses[fx];
+        if (GsXgEffects.IsInsertion(fx)) address = address < 0x20 ? 0x42 + 2 * (address - 0x02) : 0x70 + address - 0x20;
+        var def = typeDef != null && typeDef.Params.TryGetValue(address, out var d) ? d : null;
         return (typeDef, def);
     }
 
@@ -558,13 +587,15 @@ public sealed class EffectsViewModel : ObservableObject
     {
         RefreshMt32();
         RefreshGm2();
+        RefreshTabs();
         for (int fx = 0; fx < EffectCount; fx++)
         {
             var p = parameters[fx];
             int v = GsXgEffects.Value(fx);
             bool isFixed = GsXgEffects.IsFixed(fx);
             var key = $"{v}/{isFixed}/{GsXgEffects.Value(EfxTypeParam)}/{GsXgEffects.Value(VarTypeParam)}/" +
-                      $"{GsXgEffects.Value(24)}/{GsXgEffects.Value(28)}";
+                      $"{GsXgEffects.Value(24)}/{GsXgEffects.Value(28)}/" +
+                      (GsXgEffects.IsInsertion(fx) ? GsXgEffects.Value(GsXgEffects.InsertionType(fx)) : 0);
             if (key == p.Key) continue;
             p.Key = key;
             int fileValue = GsXgEffects.FileValue(fx);

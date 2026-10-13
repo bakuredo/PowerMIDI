@@ -4,6 +4,7 @@ using PowerMIDI.Core;
 namespace PowerMIDI.Tests;
 
 // XG voice map (MU Basic / MU100 Native): the file's choice is followed, unless one is chosen in the interface.
+[Collection("ChannelMixer")]   // shared static state: not in parallel with the other tests that use it
 public class VoiceMapTests
 {
     static NormalSysExEvent VoiceMapSysEx(int map) => new(new byte[] { 0x43, 0x10, 0x49, 0x00, 0x00, 0x12, (byte)map, 0xF7 });
