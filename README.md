@@ -13,7 +13,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 - **Player**: Playback speed, transposition and playing a channel with computer keyboard ! (click on a channel number in Mixer page)
 - **Playlist**: Files and folders, drag and drop, shuffle, repeat modes...
 - **Modes**: GM, GM2, GS, XG and MT-32, detected from file or forced, with matching reset and an option to
-  drop messages of other modes. Custom Sysex patches detected from XG and MT-32 modes.
+  drop messages of other modes. Custom SysEx patches detected from XG and MT-32 modes.
 - **Mixer**: Mute/Solo, activity and one controller slider per channel (modulation, volume, pan, reverb,
   chorus, delay / variation, filter and envelope settings), with instrument names for each mode.
 - **Effects**: Reverb, chorus, delay, EQ and EFX in GS mode - Reverb, chorus, variation, insertion, EQ in XG - Reverb
@@ -25,7 +25,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 
 
 ## Next-Steps
-- A better icon application.
+- A better application icon.
 - Built-in SoundFont (SF2) files support.
 
 ## Requirements
