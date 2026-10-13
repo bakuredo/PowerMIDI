@@ -129,10 +129,22 @@ public sealed record EffectBlockPair(EffectBlockViewModel Left, EffectBlockViewM
 
 // Block of the Effects tab (Reverb, Chorus, Delay, EFX, Variation): its title, its parameters and,
 // for the EFX (and the MT-32 reverb), the channel (part) buttons.
-public sealed class EffectBlockViewModel
+public sealed class EffectBlockViewModel : ObservableObject
 {
     public string Title { get; init; }
     public bool IsFirst { get; set; }   // at the top of the tab (no space above its title)
+    public bool ShowTitle { get; init; } = true;   // false: the block is a page of the tab strip, which names it
+    public string TabTitle => Title.Split(" (")[0];   // on its button of the tab strip (the full title in its tooltip)
+    // Page shown (blocks of a tab strip, see EffectsViewModel.Tabs): pressing its button selects it; the button of
+    // the page shown stays pressed.
+    internal Action Selected;
+    bool isSelected;
+    public bool IsSelected
+    {
+        get => isSelected;
+        set { if (value && Set(ref isSelected, true)) Selected?.Invoke(); else OnPropertyChanged(); }
+    }
+    internal void Deselect() { isSelected = false; OnPropertyChanged(nameof(IsSelected)); }
     public string ChannelsLabel { get; init; } = "Channels";
     public List<EffectParamViewModel> Params { get; } = new();
     public List<EffectChannelViewModel> Channels { get; } = new();

@@ -180,7 +180,7 @@ public sealed class EffectsViewModel : ObservableObject
             var group = GsXgEffects.IsXg(fx) ? xgBlocks : gsBlocks;
             if (!blocks.TryGetValue(b, out var block))
             {
-                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : "Channels" };
+                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : "Channels", ShowTitle = false };
                 blocks[b] = block;
                 group.Add(block);
             }
@@ -196,6 +196,16 @@ public sealed class EffectsViewModel : ObservableObject
             p.Label = Labels[fx];
             block.Params.Add(p);
             parameters[fx] = p;
+        }
+
+        // XG: parameter 10 of every type (Dry/Wet Balance) is shown before its other parameters.
+        foreach (var (block, dryWet, first) in new[] { (3, 0x0B, 0x02), (4, 0x2B, 0x22), (5, 0x54, 0x42) })
+        {
+            int Fx(int address) => Enumerable.Range(0, EffectCount).First(fx => GsXgEffects.Block[fx] == block && GsXgEffects.Addresses[fx] == address);
+            var list = blocks[block].Params;
+            var p = parameters[Fx(dryWet)];
+            list.Remove(p);
+            list.Insert(list.IndexOf(parameters[Fx(first)]), p);
         }
 
         // MT-32 page: the reverb (mode, time, level) and the reverb switch of parts 1-8 and of the rhythm part.
@@ -227,6 +237,18 @@ public sealed class EffectsViewModel : ObservableObject
         // Side by side, Reverb and Chorus both start at the top (same title margin).
         foreach (var group in new[] { gsBlocks, xgBlocks, gm2Blocks })
             if (group.Count >= 2) group[1].IsFirst = true;
+        // GS and XG: one block at a time, chosen in the tab strip (see Tabs); the first one at start.
+        foreach (var group in new[] { gsBlocks, xgBlocks })
+        {
+            foreach (var block in group)
+                block.Selected = () =>
+                {
+                    selectedTabs[group] = block;
+                    foreach (var other in group.Where(o => o != block)) other.Deselect();
+                    OnPropertyChanged(nameof(OtherBlocks));
+                };
+            group[0].IsSelected = true;
+        }
     }
 
     public ICommand ResetCommand { get; }
@@ -242,6 +264,8 @@ public sealed class EffectsViewModel : ObservableObject
             OnPropertyChanged(nameof(Blocks));
             OnPropertyChanged(nameof(SideRows));
             OnPropertyChanged(nameof(OtherBlocks));
+            OnPropertyChanged(nameof(HasTabs));
+            OnPropertyChanged(nameof(Tabs));
             OnPropertyChanged(nameof(Title));
             OnPropertyChanged(nameof(IsAvailable));
             OnPropertyChanged(nameof(InfoText));
@@ -257,12 +281,18 @@ public sealed class EffectsViewModel : ObservableObject
     static readonly EffectBlockViewModel[] NoBlocks = Array.Empty<EffectBlockViewModel>();
     public IReadOnlyList<EffectBlockViewModel> Blocks =>
         Mode switch { "XG" => xgBlocks, "MT-32" => mt32Blocks, "GM2" => gm2Blocks, "GS" => gsBlocks, _ => NoBlocks };
-    // Layout: the first blocks side by side, two per row (GS: Reverb | Chorus, then Delay | EQ; XG and GM2:
-    // Reverb | Chorus), the others below them at full width (GS EFX, XG Variation, the MT-32 reverb alone).
-    int SideBlockCount => Mode switch { "GS" => 4, "XG" or "GM2" => 2, _ => 0 };
+    // Layout: GM2, Reverb and Chorus side by side; GS and XG, the block of the tab strip at full width (see Tabs);
+    // MT-32, the reverb alone at full width.
+    int SideBlockCount => Mode == "GM2" ? 2 : 0;
     public IReadOnlyList<EffectBlockPair> SideRows =>
         Enumerable.Range(0, SideBlockCount / 2).Select(i => new EffectBlockPair(Blocks[2 * i], Blocks[2 * i + 1])).ToList();
-    public IEnumerable<EffectBlockViewModel> OtherBlocks => Blocks.Skip(SideBlockCount);
+    public IEnumerable<EffectBlockViewModel> OtherBlocks => HasTabs ? new[] { selectedTabs[Blocks] } : Blocks.Skip(SideBlockCount);
+
+    // GS and XG: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX;
+    // XG: Reverb, Chorus, Variation).
+    public bool HasTabs => Mode is "GS" or "XG";
+    public IReadOnlyList<EffectBlockViewModel> Tabs => HasTabs ? Blocks : NoBlocks;
+    readonly Dictionary<IReadOnlyList<EffectBlockViewModel>, EffectBlockViewModel> selectedTabs = new();
 
     public string Title => Mode switch
     {

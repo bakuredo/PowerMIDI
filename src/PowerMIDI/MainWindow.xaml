@@ -333,7 +333,7 @@
     <TabItem.Resources>
       <!-- Widths of the label and value columns of a parameter row: full width blocks. The Reverb / Chorus blocks,
            side by side, override them with narrower ones (see below). -->
-      <GridLength x:Key="FxLabelWidth">120</GridLength>
+      <GridLength x:Key="FxLabelWidth">180</GridLength>
       <GridLength x:Key="FxValueWidth">66</GridLength>
 
       <!-- Effect type, XG Variation connection or part: label · list · code of a type not in the list
@@ -442,7 +442,7 @@
       <!-- Block: title, parameters, and the channel buttons of the EFX. -->
       <DataTemplate DataType="{x:Type vm:EffectBlockViewModel}">
         <StackPanel>
-          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14">
+          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" Visibility="{Binding ShowTitle, Converter={StaticResource BoolToVisibility}}">
             <TextBlock.Style>
               <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                 <Setter Property="Margin" Value="0,12,0,4"/>
@@ -481,9 +481,22 @@
           </Style>
         </TextBlock.Style>
       </TextBlock>
+      <!-- GS and XG: tab strip of the blocks, one shown at a time at full width. -->
+      <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" Margin="0,0,0,8" Focusable="False"
+                    Visibility="{Binding HasTabs, Converter={StaticResource BoolToVisibility}}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="{x:Type vm:EffectBlockViewModel}">
+            <ToggleButton Content="{Binding TabTitle}" ToolTip="{Binding Title}"
+                          IsChecked="{Binding IsSelected}" Padding="14,2" Margin="0,0,4,0" FontSize="12"/>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel IsEnabled="{Binding IsAvailable}" Margin="0,0,6,0">
-          <!-- Blocks side by side, two per row (GS: Reverb | Chorus, Delay | EQ; XG, GM2: Reverb | Chorus), with
+          <!-- Blocks side by side, two per row (GM2: Reverb | Chorus), with
                narrower label and value columns. -->
           <ItemsControl ItemsSource="{Binding SideRows}" Focusable="False">
             <ItemsControl.ItemTemplate>
@@ -504,7 +517,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <!-- The other blocks (GS EFX, XG Variation; the MT-32 reverb alone) at full width. -->
+          <!-- The other blocks (the GS or XG block of the tab strip; the MT-32 reverb alone) at full width. -->
           <ItemsControl ItemsSource="{Binding OtherBlocks}"/>
         </StackPanel>
       </ScrollViewer>
