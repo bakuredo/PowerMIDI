@@ -129,12 +129,4 @@ public class MidiToolsTests
         var loop = MidiTools.GetLoop(file).Value;
         Assert.Empty(MidiTools.GetLoopRestore(file, loop.Start, loop.End));
     }
-
-    [Fact]
-    public void Mt32_custom_patches_are_detected()
-    {
-        var timbre = new NormalSysExEvent(new byte[] { 0x41, 0x10, 0x16, 0x12, 0x08, 0x00, 0x00, 0x41, 0x37, 0xF7 });
-        Assert.True(MidiTools.HasMt32CustomPatches(File(Reset("MT-32"), timbre)));
-        Assert.False(MidiTools.HasMt32CustomPatches(File(Reset("MT-32"), On(60), Off(60, 480))));
-    }
 }

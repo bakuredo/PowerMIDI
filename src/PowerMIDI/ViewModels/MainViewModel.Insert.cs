@@ -126,7 +126,6 @@ public sealed partial class MainViewModel
         ChannelMixer.XgMode = std == "XG";
         ChannelMixer.DropManufacturers = Array.Empty<int>();
         Mixer.Standard = std;
-        Mixer.HasCustomPatches = std == "MT-32" && MidiTools.HasMt32CustomPatches(midi);
         Effects.Standard = std;
         ShowTrackInfo(midi, item, std);
         RebuildFileState(midi, tick, std);

@@ -111,10 +111,6 @@ public sealed class MixerViewModel : ObservableObject
 
     static bool IsXgCapital(int msb, int lsb) => msb == 0 && lsb is 0 or InstrumentDefinitions.XgNativeLsb or InstrumentDefinitions.XgBasicLsb;
 
-    // MT-32 track whose SysEx redefine the patches / sounds: the instrument names may not match what is heard.
-    bool hasCustomPatches;
-    public bool HasCustomPatches { get => hasCustomPatches; set => Set(ref hasCustomPatches, value); }
-
     int shownController;
     public int ShownController
     {
@@ -234,7 +230,7 @@ public sealed class MixerViewModel : ObservableObject
         if (ch.ListShown) { ch.ListShown = false; force = true; }   // list closed since it was last opened
         var key = $"{Standard}/{ChannelMixer.VoiceMap}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
                   $"{ChannelMixer.RhythmPart[c]}/{ChannelMixer.RhythmOverride[c]}/{ChannelMixer.Override[c]}/" +
-                  $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}/{HasCustomPatches}";
+                  $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}/{ChannelMixer.SysExPatch[c]}/{Mt32Patches.Version}";
         if (!force && key == ch.InstrumentKey) return;
         ch.InstrumentKey = key;
 
@@ -260,9 +256,17 @@ public sealed class MixerViewModel : ObservableObject
         }
         else (name, state, tooltip) = (currentInfo.Name, InstrumentState.File, $"{currentInfo.Detail}{sharedText}");
 
-        // MT-32 file that redefines its sounds: the programs no longer match the factory names.
-        bool customPatch = Standard == "MT-32" && HasCustomPatches && ChannelMixer.Used[c] && !currentInfo.Drum;
-        if (customPatch) tooltip += " · custom patches: the name may be wrong";
+        // Instrument set by the SysEx of the file, not the one chosen in the interface (shown in green):
+        // XG, by a Multi Part message; MT-32, a program whose patch was redefined (ResolveSound names its timbre),
+        // or a timbre written straight into the part.
+        bool sysExPatch = HasXgBanks && ChannelMixer.SysExPatch[c] && state == InstrumentState.File;
+        if (Standard == "MT-32" && state == InstrumentState.File && !currentInfo.Drum)
+        {
+            var partName = Mt32Patches.PartName(c, defs.Mt32Voices);
+            if (partName != null) name = partName;
+            sysExPatch = partName != null || Mt32Patches.IsCustom(ChannelMixer.Program[c]);
+        }
+        if (sysExPatch) tooltip += " · set by SysEx";
 
         var display = new InstrumentChoice { Text = name, IsDisplay = true };
         Update(ch, () =>
@@ -271,7 +275,8 @@ public sealed class MixerViewModel : ObservableObject
             ch.InstrumentItems = new[] { display };
             ch.SelectedInstrument = display;
             ch.InstrumentState = state;
-            ch.IsInstrumentMissing = state != InstrumentState.Unused && (currentInfo.Missing || customPatch);
+            ch.IsInstrumentMissing = state != InstrumentState.Unused && currentInfo.Missing;
+            ch.IsSysExPatch = sysExPatch;
             ch.InstrumentToolTip = tooltip;
         });
     }
@@ -296,6 +301,9 @@ public sealed class MixerViewModel : ObservableObject
         var info = defs.Resolve(Standard, c, program, msb, EffectiveXgLsb(msb, lsb), rhythm);
         if (info.Missing && !info.Drum && HasXgBanks && msb == 0 && ChannelMixer.VoiceMap == ChannelMixer.VoiceMapBasic)
             info = info with { Name = defs.Resolve(Standard, c, program, 0, InstrumentDefinitions.XgBasicLsb, rhythm).Name };
+        // MT-32: the timbre the program plays by the patch table of the file (see Mt32Patches).
+        if (Standard == "MT-32" && !info.Drum && defs.Mt32Voices.Count > 0 && Mt32Patches.IsCustom(program))
+            info = info with { Name = Mt32Patches.ProgramName(program, defs.Mt32Voices) };
         return info;
     }
 
@@ -337,6 +345,10 @@ public sealed class MixerViewModel : ObservableObject
         if (HasXgBanks && IsXgCapital(msb, lsb)) lsb = 0;
         if (HasMu50Map && !IsMu50ModeMap(xgMap)) xgMap = InstrumentDefinitions.XgMu50Map;
         var choices = defs.GetChoices(Standard, drum, HasXgBanks ? xgMap : lsb, HasMu50Map);
+        // MT-32: the programs named by the patch table of the file.
+        if (Standard == "MT-32" && !drum && defs.Mt32Voices.Count > 0)
+            choices = choices.Select(x => !Mt32Patches.IsCustom(x.Program) ? x : new InstrumentChoice
+                { Text = $"{x.Program + 1:000} {Mt32Patches.ProgramName(x.Program, defs.Mt32Voices)}", Msb = x.Msb, Lsb = x.Lsb, Program = x.Program }).ToList();
         // GM2: the list has MSB 120 (kits) / 121 (sounds); a file without these banks plays the same sounds.
         if (HasGm2Banks) (msb, lsb) = drum ? (InstrumentDefinitions.Gm2DrumMsb, 0)
                                            : (InstrumentDefinitions.Gm2MelodicMsb, msb == InstrumentDefinitions.Gm2MelodicMsb ? lsb : 0);

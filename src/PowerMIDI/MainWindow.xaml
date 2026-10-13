@@ -125,10 +125,6 @@
                 Padding="8,2" FontSize="12" ToolTip="Back to the file's settings"/>
         <!-- Insert mode: see MainViewModel.Insert.cs. The tab's DataContext is the mixer. -->
         <ToggleButton DockPanel.Dock="Right" Style="{StaticResource InsertButton}"/>
-        <TextBlock DockPanel.Dock="Right" Text="Custom SysEx patches detected" Foreground="{DynamicResource AccentBrush}" FontSize="11"
-                   Margin="8,0,8,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                   Visibility="{Binding HasCustomPatches, Converter={StaticResource BoolToVisibility}}"
-                   ToolTip="This file redefines MT-32 sounds: the names shown may not match what is heard."/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
         <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}"
                   ToolTip="Controller set by the sliders">
@@ -265,6 +261,8 @@
                         <Setter Property="Foreground" Value="{DynamicResource OnLightFixedBrush}"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
                       </DataTrigger>
+                      <!-- XG instrument set by a Multi Part SysEx of the file. -->
+                      <DataTrigger Binding="{Binding IsSysExPatch}" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightSysExBrush}"/></DataTrigger>
                       <!-- Sound not in the list of the mode (last: wins over the colors above). -->
                       <DataTrigger Binding="{Binding IsInstrumentMissing}" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightMissingBrush}"/></DataTrigger>
                     </Style.Triggers>

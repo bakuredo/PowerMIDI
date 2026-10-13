@@ -235,7 +235,6 @@ public sealed partial class MainViewModel : ObservableObject
         if (output != null) MidiTools.SendReset(output, std);
         ChannelMixer.ResetChannelState(std == "XG");
         Mixer.Standard = std;
-        Mixer.HasCustomPatches = false;   // no file
         Effects.Standard = std;
         if (output != null)
         {
@@ -575,7 +574,6 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.ResetChannelState(std == "XG");
         ChannelMixer.SetMasterVolume(output, (int)MasterVolume);
         Mixer.Standard = std;
-        Mixer.HasCustomPatches = std == "MT-32" && MidiTools.HasMt32CustomPatches(midi);
         Effects.Standard = std;
         ApplyMixerState();   // same track played again: the chosen instruments are resent
 

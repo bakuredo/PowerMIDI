@@ -9,6 +9,7 @@ namespace PowerMIDI.Core;
 // - instrument of a channel: all its bank selects (CC0, CC32) and Program Changes are removed;
 // - fixed controller of a channel (volume, pan, sends…): all its events of that controller are removed;
 // - drum part of a channel (GS): its Use for Rhythm Part messages are removed;
+// - XG Multi Part SysEx that write one of these values: corrected in place (they may write other values too);
 // then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
 // - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
 // - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
@@ -118,6 +119,25 @@ public static class MidiFileEditor
                     removedRhythm[rhythmChannel]++;
                     continue;
                 }
+                // XG Multi Part SysEx: the values it writes for a fixed instrument or controller are corrected.
+                int part = sysEx != null ? ChannelMixer.MultiPartChannel(sysEx.Data) : -1;
+                if (part >= 0)
+                {
+                    var d = sysEx.Data;
+                    var data = ChannelMixer.ReplaceMultiPart(d, apply[part] ? (msb[part], lsb[part], program[part]) : null,
+                                                             c => applyCc[c][part] ? ccValues[c][part] : -1);
+                    if (data != null)
+                    {
+                        for (int pos = 6; pos < d.Length - 1; pos++)
+                        {
+                            if (data[pos] == d[pos]) continue;
+                            int cc = ChannelMixer.MultiPartController(d[5] + pos - 6);
+                            if (cc >= 0) removedCc[cc][part]++; else removed[part]++;
+                        }
+                        items.Add(new Item { Event = new TimedEvent(new NormalSysExEvent(data), t.Time), Priority = 2, Index = items.Count });
+                        continue;
+                    }
+                }
                 items.Add(new Item { Event = t, Priority = IsReset(t.Event) ? 0 : 2, Index = items.Count });
             }
 
@@ -175,10 +195,10 @@ public static class MidiFileEditor
             if (rhythm[ch] >= 0)
                 parts.Add(string.Format("{0} ({1} Use for Rhythm Part replaced)",
                                         rhythm[ch] == 0 ? "normal part" : "drum part " + rhythm[ch], removedRhythm[ch]));
-            if (apply[ch]) parts.Add(string.Format("instrument ({0} bank/program event(s) replaced)", removed[ch]));
+            if (apply[ch]) parts.Add(string.Format("instrument ({0} bank/program event(s) or SysEx value(s) replaced)", removed[ch]));
             for (int c = 0; c < controllers; c++)
                 if (applyCc[c][ch])
-                    parts.Add(string.Format("{0} {1} ({2} CC{3} replaced)", ChannelMixer.ControllerNames[c],
+                    parts.Add(string.Format("{0} {1} ({2} CC{3} or SysEx value(s) replaced)", ChannelMixer.ControllerNames[c],
                                             ccValues[c][ch], removedCc[c][ch], ChannelMixer.ControllerNumbers[c]));
             if (parts.Count > 0) report.Add(string.Format("channel {0}: {1}", ch + 1, string.Join(", ", parts.ToArray())));
         }

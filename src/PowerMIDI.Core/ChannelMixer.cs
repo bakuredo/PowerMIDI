@@ -130,6 +130,7 @@ public static class ChannelMixer
             Used[i] = false;
             LastNoteOn[i] = 0;
             RhythmPart[i] = 0;
+            SysExPatch[i] = false;
             // instruments and fixed values (Override, CcOverride) are not touched here:
             // player clears them itself when it moves to another file.
         }
@@ -138,6 +139,7 @@ public static class ChannelMixer
         DrumKitProgram[1] = DrumKitProgram[2] = -1;
         fileVoiceMap = VoiceMapNative;
         Mt32Effects.ResetFile();
+        Mt32Patches.ResetFile();
         Gm2Effects.ResetFile();
         GsXgEffects.ResetFile();
     }
@@ -257,6 +259,64 @@ public static class ChannelMixer
         if (XgMode && VoiceMapOverride >= 0) device.SendEvent(VoiceMapEvent(VoiceMapOverride));
     }
 
+    // ---------- XG Multi Part SysEx ----------
+    // F0 43 1n 4C 08 pp aa vv … F7 sets a part like the bank selects, the Program Change and the controllers of its
+    // channel do (some files use nothing else): 01 / 02 / 03 = bank MSB / LSB / program, 0B volume, 0E pan,
+    // 12 / 13 / 14 chorus / reverb / variation send, 15-17 vibrato, 18 / 19 filter, 1A-1C envelope. They are read
+    // as such, and corrected with the values fixed in the interface. Part pp is taken as channel pp (its default
+    // receive channel); the parts above 16 and the other addresses are left as they are.
+    public static readonly bool[] SysExPatch = new bool[16];   // instrument of the channel set by such a SysEx
+
+    // Channel of an XG Multi Part SysEx, or -1 if it is not one (or a part above 16).
+    public static int MultiPartChannel(byte[] d) =>
+        d.Length >= 8 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0x08 && d[4] < 16 ? d[4] : -1;
+
+    // Mixer controller (index k) set by a Multi Part address, or -1.
+    public static int MultiPartController(int address) => address switch
+    {
+        0x0B => 0, 0x0E => 1, 0x13 => 2, 0x12 => 3, 0x14 => 4, 0x1A => 5, 0x1B => 6, 0x1C => 7, 0x18 => 8, 0x19 => 9,
+        0x15 => 10, 0x16 => 11, 0x17 => 12, _ => -1,
+    };
+
+    // Multi Part SysEx with its values replaced: instrument (bank MSB, LSB, program; null = the file's) and
+    // controllers (controller(k) = value to write, -1 = the file's). Returns null if nothing changes.
+    public static byte[] ReplaceMultiPart(byte[] d, (int Msb, int Lsb, int Program)? instrument, Func<int, int> controller)
+    {
+        byte[] data = null;
+        for (int pos = 6; pos < d.Length - 1; pos++)
+        {
+            int address = d[5] + pos - 6, k = MultiPartController(address);
+            int value = address == 0x01 && instrument != null ? instrument.Value.Msb
+                      : address == 0x02 && instrument != null ? instrument.Value.Lsb
+                      : address == 0x03 && instrument != null ? instrument.Value.Program
+                      : k >= 0 ? controller(k) : -1;
+            if (value < 0 || value == d[pos]) continue;
+            data ??= (byte[])d.Clone();
+            data[pos] = (byte)value;
+        }
+        return data;
+    }
+
+    // Multi Part SysEx sent by the file: stores its values; returns the message to play (null = unchanged).
+    static MidiEvent ReadMultiPart(byte[] d)
+    {
+        int channel = MultiPartChannel(d);
+        if (channel < 0) return null;
+        for (int pos = 6; pos < d.Length - 1; pos++)
+        {
+            int address = d[5] + pos - 6, k = MultiPartController(address);
+            if (k >= 0) FileCc[k, channel] = d[pos];
+            else if (address == 0x01) BankMsb[channel] = d[pos];
+            else if (address == 0x02) BankLsb[channel] = d[pos];
+            else if (address == 0x03) Program[channel] = d[pos];
+            if (address is >= 0x01 and <= 0x03) Used[channel] = SysExPatch[channel] = true;
+        }
+        var data = ReplaceMultiPart(d,
+            Override[channel] ? (OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel]) : null,
+            k => Sent(k, channel));
+        return data != null ? new NormalSysExEvent(data) : null;
+    }
+
     public static void SetController(IOutputDevice device, int k, int channel, int value)
     {
         OverrideCc[k, channel] = value;
@@ -317,6 +377,7 @@ public static class ChannelMixer
         {
             int channel = pc.Channel;
             Program[channel] = pc.ProgramNumber;
+            if (Mt32Mode) Mt32Patches.ProgramChanged(channel);
             Used[channel] = true;
             if (Override[channel])
             {
@@ -355,6 +416,7 @@ public static class ChannelMixer
             }
             if (Mt32Mode)
             {
+                Mt32Patches.Read(d);
                 var mt32 = Mt32Effects.Read(d);
                 if (mt32 != null) return mt32;
             }
@@ -363,6 +425,8 @@ public static class ChannelMixer
                 var gm2 = Gm2Effects.Read(d);
                 if (gm2 != null) return gm2;
             }
+            var multiPart = ReadMultiPart(d);
+            if (multiPart != null) return multiPart;
             var effect = GsXgEffects.Read(d);
             if (effect != null) return effect;
             var rhythm = ReadRhythmPart(d);
@@ -408,6 +472,7 @@ public static class ChannelMixer
     static void SendInstrument(IOutputDevice device, int channel, int msb, int lsb, int program)
     {
         NoteSentProgram(channel, msb, lsb, program);
+        if (Mt32Mode) Mt32Patches.ProgramChanged(channel);   // the part plays its program again
         if (device == null) return;
         device.SendEvent(Cc(channel, 0, msb));
         device.SendEvent(Cc(channel, 32, lsb));

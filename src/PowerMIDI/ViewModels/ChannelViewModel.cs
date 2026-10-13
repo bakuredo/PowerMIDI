@@ -149,6 +149,10 @@ public sealed class ChannelViewModel : ObservableObject
     bool isInstrumentMissing;
     public bool IsInstrumentMissing { get => isInstrumentMissing; internal set => Set(ref isInstrumentMissing, value); }
 
+    // XG instrument set by a Multi Part SysEx of the file (name shown in green).
+    bool isSysExPatch;
+    public bool IsSysExPatch { get => isSysExPatch; internal set => Set(ref isSysExPatch, value); }
+
     string instrumentToolTip;
     public string InstrumentToolTip { get => instrumentToolTip; internal set => Set(ref instrumentToolTip, value); }
 

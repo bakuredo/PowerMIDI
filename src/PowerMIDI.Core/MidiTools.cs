@@ -94,13 +94,6 @@ public static class MidiTools
         return Resets.TryGetValue(mode, out var data) ? new MidiEvent[] { new NormalSysExEvent(data) } : Array.Empty<MidiEvent>();
     }
 
-    // MT-32 sounds redefined by the file: SysEx writing to the Timbre Temp (04 xx xx), Patch Memory
-    // (05 xx xx, the table program number -> sound) or Timbre Memory (08 xx xx, the 64 user sounds) areas.
-    // The programs then no longer match the factory names of MT-32.xml.
-    public static bool HasMt32CustomPatches(MidiFile file) =>
-        file.GetTrackChunks().SelectMany(c => c.Events).OfType<SysExEvent>().Any(e =>
-            e.Data is { Length: >= 8 } d && d[0] == 0x41 && d[2] == 0x16 && d[3] == 0x12 && d[4] is 0x04 or 0x05 or 0x08);
-
     // Standard of a file that says nothing about it, and the one shown when no track is loaded (mode Auto).
     public const string DefaultStandard = "GM";
 

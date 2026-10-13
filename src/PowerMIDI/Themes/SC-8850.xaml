@@ -30,4 +30,5 @@
   <SolidColorBrush x:Key="OnLightDisabledBrush" Color="#8A8A8A"/>
   <SolidColorBrush x:Key="OnLightFixedBrush" Color="#1F5FBF"/>
   <SolidColorBrush x:Key="OnLightMissingBrush" Color="#C62828"/>
+  <SolidColorBrush x:Key="OnLightSysExBrush" Color="#2E7D32"/>
 </ResourceDictionary>
