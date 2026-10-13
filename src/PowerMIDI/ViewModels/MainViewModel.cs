@@ -232,6 +232,7 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.Mt32Mode = std == "MT-32";
         ChannelMixer.Gm2Mode = std == "GM2";
         ChannelMixer.XgMode = std == "XG";
+        ChannelMixer.GsMode = std == "GS";
         if (output != null) MidiTools.SendReset(output, std);
         ChannelMixer.ResetChannelState(std == "XG");
         Mixer.Standard = std;
@@ -568,6 +569,7 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.Mt32Mode = std == "MT-32";   // MT-32 reverb SysEx follow the Effects tab
         ChannelMixer.Gm2Mode = std == "GM2";      // GM2 reverb / chorus SysEx too
         ChannelMixer.XgMode = std == "XG";        // XG voice map chosen in the Mixer tab
+        ChannelMixer.GsMode = std == "GS";
         ChannelMixer.DropManufacturers = isCleaned ? MidiTools.GetOtherModeManufacturers(std) : Array.Empty<int>();
 
         MidiTools.SendReset(output, std);

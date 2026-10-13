@@ -235,6 +235,7 @@ public static class ChannelMixer
     // plays; bank LSB 127 / 126 ask for one of them whatever this setting.
     public const int VoiceMapBasic = 0, VoiceMapNative = 1;
     public static bool XgMode;                     // XG track: the voice map chosen in the interface is sent
+    public static bool GsMode;                     // GS track (see the GM On of the file, in Callback)
     public static int VoiceMapOverride = -1;       // chosen in the interface (-1 = Auto: the file's)
     static int fileVoiceMap = VoiceMapNative;      // last one asked by the file (MU100 Native after a reset)
 
@@ -410,9 +411,19 @@ public static class ChannelMixer
                 // Mode forced in interface: file's resets (GS / XG / GM / GM2) are ignored.
                 if (ForceMode) return null;
                 bool xg = d.Length >= 3 && d[0] == 0x43 && d[2] == 0x4C;
+                // GM On in a GS / XG track (a file with GS / XG SysEx but no reset of that mode): it would leave
+                // the module in GM mode, where bank selects are ignored (variations, maps, the instruments chosen
+                // in the Mixer). The reset of the mode of the track is played instead.
+                bool gmOn = d.Length >= 4 && d[0] == 0x7E && d[2] == 0x09 && d[3] == 0x01;
+                MidiEvent played = e;
+                if (gmOn && (GsMode || XgMode))
+                {
+                    played = MidiTools.GetModeEvents(XgMode ? "XG" : "GS")[0];
+                    xg = XgMode;
+                }
                 ResetChannelState(xg);
                 ResendAfterReset();
-                return e;
+                return played;
             }
             if (Mt32Mode)
             {

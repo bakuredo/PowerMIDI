@@ -124,6 +124,7 @@ public sealed partial class MainViewModel
         ChannelMixer.Mt32Mode = std == "MT-32";
         ChannelMixer.Gm2Mode = std == "GM2";
         ChannelMixer.XgMode = std == "XG";
+        ChannelMixer.GsMode = std == "GS";
         ChannelMixer.DropManufacturers = Array.Empty<int>();
         Mixer.Standard = std;
         Effects.Standard = std;
