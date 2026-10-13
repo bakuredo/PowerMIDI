@@ -9,6 +9,7 @@ namespace PowerMIDI.Core;
 // XG: SysEx F0 43 1n 4C 02 01 aa vv … F7 (no checksum; types are 2 bytes MSB/LSB).
 // EFX (SC-88Pro / SC-8850): DT1 40 03 xx (2-byte type) and 40 4x 22 (EFX on part x).
 // XG insertion effects 1 to 4 (MU100 and later): SysEx F0 43 1n 4C 03 0x aa vv … F7, x = 0..3.
+// XG Multi EQ (MU100 and later): SysEx F0 43 1n 4C 02 40 aa vv F7.
 // A type sets the other parameters of its block: they are then -1 ("auto", the type's default) until set.
 public static class GsXgEffects
 {
@@ -22,6 +23,14 @@ public static class GsXgEffects
     // Block 7, GS EQ (SC-88 and later; no type): 126-129 low frequency (0 = 200 Hz, 1 = 400 Hz), low gain
     // (52..76 = -12..+12 dB), high frequency (0 = 3 kHz, 1 = 6 kHz), high gain: DT1 40 02 00..03;
     // 130-145: EQ on channels 1 to 16 (Part EQ, DT1 40 4x 20; 1 = on, the state after a reset).
+    // Block 12, XG Multi EQ, 18 parameters from index 218 (XgEqFirst): type (02 40 00: flat, jazz, pops, rock,
+    // concert), then the five bands: gain (52..76 = -12..+12 dB), frequency (index in the XG frequency table),
+    // Q (1..120 = 0.1..12.0) and, for the first and the last band, shape (0 = shelving, 1 = peaking).
+    static readonly int[] XgEqAddresses = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x09, 0x0A, 0x0B, 0x0D, 0x0E, 0x0F, 0x11, 0x12, 0x13, 0x14 };
+    // Values of the 18 parameters: type, band 1 (gain, frequency, Q, shape), bands 2 to 4 (gain, frequency, Q), band 5.
+    static int[] XgEq(int type, int gain, int q, int shape, params int[] frequencies) => new[] {
+        type, gain, frequencies[0], q, shape, gain, frequencies[1], q, gain, frequencies[2], q, gain, frequencies[3], q,
+        gain, frequencies[4], q, shape };
     // Blocks 8-11, XG insertion effects 1 to 4: 18 parameters each from index 146 (InsFirst): type (03 0x 00,
     // 2 bytes), part (0C: 0-63, 64-65 = AD inputs, 127 = off), parameters 1 to 10 and 11 to 16 (20..25).
     // Parameters 1 to 10 have two addresses: 02..0B (1 byte) and 30, 32 … 42 (MSB + LSB); the module only
@@ -37,39 +46,40 @@ public static class GsXgEffects
         Range2(0x42, 10), Range(0x70, 6),                                                  // 82-97 XG Variation
         Range(0x03, 9), Range(0x10, 6), Range(0x25, 7), Range(0x30, 6),                    // 98-125 XG Reverb / Chorus
         new[] { 0x00, 0x01, 0x02, 0x03 }, Repeat(0x20, 16),                                // 126-145 GS EQ
-        InsEach(_ => Cat(new[] { 0x00, 0x0C }, Range(0x02, 10), Range(0x20, 6))));           // 146-217 XG Insertion 1-4
+        InsEach(_ => Cat(new[] { 0x00, 0x0C }, Range(0x02, 10), Range(0x20, 6))),            // 146-217 XG Insertion 1-4
+        XgEqAddresses);                                                                    // 218-235 XG Multi EQ
     // Middle address byte: GS 40 01 / XG 02 01 for blocks 0-5; EFX 40 03; EQ 40 02; EFX / EQ per part 40 4x
     // (block x: 1..9 = parts 1..9, 0 = part 10, A..F = parts 11..16; same numbering as 40 1x).
-    // XG insertion effects: the number of the effect (0..3), after 03.
+    // XG: 01 (02 01 xx), 40 for the Multi EQ (02 40 xx); insertion effects: the number of the effect (0..3), after 03.
     public static readonly int[] AddressHi = Cat(Repeat(0x01, 42), Repeat(0x03, 24),
         new[] { 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x40, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F },
         Repeat(0x01, 16), Repeat(0x01, 28),
         Repeat(0x02, 4), new[] { 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x40, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F },
-        InsEach(n => Repeat(n, InsSize)));
+        InsEach(n => Repeat(n, InsSize)), Repeat(0x40, XgEqSize));
     public static readonly int[] Block = Cat(new[] {
         0, 0, 0, 0, 0, 0, 0,  1, 1, 1, 1, 1, 1, 1, 1, 1,  2, 2, 2, 2, 2, 2, 2, 2,
         3, 3, 3, 3,  4, 4, 4, 4, 4, 4, 4,  5, 5, 5, 5, 5, 5, 5 }, Repeat(6, 40), Repeat(5, 16), Repeat(3, 15), Repeat(4, 13), Repeat(7, 20),
-        InsEach(n => Repeat(InsBlockFirst + n, InsSize)));
+        InsEach(n => Repeat(InsBlockFirst + n, InsSize)), Repeat(XgEqBlock, XgEqSize));
     public static readonly int[] Min = Cat(new[] {
         0, 0, 0, 0, 0, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0,  0, 0, 1, 1, 1, 0, 0, 0,
         0, 0, 1, 0,  0, 0, 1, 0, 0, 0, 1,  0, 0, 1, 0, 0, 0, 0 }, Repeat(0, 40), Repeat(0, 16), Repeat(0, 28),
-        new[] { 0, 52, 0, 52 }, Repeat(0, 16), Repeat(0, InsCount * InsSize));
+        new[] { 0, 52, 0, 52 }, Repeat(0, 16), Repeat(0, InsCount * InsSize), XgEq(0, 52, 1, 0, 4, 14, 14, 14, 28));
     public static readonly int[] Max = Cat(new[] {
         7, 7, 7, 127, 127, 127, 127,  7, 7, 127, 127, 127, 127, 127, 127, 127,  9, 7, 115, 120, 120, 127, 127, 127,
         16383, 127, 127, 127,  16383, 127, 127, 127, 127, 127, 127,  16383, 127, 127, 127, 127, 1, 127 },
         new[] { 16383 }, Repeat(127, 23), Repeat(1, 16), Repeat(16383, 10), Repeat(127, 6), Repeat(127, 28),
         new[] { 1, 76, 1, 76 }, Repeat(1, 16),
-        InsEach(_ => Cat(new[] { 16383, 127 }, Repeat(16383, 10), Repeat(127, 6))));
+        InsEach(_ => Cat(new[] { 16383, 127 }, Repeat(16383, 10), Repeat(127, 6))), XgEq(4, 76, 120, 1, 40, 54, 54, 54, 58));
     // Values after a reset; -1 = set by module according to type ("auto").
     // XG types: MSB × 128 + LSB (Hall 1 = 01 00, Chorus 1 = 41 00, Delay L,C,R = 05 00).
     // EFX: type and parameters unknown after a reset ("auto"); no part goes through EFX.
-    // XG insertion effects: Distortion (49 00) on no part.
+    // XG insertion effects: Distortion (49 00) on no part. XG Multi EQ: flat.
     public static readonly int[] Defaults = Cat(new[] {
         4, 4, 0, 64, 64, 0, 0,  2, 0, 64, 8, 80, 3, 19, 0, 0,  0, 0, 97, 1, 1, 64, 80, 0,
         128, 64, 64, -1,  65 * 128, 64, 64, 0, -1, -1, -1,  5 * 128, 64, 64, 0, 0, 0, 127 },
         Repeat(-1, 24), Repeat(0, 16), Repeat(-1, 16), Repeat(-1, 28),
         new[] { 0, 64, 0, 64 }, Repeat(1, 16),   // EQ: 200 Hz / 3 kHz, gains 0 dB, every part through the EQ
-        InsEach(_ => Cat(new[] { 0x49 * 128, 127 }, Repeat(-1, 16))));
+        InsEach(_ => Cat(new[] { 0x49 * 128, 127 }, Repeat(-1, 16))), XgEq(0, 64, 7, 0, 0x0C, 0x1C, 0x22, 0x2E, 0x34));
     // Parameter set by type: in GS, type sets all effect's parameters;
     // in XG, only effect's own parameters (not return, pan or sends).
     public static readonly bool[] TypeDependent = CatBool(new[] {
@@ -77,14 +87,15 @@ public static class GsXgEffects
         true, true, true, true, true, true, true, true,
         true, false, false, true,  true, false, false, false, true, true, true,  true, false, false, false, false, false, false },
         RepeatBool(true, 24), RepeatBool(false, 16), RepeatBool(true, 16), RepeatBool(true, 28), RepeatBool(false, 20),
-        InsTypeDependent, InsTypeDependent, InsTypeDependent, InsTypeDependent);
+        InsTypeDependent, InsTypeDependent, InsTypeDependent, InsTypeDependent, RepeatBool(true, XgEqSize));
     static bool[] InsTypeDependent => CatBool(new[] { true, false }, RepeatBool(true, 16));
     public const int InsFirst = 146, InsSize = 18, InsCount = 4, InsBlockFirst = 8;
-    public const int Count = InsFirst + InsCount * InsSize;
-    // Type of each block (GS Reverb, GS Chorus, GS Delay, XG Reverb, XG Chorus, XG Variation, EFX, XG Insertion 1-4);
-    // the EQ has none.
-    static readonly int[] TypeParams = { 0, 7, 16, 24, 28, 35, 42, InsFirst, InsFirst + InsSize, InsFirst + 2 * InsSize, InsFirst + 3 * InsSize };
-    public const int Blocks = InsBlockFirst + InsCount;
+    public const int XgEqFirst = InsFirst + InsCount * InsSize, XgEqSize = 18, XgEqBlock = InsBlockFirst + InsCount;
+    public const int Count = XgEqFirst + XgEqSize;
+    // Type of each block (GS Reverb, GS Chorus, GS Delay, XG Reverb, XG Chorus, XG Variation, EFX, XG Insertion 1-4,
+    // XG Multi EQ); the GS EQ has none.
+    static readonly int[] TypeParams = { 0, 7, 16, 24, 28, 35, 42, InsFirst, InsFirst + InsSize, InsFirst + 2 * InsSize, InsFirst + 3 * InsSize, XgEqFirst };
+    public const int Blocks = XgEqBlock + 1;
 
     static int[] Cat(params int[][] parts) { var l = new List<int>(); foreach (var a in parts) l.AddRange(a); return l.ToArray(); }
     static bool[] CatBool(params bool[][] parts) { var l = new List<bool>(); foreach (var a in parts) l.AddRange(a); return l.ToArray(); }
@@ -97,8 +108,8 @@ public static class GsXgEffects
     static readonly bool[] effectFixed = new bool[Count];   // fixed in interface?
     static readonly int[] effectFixedValue = new int[Count];
 
-    public static bool IsXg(int e) { return (Block[e] >= 3 && Block[e] <= 5) || IsInsertion(e); }
-    public static bool IsInsertion(int e) { return e >= InsFirst; }
+    public static bool IsXg(int e) { return (Block[e] >= 3 && Block[e] <= 5) || e >= InsFirst; }
+    public static bool IsInsertion(int e) { return e >= InsFirst && e < XgEqFirst; }
     // Type of the insertion effect of a parameter, and its parameters 1 to 10 (see Addresses).
     public static int InsertionType(int e) { return InsFirst + (e - InsFirst) / InsSize * InsSize; }
     static bool IsInsertionParam10(int e) { return IsInsertion(e) && Addresses[e] >= 0x02 && Addresses[e] <= 0x0B; }
@@ -145,8 +156,8 @@ public static class GsXgEffects
         if (IsXg(e))
         {
             if (Size(e) == 2)
-                return new NormalSysExEvent(new byte[] { 0x43, 0x10, 0x4C, 0x02, 0x01, (byte)address, (byte)(value >> 7), (byte)(value & 0x7F), 0xF7 });
-            return new NormalSysExEvent(new byte[] { 0x43, 0x10, 0x4C, 0x02, 0x01, (byte)address, (byte)value, 0xF7 });
+                return new NormalSysExEvent(new byte[] { 0x43, 0x10, 0x4C, 0x02, (byte)AddressHi[e], (byte)address, (byte)(value >> 7), (byte)(value & 0x7F), 0xF7 });
+            return new NormalSysExEvent(new byte[] { 0x43, 0x10, 0x4C, 0x02, (byte)AddressHi[e], (byte)address, (byte)value, 0xF7 });
         }
         int hi = AddressHi[e];
         byte[] data = Size(e) == 2
@@ -171,8 +182,9 @@ public static class GsXgEffects
             hi = d[5];
             gs = true; first = 7; start = 6; dataCount = d.Length - 9;      // … data, checksum, F7
         }
-        else if (d.Length >= 8 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0x02 && d[4] == 0x01)
+        else if (d.Length >= 8 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0x02 && (d[4] == 0x01 || d[4] == 0x40))
         {
+            hi = d[4];
             first = 6; start = 5; dataCount = d.Length - 7;                // … data, F7
         }
         else if (d.Length >= 8 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0x03 && d[4] < InsCount)
@@ -199,7 +211,7 @@ public static class GsXgEffects
             address = d[start] + i;
             for (int e = 0; e < Count; e++)
             {
-                if (IsXg(e) == gs || (gs && AddressHi[e] != hi)) continue;
+                if (IsXg(e) == gs || IsInsertion(e) || AddressHi[e] != hi) continue;
                 if (Addresses[e] == address) { result.Add(new[] { first + i, e, 0 }); break; }
                 if (Size(e) == 2 && Addresses[e] + 1 == address) { result.Add(new[] { first + i, e, 1 }); break; }
             }

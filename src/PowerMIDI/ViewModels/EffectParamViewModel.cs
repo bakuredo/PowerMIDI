@@ -114,13 +114,23 @@ public sealed class EffectChannelViewModel : EffectParamViewModel
         Number = number;
     }
 
+    // Button of a part of an XG Variation / Insertion effect: the parameter (index) is the part the effect is
+    // inserted on, one at most. Pressed = this part; pressing it again takes the effect off every part.
+    public EffectChannelViewModel(EffectsViewModel effects, int index, int channel, int offValue) : this(effects, index, channel)
+    {
+        Part = channel;
+        this.offValue = offValue;
+    }
+
     public string Number { get; }
+    public int Part { get; } = -1;   // -1: a switch of its own (0 / 1)
+    readonly int offValue;
 
     bool isChecked;
     public bool IsChecked
     {
         get => isChecked;
-        set { if (Set(ref isChecked, value)) Fix(value ? 1 : 0); }
+        set { if (Set(ref isChecked, value)) Fix(Part >= 0 ? (value ? Part : offValue) : value ? 1 : 0); }
     }
 }
 
@@ -148,5 +158,8 @@ public sealed class EffectBlockViewModel : ObservableObject
     public string ChannelsLabel { get; init; } = "Channels";
     public List<EffectParamViewModel> Params { get; } = new();
     public List<EffectChannelViewModel> Channels { get; } = new();
-    public bool HasChannels => Channels.Count > 0;
+    public bool HasChannels => Channels.Count > 0 && channelsShown;
+    // False: the buttons do not apply now (XG Variation connected as a system effect).
+    bool channelsShown = true;
+    internal bool ChannelsShown { set { if (Set(ref channelsShown, value)) OnPropertyChanged(nameof(HasChannels)); } }
 }

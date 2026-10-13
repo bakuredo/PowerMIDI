@@ -10,7 +10,8 @@ namespace PowerMIDI.ViewModels;
 // Index = the one in GsXgEffects.Addresses. Blocks 0-2: GS (SysEx 40 01 xx); blocks 3-5: XG (02 01 xx);
 // block 6: GS EFX of the SC-88Pro / SC-8850 (40 03 xx, and 40 4x 22 for the EFX on each channel);
 // block 7: GS EQ of the SC-88 and later (40 02 xx, and 40 4x 20 for the EQ on each channel).
-// blocks 8-11: XG insertion effects 1 to 4 of the MU100 and later (03 0x xx), not offered with the MU Basic voice map.
+// blocks 8-11: XG insertion effects 1 to 4 of the MU100 and later (03 0x xx), block 12: its Multi EQ (02 40 xx);
+// they are not offered with the MU Basic voice map.
 // The values live in GsXgEffects, Mt32Effects and Gm2Effects (shared with the playback thread); this view model shows them and fixes
 // the ones the user changes.
 public sealed class EffectsViewModel : ObservableObject
@@ -24,7 +25,7 @@ public sealed class EffectsViewModel : ObservableObject
     const int EqChannelFirst = 130;   // 130-145: GS EQ on channels 1 to 16
 
     static readonly string[] BlockNames = { "Reverb", "Chorus", "Delay", "Reverb", "Chorus", "Variation", "EFX (SC-88Pro / SC-8850)",
-                                            "EQ (SC-88 and later)", "Insertion 1", "Insertion 2", "Insertion 3", "Insertion 4" };
+                                            "EQ (SC-88 and later)", "Insertion 1", "Insertion 2", "Insertion 3", "Insertion 4", "Multi EQ" };
     static readonly string[] Labels = new[]
         {
             "Type", "Character", "Pre-LPF", "Level", "Time", "Delay feedback", "Pre-delay",                 // GS Reverb
@@ -44,6 +45,9 @@ public sealed class EffectsViewModel : ObservableObject
         .Concat(Enumerable.Range(1, 16).Select(i => $"Channel {i}"))   // GS EQ per channel
         .Concat(Enumerable.Range(0, GsXgEffects.InsCount).SelectMany(_ =>                           // XG Insertion 1-4
             new[] { "Type", "Part" }.Concat(Enumerable.Range(1, 16).Select(i => $"Param. {i}"))))
+        .Concat(new[] { "Type", "Low Gain", "Low Frequency", "Low Q", "Low Shape", "Low-Mid Gain", "Low-Mid Frequency", "Low-Mid Q",   // XG Multi EQ
+                        "Mid Gain", "Mid Frequency", "Mid Q", "High-Mid Gain", "High-Mid Frequency", "High-Mid Q",
+                        "High Gain", "High Frequency", "High Q", "High Shape" })
         .ToArray();
 
     static readonly int[] PanParams = { 26, 30, 37 };   // XG pan: L63..C..R63
@@ -123,10 +127,13 @@ public sealed class EffectsViewModel : ObservableObject
             "PH / AutoWah", Xg(0x11, 0x08)),
     };
 
+    readonly Dictionary<int, string> xgEqFrequencies = new();   // XG Multi EQ: value -> "500Hz"
     readonly InstrumentDefinitions defs;
     readonly Func<IOutputDevice> output;   // current MIDI port (null if none)
     readonly Action<Exception> showError;
     readonly EffectParamViewModel[] parameters = new EffectParamViewModel[EffectCount];
+    EffectBlockViewModel variationBlock;
+    readonly List<EffectChannelViewModel> partButtons = new();   // XG Variation / Insertion part buttons (16 per effect)
     readonly List<EffectBlockViewModel> gsBlocks = new(), xgBlocks = new(), mt32Blocks = new();
 
     // MT-32 page: parameter p of Mt32Effects has the index Mt32Base + p (the GS / XG ones are 0..145).
@@ -180,10 +187,16 @@ public sealed class EffectsViewModel : ObservableObject
             choices[type] = choices[VarTypeParam].Where(c => c.Value != 0).ToList();
             choices[type + 1] = choices[41];
         }
+        // XG Multi EQ: types, shape of the first and the last band; the frequencies are those of the EQ parameters
+        // of the effect types (one table: 32 Hz … 16 kHz).
+        choices[GsXgEffects.XgEqFirst] = IndexedChoices("Flat", "Jazz", "Pops", "Rock", "Concert");
+        choices[GsXgEffects.XgEqFirst + 4] = choices[GsXgEffects.XgEqFirst + 17] = IndexedChoices("Shelving", "Peaking");
+        foreach (var p in defs.XgVariationTypes.Values.SelectMany(t => t.Params.Values).Where(p => Regex.IsMatch(p.Name, @"^EQ .*Frequency$")))
+            foreach (var (value, label) in p.Labels) xgEqFrequencies[value] = label;
 
-        // Display order: GS (Reverb, Chorus, Delay, EQ, EFX) then XG (Reverb, Chorus, Variation, Insertion 1-4); within each block,
+        // Display order: GS (Reverb, Chorus, Delay, EQ, EFX) then XG (Reverb, Chorus, Variation, Insertion 1-4, Multi EQ); within each block,
         // by index (type first). Parameters added at the end of the list thus land in their block.
-        var blockOrder = new[] { 0, 1, 2, 7, 6, 3, 4, 5, 8, 9, 10, 11 };
+        var blockOrder = new[] { 0, 1, 2, 7, 6, 3, 4, 5, 8, 9, 10, 11, 12 };
         var blocks = new Dictionary<int, EffectBlockViewModel>();
         foreach (int fx in Enumerable.Range(0, EffectCount).OrderBy(fx => Array.IndexOf(blockOrder, GsXgEffects.Block[fx])).ThenBy(fx => fx))
         {
@@ -191,9 +204,10 @@ public sealed class EffectsViewModel : ObservableObject
             var group = GsXgEffects.IsXg(fx) ? xgBlocks : gsBlocks;
             if (!blocks.TryGetValue(b, out var block))
             {
-                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : "Channels", ShowTitle = false,
-                                                   TabTitle = b >= GsXgEffects.InsBlockFirst ? $"Ins {b - GsXgEffects.InsBlockFirst + 1}" : BlockNames[b].Split(" (")[0] };
+                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : GsXgEffects.IsXg(fx) ? "Part" : "Channels", ShowTitle = false,
+                                                   TabTitle = b == GsXgEffects.XgEqBlock ? "EQ" : b >= GsXgEffects.InsBlockFirst ? $"Ins {b - GsXgEffects.InsBlockFirst + 1}" : BlockNames[b].Split(" (")[0] };
                 blocks[b] = block;
+                if (b == 5) variationBlock = block;
                 group.Add(block);
             }
             if (ButtonChannel(fx) >= 0)
@@ -206,7 +220,16 @@ public sealed class EffectsViewModel : ObservableObject
             EffectParamViewModel p = choices.TryGetValue(fx, out var list) ? new EffectListViewModel(this, fx, list)
                                    : new EffectSliderViewModel(this, fx) { Minimum = GsXgEffects.Min[fx], Maximum = GsXgEffects.Max[fx] };
             p.Label = Labels[fx];
-            block.Params.Add(p);
+            // XG Variation / Insertion part: 16 buttons above the parameters, like the channels of the GS EFX (the list
+            // stays out of the block: it still describes the value). 127 = on no part.
+            if (IsXgPart(fx))
+                for (int part = 0; part < 16; part++)
+                {
+                    var button = new EffectChannelViewModel(this, fx, part, 127);
+                    block.Channels.Add(button);
+                    partButtons.Add(button);
+                }
+            else block.Params.Add(p);
             parameters[fx] = p;
         }
 
@@ -301,11 +324,11 @@ public sealed class EffectsViewModel : ObservableObject
     public IEnumerable<EffectBlockViewModel> OtherBlocks => HasTabs ? new[] { selectedTabs[Blocks] } : Blocks.Skip(SideBlockCount);
 
     // GS and XG: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX;
-    // XG: Reverb, Chorus, Variation, Ins 1 to 4).
+    // XG: Reverb, Chorus, Variation, Ins 1 to 4, EQ).
     public bool HasTabs => Mode is "GS" or "XG";
     public IReadOnlyList<EffectBlockViewModel> Tabs =>
         !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgBlocks.Take(XgBlocksWithoutInsertion).ToList() : Blocks;
-    // The XG insertion effects are not offered with the MU Basic voice map: an XG Level 1 module has none.
+    // The XG insertion effects and Multi EQ are not offered with the MU Basic voice map: an XG Level 1 module has none.
     const int XgBlocksWithoutInsertion = 3;
     bool showInsertion = true;
     void RefreshTabs()
@@ -394,7 +417,7 @@ public sealed class EffectsViewModel : ObservableObject
             case 4: types = defs.XgChorusTypes; typeParam = 28; break;
             case 5: types = defs.XgVariationTypes; typeParam = VarTypeParam; break;
             case 6: types = defs.EfxTypes; typeParam = EfxTypeParam; break;
-            case >= GsXgEffects.InsBlockFirst: types = defs.XgVariationTypes; typeParam = GsXgEffects.InsertionType(fx); break;
+            case >= GsXgEffects.InsBlockFirst and < GsXgEffects.XgEqBlock: types = defs.XgVariationTypes; typeParam = GsXgEffects.InsertionType(fx); break;
             default: return null;
         }
         int code = GsXgEffects.Value(typeParam);
@@ -478,6 +501,14 @@ public sealed class EffectsViewModel : ObservableObject
         if (PanParams.Contains(fx)) return MixerViewModel.FormatControllerValue(1, value);
         if (SignedParams.Contains(fx)) { int d = value - 64; return d > 0 ? $"+{d}" : d.ToString(); }
         if (EqGainParams.Contains(fx)) { int d = value - 64; return (d > 0 ? $"+{d}" : d.ToString()) + " dB"; }
+        if (fx >= GsXgEffects.XgEqFirst)
+        {
+            // XG Multi EQ: gain, frequency and Q of a band (the type and the shapes are lists).
+            string label = Labels[fx];
+            if (label.EndsWith("Gain")) { int d = value - 64; return (d > 0 ? $"+{d}" : d.ToString()) + " dB"; }
+            if (label.EndsWith("Frequency")) return xgEqFrequencies.TryGetValue(value, out var hz) ? hz : value.ToString();
+            return string.Format(CultureInfo.InvariantCulture, "{0:0.0}", value / 10.0);
+        }
         return value.ToString();
     }
 
@@ -581,6 +612,32 @@ public sealed class EffectsViewModel : ObservableObject
         }
     }
 
+    // XG Variation part (41) or part of an insertion effect (its second parameter).
+    static bool IsXgPart(int fx) => fx == 41 || (GsXgEffects.IsInsertion(fx) && fx == GsXgEffects.InsertionType(fx) + 1);
+
+    // Part buttons of the XG Variation / Insertion effects: the one of the part is pressed, in blue when fixed.
+    void RefreshPartButtons()
+    {
+        // Variation: the part only applies when it is connected as an insertion effect (connection 0).
+        variationBlock.ChannelsShown = GsXgEffects.Value(40) != 1;
+        foreach (var button in partButtons)
+        {
+            int v = GsXgEffects.Value(button.Index);
+            bool on = v == button.Part, isFixed = on && GsXgEffects.IsFixed(button.Index);
+            var key = $"{on}/{isFixed}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsFixed = isFixed;
+                button.IsChecked = on;
+                button.ToolTip = $"Part {button.Part + 1}: " + (on ? "goes through the effect" : "no effect");
+            }
+            finally { button.Updating = false; }
+        }
+    }
+
     // Updates every parameter from GsXgEffects: fixed value (blue), from the file, or "auto" (gray).
     // A parameter is only updated if something changed (the EFX / XG types change the name and range of theirs).
     public void Refresh()
@@ -588,6 +645,7 @@ public sealed class EffectsViewModel : ObservableObject
         RefreshMt32();
         RefreshGm2();
         RefreshTabs();
+        RefreshPartButtons();
         for (int fx = 0; fx < EffectCount; fx++)
         {
             var p = parameters[fx];

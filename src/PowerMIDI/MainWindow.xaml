@@ -415,7 +415,7 @@
       <!-- EFX on a channel: pressed = the part goes through the EFX; blue when fixed (dark if pressed, on a light background). -->
       <DataTemplate DataType="{x:Type vm:EffectChannelViewModel}">
         <ToggleButton Content="{Binding Number}" IsChecked="{Binding IsChecked}" ToolTip="{Binding ToolTip}"
-                      Width="30" Height="22" Margin="0,0,4,4" FontSize="11">
+                      Width="24" Height="22" Margin="0,0,4,4" FontSize="11" Padding="0">
           <ToggleButton.InputBindings>
             <MouseBinding MouseAction="RightClick" Command="{Binding ClearCommand}"/>
           </ToggleButton.InputBindings>
@@ -438,8 +438,7 @@
           </ToggleButton.Style>
         </ToggleButton>
       </DataTemplate>
-
-      <!-- Block: title, parameters, and the channel buttons of the EFX. -->
+      <!-- Block: title, the channel (part) buttons of the effects that have them, then the parameters. -->
       <DataTemplate DataType="{x:Type vm:EffectBlockViewModel}">
         <StackPanel>
           <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" Visibility="{Binding ShowTitle, Converter={StaticResource BoolToVisibility}}">
@@ -452,9 +451,8 @@
               </Style>
             </TextBlock.Style>
           </TextBlock>
-          <ItemsControl ItemsSource="{Binding Params}"/>
           <!-- Channel buttons: their label on its own line, so that they also fit in a half-width block. -->
-          <DockPanel Margin="0,4,0,0" Visibility="{Binding HasChannels, Converter={StaticResource BoolToVisibility}}">
+          <DockPanel Margin="0,0,0,4" Visibility="{Binding HasChannels, Converter={StaticResource BoolToVisibility}}">
             <TextBlock DockPanel.Dock="Top" Text="{Binding ChannelsLabel}" Margin="8,3,0,5"/>
             <ItemsControl ItemsSource="{Binding Channels}" Margin="8,0,0,0">
               <ItemsControl.ItemsPanel>
@@ -462,6 +460,7 @@
               </ItemsControl.ItemsPanel>
             </ItemsControl>
           </DockPanel>
+          <ItemsControl ItemsSource="{Binding Params}"/>
         </StackPanel>
       </DataTemplate>
     </TabItem.Resources>
@@ -490,7 +489,7 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate DataType="{x:Type vm:EffectBlockViewModel}">
             <ToggleButton Content="{Binding TabTitle}" ToolTip="{Binding Title}"
-                          IsChecked="{Binding IsSelected}" Padding="14,2" Margin="0,0,4,0" FontSize="12"/>
+                          IsChecked="{Binding IsSelected}" Padding="9,2" Margin="0,0,4,0" FontSize="12"/>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
