@@ -42,14 +42,41 @@ public sealed class InstrumentChoice
     public int? AssignXgBank { get; init; }
 }
 
-// GM, GM2, MT-32, GS and XG banks and effect types, read from the Domino sequencer definition files
-// (instruments\GM.xml, GM2.xml, MT-32.xml, GS.xml = SC-8850, XG.xml = XGb / MU50), converted to UTF-8.
+// GM, GM2, MT-32, GS and XG banks and effect types, read from definition files in the format of the Domino
+// sequencer (instruments\GM.xml, GM2.xml, MT-32.xml, GS.xml = SC-8850, XG.xml = MU2000), in UTF-8.
 // Programs are 0-based. GS maps: 1 = SC-55, 2 = SC-88, 3 = SC-88Pro, 4 = SC-8850.
-// XG drums: MSB 127 = drum kits, 126 = SFX kits. GM2: MSB 121 + LSB = melodic sounds, MSB 120 = drum kits.
+// XG drums: MSB 127 = drum kits, 126 = SFX kits; XG maps: see XgMapNames.
+// GM2: MSB 121 + LSB = melodic sounds, MSB 120 = drum kits.
 public sealed class InstrumentDefinitions
 {
     public static readonly Dictionary<int, string> GsMapNames = new() { [1] = "SC-55", [2] = "SC-88", [3] = "SC-88Pro", [4] = "SC-8850" };
     public const int DefaultGsMap = 4;   // map used when the file sends no LSB (CC32): the SC-8850's
+
+    // XG maps of the MU2000 (map selector of a channel in XG mode). Unlike the GS maps, most of them are families
+    // of sounds picked by the bank MSB. 2000: the voices of bank MSB 0, whose 128 capital voices have two versions
+    // (bank LSB 0 = MU100 Native voices, the default of the module, also LSB 126; LSB 127 = MU Basic voices);
+    // the list shows the MU100 Native ones.
+    // MU50: the voices an XG Level 1 module also has (capital voices and part of the variations, marked MU50="1" in
+    // the file), offered when the module plays the MU Basic voice map; its capital voices are plain bank LSB 0.
+    // With that voice map, only the MU50 map, the SFX voices and the drum kits of the MU50 are offered.
+    public static readonly Dictionary<int, string> XgMapNames = new()
+        { [2] = "2000", [3] = "MEx", [4] = "SFX", [5] = "Spl", [6] = "GM2", [7] = "50" };
+    public const int XgNativeMap = 2, XgSamplingMap = 5, XgMu50Map = 7;
+    public const int XgBasicLsb = 127, XgNativeLsb = 126;
+
+    // Map of an XG voice (not of a drum kit); a bank the MU2000 does not have counts as the default map.
+    public static int XgMap(int msb, int lsb) => msb switch { 48 => 3, 64 => 4, 16 => 5, 121 => 6, _ => XgNativeMap };
+
+    // Map of an XG voice when the MU50 map is offered (MU Basic voice map): a voice the MU50 has belongs to it,
+    // unless its bank asks for the MU100 Native version of the capital voice (LSB 126).
+    public int XgMap(int msb, int lsb, int program, bool withMu50) =>
+        withMu50 && msb == 0 && lsb != XgNativeLsb && XgMu50Voices.Contains((0, lsb == XgBasicLsb ? 0 : lsb, program)) ? XgMu50Map : XgMap(msb, lsb);
+
+    static bool IsInXgMap(int map, int msb, int lsb) => map switch
+    {
+        3 => msb == 48, 4 => msb == 64, XgSamplingMap => msb == 16, 6 => msb == 121,
+        _ => msb == 0 && lsb < XgNativeLsb,
+    };
 
     public readonly Dictionary<int, string> GmVoices = new();
     public readonly Dictionary<int, string> GmDrums = new();
@@ -62,6 +89,8 @@ public sealed class InstrumentDefinitions
     public readonly Dictionary<(int Map, int Program), string> GsDrums = new();
     public readonly Dictionary<(int Msb, int Lsb, int Program), string> XgVoices = new();
     public readonly Dictionary<(int Msb, int Program), string> XgDrums = new();
+    public readonly HashSet<(int Msb, int Lsb, int Program)> XgMu50Voices = new();   // voices the MU50 also has
+    public readonly HashSet<(int Msb, int Program)> XgMu50Drums = new();             // and its drum kits
     public Dictionary<int, EffectTypeDef> EfxTypes = new();
     public Dictionary<int, EffectTypeDef> XgReverbTypes = new();
     public Dictionary<int, EffectTypeDef> XgChorusTypes = new();
@@ -142,24 +171,26 @@ public sealed class InstrumentDefinitions
         if (File.Exists(xgFile))
         {
             var x = LoadXml(xgFile);
-            // After the "TG300B" header come the MU50's GS mode sounds: ignore them.
-            bool inGsSection = false;
             foreach (XmlElement map in x.SelectNodes("/ModuleData/InstrumentList/Map"))
             {
-                if ((Attr(map, "Name") ?? "").Contains("TG300B", StringComparison.OrdinalIgnoreCase)) inGsSection = true;
-                if (inGsSection) continue;
                 foreach (var pc in Children(map, "PC"))
                     foreach (var bank in Children(pc, "Bank"))
                     {
                         if (!int.TryParse(Attr(bank, "MSB"), out int msb) || msb > 127) continue;
-                        defs.XgVoices[(msb, int.Parse(Attr(bank, "LSB")), int.Parse(Attr(pc, "PC")) - 1)] = Attr(bank, "Name");
+                        var key = (msb, int.Parse(Attr(bank, "LSB")), int.Parse(Attr(pc, "PC")) - 1);
+                        defs.XgVoices[key] = Attr(bank, "Name");
+                        if (Attr(bank, "MU50") == "1") defs.XgMu50Voices.Add(key);
                     }
             }
             foreach (XmlElement map in x.SelectNodes("/ModuleData/DrumSetList/Map"))
                 foreach (var pc in Children(map, "PC"))
                     foreach (var bank in Children(pc, "Bank"))
                         if (Attr(bank, "MSB") is "126" or "127")
-                            defs.XgDrums[(int.Parse(Attr(bank, "MSB")), int.Parse(Attr(pc, "PC")) - 1)] = Attr(pc, "Name");
+                        {
+                            var key = (int.Parse(Attr(bank, "MSB")), int.Parse(Attr(pc, "PC")) - 1);
+                            defs.XgDrums[key] = Attr(pc, "Name");
+                            if (Attr(bank, "MU50") == "1") defs.XgMu50Drums.Add(key);
+                        }
             defs.XgReverbTypes = ReadXgEffectDefinitions(x, "00", "Reverb Parameter");
             defs.XgChorusTypes = ReadXgEffectDefinitions(x, "20", "Chorus Parameter");
             defs.XgVariationTypes = ReadXgEffectDefinitions(x, "40", "Variation Parameter");
@@ -399,7 +430,9 @@ public sealed class InstrumentDefinitions
     }
 
     // Instruments offered for a channel, sorted by program then bank. Cached per (standard, type, map).
-    public IReadOnlyList<InstrumentChoice> GetChoices(string standard, bool drum, int lsb)
+    // map: in GS, the map of the channel (bank LSB 1 to 4, anything else: the default one); in XG, see XgMapNames.
+    // mu50Only (XG, MU Basic voice map): only the drum kits and the SFX voices the MU50 also has.
+    public IReadOnlyList<InstrumentChoice> GetChoices(string standard, bool drum, int lsb, bool mu50Only = false)
     {
         // MT-32: the 128 preset patches, or the rhythm part.
         bool mt32 = standard == "MT-32" && Mt32Voices.Count > 0;
@@ -407,27 +440,35 @@ public sealed class InstrumentDefinitions
         bool gm2 = !mt32 && standard == "GM2" && Gm2Voices.Count > 0;
         bool useXg = !mt32 && !gm2 && standard == "XG" && XgVoices.Count > 0;
         bool useGs = !mt32 && !gm2 && !useXg && standard != "GM" && standard != "GM2" && GsVoices.Count > 0;
-        int map = lsb >= 1 && lsb <= 4 ? lsb : DefaultGsMap;
-        var cacheKey = $"{mt32}/{gm2}/{useXg}/{useGs}/{drum}/{map}";
+        int map = useXg ? (XgMapNames.ContainsKey(lsb) ? lsb : XgNativeMap) : lsb >= 1 && lsb <= 4 ? lsb : DefaultGsMap;
+        mu50Only &= useXg;
+        var cacheKey = $"{mt32}/{gm2}/{useXg}/{useGs}/{drum}/{map}/{mu50Only}";
         if (choiceCache.TryGetValue(cacheKey, out var cached)) return cached;
 
         var raw = new List<(int Msb, int Lsb, int Program, string Name)>();
         if (mt32) raw.AddRange((drum ? Mt32Drums : Mt32Voices).Select(kv => (0, 0, kv.Key, kv.Value)));
         else if (gm2 && drum) raw.AddRange(Gm2Drums.Select(kv => (Gm2DrumMsb, 0, kv.Key, kv.Value)));
         else if (gm2) raw.AddRange(Gm2Voices.Select(kv => (Gm2MelodicMsb, kv.Key.Lsb, kv.Key.Program, kv.Value)));
-        else if (useXg && drum) raw.AddRange(XgDrums.Select(kv => (kv.Key.Msb, 0, kv.Key.Program, kv.Value)));
-        else if (useXg) raw.AddRange(XgVoices.Select(kv => (kv.Key.Msb, kv.Key.Lsb, kv.Key.Program, kv.Value)));
+        else if (useXg && drum) raw.AddRange(XgDrums.Where(kv => !mu50Only || XgMu50Drums.Contains(kv.Key)).Select(kv => (kv.Key.Msb, 0, kv.Key.Program, kv.Value)));
+        // MU50 map: its capital voices are the MU Basic ones (named by bank LSB 127), sent as plain bank LSB 0.
+        else if (useXg && map == XgMu50Map)
+            raw.AddRange(XgMu50Voices.Where(k => k.Msb == 0).Select(k => (0, k.Lsb, k.Program,
+                k.Lsb == 0 && XgVoices.TryGetValue((0, XgBasicLsb, k.Program), out var basic) ? basic : XgVoices[k])));
+        else if (useXg) raw.AddRange(XgVoices.Where(kv => IsInXgMap(map, kv.Key.Msb, kv.Key.Lsb) && (!mu50Only || XgMu50Voices.Contains(kv.Key))).Select(kv => (kv.Key.Msb, kv.Key.Lsb, kv.Key.Program, kv.Value)));
         else if (useGs && drum) raw.AddRange(GsDrums.Where(kv => kv.Key.Map == map).Select(kv => (0, map, kv.Key.Program, kv.Value)));
         else if (useGs) raw.AddRange(GsVoices.Where(kv => kv.Key.Map == map).Select(kv => (kv.Key.Msb, map, kv.Key.Program, kv.Value)));
         else if (drum && GmDrums.Count > 0) raw.AddRange(GmDrums.Select(kv => (0, 0, kv.Key, kv.Value)));
         else for (int pc = 0; pc < 128; pc++) raw.Add((0, 0, pc, GmProgramName(pc)));
 
-        // In XG, the SFX voices (MSB 64) and SFX kits (MSB 126) come after the normal sounds.
-        var choices = raw.OrderBy(r => useXg && r.Msb >= 64 && r.Msb != 127).ThenBy(r => r.Program).ThenBy(r => r.Msb).ThenBy(r => r.Lsb)
-            .Select(r =>
+        // In XG, the SFX kits (MSB 126) come after the drum kits; the sampling voices are listed bank after bank.
+        bool byBank = useXg && !drum && map == XgSamplingMap;
+        var sorted = raw.OrderBy(r => useXg && drum && r.Msb == 126).ThenBy(r => byBank ? r.Lsb : 0).ThenBy(r => r.Program)
+                        .ThenBy(r => r.Msb).ThenBy(r => r.Lsb).ToList();
+        var choices = sorted.Select((r, i) =>
             {
                 // Base sound of a program: number shown. Variation: indented under its program.
-                bool isBase = drum || mt32 || (gm2 && r.Lsb == 0) || (r.Msb == 0 && (useGs || r.Lsb == 0)) || (useXg && r.Msb == 64 && r.Lsb == 0);
+                bool isBase = drum || mt32 || (gm2 && r.Lsb == 0) || (useGs && r.Msb == 0) || (!gm2 && !useGs && !useXg)
+                              || (useXg && (byBank || i == 0 || sorted[i - 1].Program != r.Program));
                 var prefix = isBase ? $"{r.Program + 1:000} " : "      · ";
                 return new InstrumentChoice { Text = prefix + r.Name, Msb = r.Msb, Lsb = r.Lsb, Program = r.Program };
             }).ToList();

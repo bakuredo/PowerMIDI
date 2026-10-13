@@ -67,6 +67,7 @@ public static class ChannelMixer
             {
                 device.SendEvent(MasterVolumeEvent());
                 ApplyAll(device);
+                ApplyVoiceMap(device);
                 ReapplyOverrides(device);
                 ApplyEffects(device);
             }
@@ -135,6 +136,7 @@ public static class ChannelMixer
         RhythmPart[9] = 1;
         if (xg) BankMsb[9] = 127;
         DrumKitProgram[1] = DrumKitProgram[2] = -1;
+        fileVoiceMap = VoiceMapNative;
         Mt32Effects.ResetFile();
         Gm2Effects.ResetFile();
         GsXgEffects.ResetFile();
@@ -225,6 +227,36 @@ public static class ChannelMixer
     // GM2 mode: the file's GM2 reverb / chorus SysEx are read (Effects tab) and corrected with the values fixed there.
     public static bool Gm2Mode;
 
+    // ---------- XG voice map (MU100 and later) ----------
+    // The 128 capital voices (bank MSB 0, LSB 0) exist in two versions: MU Basic (0, the voices of the MU50) and
+    // MU100 Native (1, the default of the module). SysEx F0 43 1n 49 00 00 12 vv F7 chooses the one bank LSB 0
+    // plays; bank LSB 127 / 126 ask for one of them whatever this setting.
+    public const int VoiceMapBasic = 0, VoiceMapNative = 1;
+    public static bool XgMode;                     // XG track: the voice map chosen in the interface is sent
+    public static int VoiceMapOverride = -1;       // chosen in the interface (-1 = Auto: the file's)
+    static int fileVoiceMap = VoiceMapNative;      // last one asked by the file (MU100 Native after a reset)
+
+    // Voice map in effect: the one chosen in the interface, otherwise the file's.
+    public static int VoiceMap => VoiceMapOverride >= 0 ? VoiceMapOverride : fileVoiceMap;
+
+    static NormalSysExEvent VoiceMapEvent(int map) => new(new byte[] { 0x43, 0x10, 0x49, 0x00, 0x00, 0x12, (byte)map, 0xF7 });
+
+    static bool IsVoiceMapSysEx(byte[] d) =>
+        d.Length >= 8 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x49 && d[3] == 0 && d[4] == 0 && d[5] == 0x12;
+
+    // Chooses the voice map (-1 = Auto: back to the file's) and sends it to the module in XG mode.
+    public static void SetVoiceMap(IOutputDevice device, int map)
+    {
+        VoiceMapOverride = map;
+        if (device != null && XgMode) device.SendEvent(VoiceMapEvent(VoiceMap));
+    }
+
+    // The voice map chosen in the interface (start of track, seek, port change, after a reset in file).
+    public static void ApplyVoiceMap(IOutputDevice device)
+    {
+        if (XgMode && VoiceMapOverride >= 0) device.SendEvent(VoiceMapEvent(VoiceMapOverride));
+    }
+
     public static void SetController(IOutputDevice device, int k, int channel, int value)
     {
         OverrideCc[k, channel] = value;
@@ -306,6 +338,12 @@ public static class ChannelMixer
             }
             // Forced mode + "Clean": SysEx of other modes ignored (manufacturer 41 Roland / 43 Yamaha).
             if (ForceMode && MidiFileEditor.IsOtherModeSysEx(d, DropManufacturers)) return null;
+            // XG voice map asked by the file: remembered; replaced if one is chosen in the interface.
+            if (IsVoiceMapSysEx(d))
+            {
+                fileVoiceMap = d[6] == VoiceMapBasic ? VoiceMapBasic : VoiceMapNative;
+                return VoiceMapOverride >= 0 ? VoiceMapEvent(VoiceMapOverride) : e;
+            }
             if (MidiFileEditor.IsReset(e))
             {
                 // Mode forced in interface: file's resets (GS / XG / GM / GM2) are ignored.

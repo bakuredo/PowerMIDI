@@ -162,6 +162,14 @@ public sealed class EffectsViewModel : ObservableObject
             choices[EfxTypeParam] = new[] { new EffectChoice("Thru", 0) }
                 .Concat(defs.EfxTypes.OrderBy(kv => kv.Key).Select(kv => new EffectChoice(kv.Value.Name, kv.Key))).ToList();
 
+        // XG types: those of the definition file (MU2000: 19 reverbs, 21 choruses, 118 variations) when present;
+        // the lists above are only what an XG Level 1 module has.
+        static List<EffectChoice> TypeChoices(Dictionary<int, EffectTypeDef> types) =>
+            types.OrderBy(kv => kv.Key).Select(kv => new EffectChoice(kv.Key == 0 ? "Off" : kv.Value.Name, kv.Key)).ToList();
+        if (defs.XgReverbTypes.Count > 0) choices[24] = TypeChoices(defs.XgReverbTypes);
+        if (defs.XgChorusTypes.Count > 0) choices[28] = TypeChoices(defs.XgChorusTypes);
+        if (defs.XgVariationTypes.Count > 0) choices[VarTypeParam] = TypeChoices(defs.XgVariationTypes);
+
         // Display order: GS (Reverb, Chorus, Delay, EQ, EFX) then XG (Reverb, Chorus, Variation); within each block,
         // by index (type first). Parameters added at the end of the list thus land in their block.
         var blockOrder = new[] { 0, 1, 2, 7, 6, 3, 4, 5 };

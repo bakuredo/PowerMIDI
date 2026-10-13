@@ -12,8 +12,11 @@ PowerMIDI uses the following third-party work.
 The files of the `instruments` folder use the module definition format of the Domino sequencer by Takabo Soft
 (http://takabosoft.com/).
 
-`GS.xml` and `XG.xml` are based on files from the English translation of Domino by Hans5958
+`GS.xml` is based on a file from the English translation of Domino by Hans5958
 (https://github.com/Hans5958/Domino-English-Translation, MIT license).
+
+`XG.xml` lists the voices, drum kits and effects of the Yamaha MU2000, compiled from Yamaha's own data for that
+module (XGWorks database, MU2000 Sound List).
 
 These definition files remain the work of their respective authors.
 

@@ -97,6 +97,112 @@ public class InstrumentDefinitionsTests
         Assert.False(Defs.Resolve("MT-32", 0, 127, 0, 0, 0).Missing);
     }
 
+    // XG (MU2000): the bank gives the map of a voice.
+    [Theory]
+    [InlineData(0, 0, "2000")]
+    [InlineData(0, 126, "2000")]
+    [InlineData(0, 40, "2000")]
+    [InlineData(0, 127, "2000")]
+    [InlineData(48, 8, "MEx")]
+    [InlineData(64, 0, "SFX")]
+    [InlineData(16, 1, "Spl")]
+    [InlineData(121, 3, "GM2")]
+    [InlineData(5, 0, "2000")]      // a bank the module does not have
+    public void Xg_map_of_a_bank(int msb, int lsb, string map) =>
+        Assert.Equal(map, InstrumentDefinitions.XgMapNames[InstrumentDefinitions.XgMap(msb, lsb)]);
+
+    [Fact]
+    public void Xg_choices_follow_the_map()
+    {
+        IReadOnlyList<InstrumentChoice> Map(string name) =>
+            Defs.GetChoices("XG", false, InstrumentDefinitions.XgMapNames.First(m => m.Value == name).Key);
+        var native = Map("2000");
+        Assert.DoesNotContain("Basic", InstrumentDefinitions.XgMapNames.Values);
+
+        // The 128 capital voices: bank LSB 0 (MU100 Native, "#" on the reworked ones).
+        var nativeCapital = native.Where(c => c.Lsb == 0).ToList();
+        Assert.Equal(128, nativeCapital.Count);
+        Assert.Equal("001 Grand Piano #", nativeCapital[0].Text);
+        Assert.Contains(nativeCapital, c => c.Text.EndsWith("#"));
+        Assert.Equal(native[0], nativeCapital[0]);          // the capital voice first, then its variations
+
+        // The variations are indented under their capital voice.
+        var variations = native.Where(c => c.Lsb != 0).ToList();
+        Assert.NotEmpty(variations);
+        Assert.All(variations, c => Assert.StartsWith("      · ", c.Text));
+        Assert.DoesNotContain(native, c => c.Msb != 0 || c.Lsb >= InstrumentDefinitions.XgNativeLsb);
+
+        // The other maps are families of sounds, each with its bank MSB.
+        Assert.All(Map("MEx"), c => Assert.Equal(48, c.Msb));
+        Assert.All(Map("SFX"), c => Assert.Equal(64, c.Msb));
+        Assert.All(Map("GM2"), c => Assert.Equal(121, c.Msb));
+        var sampling = Map("Spl");
+        Assert.Equal(256, sampling.Count);
+        Assert.Equal(Enumerable.Range(1, 256).Select(n => $"Voice{n:000}"), sampling.Select(c => c.Text[4..]));
+        Assert.Equal(256, Map("GM2").Count);
+    }
+
+    // MU50 map (offered with the MU Basic voice map): the voices an XG Level 1 module also has.
+    [Fact]
+    public void Mu50_map_lists_the_voices_of_the_mu50()
+    {
+        Assert.Equal(480, Defs.XgMu50Voices.Count);
+        var mu50 = Defs.GetChoices("XG", false, InstrumentDefinitions.XgMu50Map);
+        Assert.Equal(438, mu50.Count);                                       // the others are SFX voices (their own map)
+        Assert.All(mu50, c => Assert.Equal(0, c.Msb));
+        Assert.Equal(128, mu50.Count(c => c.Lsb == 0));                      // capital voices: plain bank LSB 0
+        Assert.Equal("001 Grand Piano", mu50[0].Text);                       // with their MU Basic name
+        Assert.DoesNotContain(mu50, c => c.Text.EndsWith("#"));
+        Assert.Contains(mu50, c => c.Text == "      · Grand Piano KSP" && c.Lsb == 1);
+        var full = Defs.GetChoices("XG", false, InstrumentDefinitions.XgNativeMap);
+        Assert.True(mu50.Count < full.Count);
+
+        // Map of a voice when the MU50 map is offered, or not.
+        Assert.Equal(InstrumentDefinitions.XgMu50Map, Defs.XgMap(0, 0, 0, true));
+        Assert.Equal(InstrumentDefinitions.XgMu50Map, Defs.XgMap(0, 1, 0, true));
+        Assert.Equal(InstrumentDefinitions.XgMu50Map, Defs.XgMap(0, InstrumentDefinitions.XgBasicLsb, 0, true));    // the same voice
+        Assert.Equal(InstrumentDefinitions.XgNativeMap, Defs.XgMap(0, InstrumentDefinitions.XgNativeLsb, 0, true));
+        var notOnMu50 = full.First(c => c.Lsb != 0 && !Defs.XgMu50Voices.Contains((0, c.Lsb, c.Program)));
+        Assert.Equal(InstrumentDefinitions.XgNativeMap, Defs.XgMap(0, notOnMu50.Lsb, notOnMu50.Program, true));
+        Assert.Equal(InstrumentDefinitions.XgNativeMap, Defs.XgMap(0, 0, 0, false));
+        Assert.Equal(4, Defs.XgMap(64, 0, 0, true));
+
+        // With the MU Basic voice map: only the SFX voices and the drum kits of the MU50.
+        var sfx = Defs.GetChoices("XG", false, 4, true);
+        Assert.Equal(42, sfx.Count);
+        Assert.True(sfx.Count < Defs.GetChoices("XG", false, 4).Count);
+        var kits = Defs.GetChoices("XG", true, 0, true);
+        Assert.Equal(new[] { "001 Standard Kit", "002 Standard Kit 2", "009 Room Kit", "017 Rock Kit", "025 Electro Kit", "026 Analog Kit",
+                             "033 Jazz Kit", "041 Brush Kit", "049 Symphony Kit", "001 SFX Kit 1", "002 SFX Kit 2" }, kits.Select(c => c.Text));
+        Assert.True(kits.Count < Defs.GetChoices("XG", true, 0).Count);
+    }
+
+    [Fact]
+    public void Xg_names_of_the_mu2000()
+    {
+        Assert.Equal("Grand Piano #", Defs.Resolve("XG", 0, 0, 0, 0, 0).Name);
+        Assert.Equal("Grand Piano #", Defs.Resolve("XG", 0, 0, 0, InstrumentDefinitions.XgNativeLsb, 0).Name);
+        Assert.Equal("Grand Piano", Defs.Resolve("XG", 0, 0, 0, InstrumentDefinitions.XgBasicLsb, 0).Name);
+        Assert.Equal("Drums · Standard Kit", Defs.Resolve("XG", 9, 0, 127, 0, 0).Name);
+        Assert.Equal("Drums · SFX Kit 1", Defs.Resolve("XG", 9, 0, 126, 0, 0).Name);
+        Assert.Equal("Voice001", Defs.Resolve("XG", 0, 0, 16, 0, 0).Name);
+    }
+
+    [Fact]
+    public void Xg_effect_types_of_the_mu2000()
+    {
+        Assert.Equal(19, Defs.XgReverbTypes.Count);
+        Assert.Equal(21, Defs.XgChorusTypes.Count);
+        Assert.Equal(118, Defs.XgVariationTypes.Count);
+        Assert.Equal("Hall 1", Defs.XgReverbTypes[1 * 128].Name);
+        var cross = Defs.XgVariationTypes[8 * 128];
+        Assert.Equal("Cross Delay", cross.Name);
+        var delay = cross.Params[0x42];
+        Assert.Equal(("L->R Delay", 1, 7430, 1700, "1/10 ms"), (delay.Name, delay.Min, delay.Max, delay.Default, delay.Unit));
+        Assert.Equal("THRU", Defs.XgReverbTypes[1 * 128].Params[0x05].Labels[0]);     // HPF cutoff, wide open
+        Assert.Equal("22Hz", Defs.XgReverbTypes[1 * 128].Params[0x05].Labels[1]);
+    }
+
     // In GM, the drum channel only offers the GM kit, not those of the GS maps.
     [Fact]
     public void Choices_of_a_gm_drum_channel_are_the_gm_kits()

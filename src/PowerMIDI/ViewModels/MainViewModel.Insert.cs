@@ -123,6 +123,7 @@ public sealed partial class MainViewModel
         ChannelMixer.ForceMode = false;
         ChannelMixer.Mt32Mode = std == "MT-32";
         ChannelMixer.Gm2Mode = std == "GM2";
+        ChannelMixer.XgMode = std == "XG";
         ChannelMixer.DropManufacturers = Array.Empty<int>();
         Mixer.Standard = std;
         Mixer.HasCustomPatches = std == "MT-32" && MidiTools.HasMt32CustomPatches(midi);

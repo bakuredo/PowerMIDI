@@ -93,7 +93,10 @@ public sealed class ChannelViewModel : ObservableObject
 
     public string MuteText => IsSolo ? "S" : "M";
 
-    // ---------- GS map ----------
+    // ---------- Map (GS: Sound Canvas maps; XG: MU2000 maps) ----------
+    IReadOnlyList<MapChoice> mapItems = MixerViewModel.GsMapChoices;
+    public IReadOnlyList<MapChoice> MapItems { get => mapItems; internal set => Set(ref mapItems, value); }
+
     MapChoice selectedMap;
     public MapChoice SelectedMap
     {

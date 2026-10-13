@@ -121,6 +121,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (ini.GetInt("Playback", "MasterVolume") is int volume && volume is >= 0 and <= 127) MasterVolume = volume;
         Shuffle = ini.Get("Playback", "Shuffle") == "1";
         if (ini.GetInt("Playback", "Repeat") is int repeat && repeat is >= 0 and <= 2) RepeatMode = repeat;
+        Mixer.LoadVoiceMap(ini.Get("MIDI", "VoiceMap"));
     }
 
     public void WriteSettings(IniFile ini)
@@ -130,6 +131,7 @@ public sealed partial class MainViewModel : ObservableObject
         ini.Set("Playback", "Shuffle", Shuffle ? 1 : 0);
         ini.Set("Playback", "Repeat", RepeatMode);   // 0 = off, 1 = playlist, 2 = track
         ini.Set("Playback", "LastFolder", lastFolder ?? "");
+        ini.Set("MIDI", "VoiceMap", Mixer.VoiceMapSetting);
     }
 
     // ---------- MIDI port ----------
@@ -196,6 +198,7 @@ public sealed partial class MainViewModel : ObservableObject
     void ApplyMixerState()
     {
         ChannelMixer.ApplyAll(output);
+        ChannelMixer.ApplyVoiceMap(output);
         ChannelMixer.ReapplyOverrides(output);
         ChannelMixer.ApplyEffects(output);
     }
@@ -228,6 +231,7 @@ public sealed partial class MainViewModel : ObservableObject
         var std = selectedMode == "Auto" ? MidiTools.DefaultStandard : selectedMode;
         ChannelMixer.Mt32Mode = std == "MT-32";
         ChannelMixer.Gm2Mode = std == "GM2";
+        ChannelMixer.XgMode = std == "XG";
         if (output != null) MidiTools.SendReset(output, std);
         ChannelMixer.ResetChannelState(std == "XG");
         Mixer.Standard = std;
@@ -564,6 +568,7 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.ForceMode = isForced;   // file resets ignored
         ChannelMixer.Mt32Mode = std == "MT-32";   // MT-32 reverb SysEx follow the Effects tab
         ChannelMixer.Gm2Mode = std == "GM2";      // GM2 reverb / chorus SysEx too
+        ChannelMixer.XgMode = std == "XG";        // XG voice map chosen in the Mixer tab
         ChannelMixer.DropManufacturers = isCleaned ? MidiTools.GetOtherModeManufacturers(std) : Array.Empty<int>();
 
         MidiTools.SendReset(output, std);

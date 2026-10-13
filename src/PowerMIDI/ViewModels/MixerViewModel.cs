@@ -17,7 +17,10 @@ public sealed class MixerViewModel : ObservableObject
         "Decay Time", "Release Time", "Filter Cutoff", "Filter Resonance", "Vibrato Rate", "Vibrato Depth", "Vibrato Delay", "Modulation" };
     public static int ControllerCount => ControllerNames.Length;
 
-    public static readonly MapChoice[] MapChoices = { new("8850", 4), new("Pro", 3), new("88", 2), new("55", 1) };
+    public static readonly MapChoice[] GsMapChoices = { new("8850", 4), new("Pro", 3), new("88", 2), new("55", 1) };
+    public static readonly MapChoice[] XgMapChoices = { new("2000", 2), new("MEx", 3), new("SFX", 4), new("Spl", 5), new("GM2", 6) };
+    // With the MU Basic voice map: what the MU50 has.
+    public static readonly MapChoice[] XgMapChoicesMu50 = { new("50", InstrumentDefinitions.XgMu50Map), new("SFX", 4) };
 
     static readonly long LedHoldTicks = TimeSpan.FromMilliseconds(100).Ticks;
 
@@ -42,7 +45,71 @@ public sealed class MixerViewModel : ObservableObject
     public IReadOnlyList<ChannelViewModel> Channels { get; }
 
     // Standard of the current track (GS, XG, GM…), used to name the instruments. No track: the default one.
-    public string Standard { get; set; } = MidiTools.DefaultStandard;
+    string standard = MidiTools.DefaultStandard;
+    public string Standard
+    {
+        get => standard;
+        set { if (Set(ref standard, value)) OnPropertyChanged(nameof(IsXg)); }
+    }
+
+    // XG mode: the voice map list is shown under the channels.
+    public bool IsXg => HasXgBanks;
+
+    // ---------- XG voice map (the list under the channels): Auto, MU Basic, MU100 Native ----------
+    // It tells which version of the 128 capital voices bank LSB 0 plays (see ChannelMixer.VoiceMap): sent to the
+    // module, and followed by the names and the maps shown. It belongs to the module, not to the track: kept from
+    // one track to the next and remembered in PowerMIDI.ini; it is not written into the saved files.
+    public static readonly string[] VoiceMapNames = { "Auto", "MU Basic", "MU100 Native" };
+    static readonly string[] VoiceMapKeys = { "Auto", "Basic", "Native" };
+
+    public int VoiceMapIndex
+    {
+        get => ChannelMixer.VoiceMapOverride + 1;
+        set
+        {
+            if (value < 0 || value >= VoiceMapNames.Length || value == VoiceMapIndex) return;
+            Run(() =>
+            {
+                ChannelMixer.SetVoiceMap(output(), value - 1);
+                setStatus(value == 0 ? "XG voice map: Auto (file choice)" : $"XG voice map: {VoiceMapNames[value]}");
+                foreach (var ch in Channels) { ch.InstrumentKey = ""; ch.MapKey = ""; }
+                Refresh();
+            });
+            OnPropertyChanged();
+        }
+    }
+
+    // Value written in PowerMIDI.ini, and read from it at startup (nothing is sent: no track yet).
+    public string VoiceMapSetting => VoiceMapKeys[VoiceMapIndex];
+    public void LoadVoiceMap(string setting)
+    {
+        int index = Array.FindIndex(VoiceMapKeys, k => string.Equals(k, setting, StringComparison.OrdinalIgnoreCase));
+        ChannelMixer.VoiceMapOverride = Math.Max(index, 0) - 1;
+        OnPropertyChanged(nameof(VoiceMapIndex));
+    }
+
+    // Bank LSB of an XG capital voice as it sounds: LSB 0 follows the voice map, LSB 126 is the MU100 Native one
+    // (written 0, as in the definition file), LSB 127 the MU Basic one.
+    int EffectiveXgLsb(int msb, int lsb)
+    {
+        if (!HasXgBanks || msb != 0) return lsb;
+        if (lsb == 0) return ChannelMixer.VoiceMap == ChannelMixer.VoiceMapBasic ? InstrumentDefinitions.XgBasicLsb : 0;
+        return lsb == InstrumentDefinitions.XgNativeLsb ? 0 : lsb;
+    }
+
+    // MU50 map offered: the module plays the MU Basic voice map (and the file tells which voices the MU50 has).
+    bool HasMu50Map => HasXgBanks && ChannelMixer.VoiceMap == ChannelMixer.VoiceMapBasic && defs.XgMu50Voices.Count > 0;
+
+    // XG map of a voice (see InstrumentDefinitions.XgMapNames).
+    int XgMapOfSound(int msb, int lsb, int program) =>
+        HasMu50Map ? defs.XgMap(msb, lsb, program, true) : InstrumentDefinitions.XgMap(msb, lsb);
+
+    // With the MU50 map (MU Basic voice map), the lists only offer what the MU50 has: the MU50 map, the SFX voices
+    // and the drum kits it has. A voice of another map is still named, with no map selected.
+    static bool IsMu50ModeMap(int map) => map is InstrumentDefinitions.XgMu50Map or XgSfxMap;
+    const int XgSfxMap = 4;
+
+    static bool IsXgCapital(int msb, int lsb) => msb == 0 && lsb is 0 or InstrumentDefinitions.XgNativeLsb or InstrumentDefinitions.XgBasicLsb;
 
     // MT-32 track whose SysEx redefine the patches / sounds: the instrument names may not match what is heard.
     bool hasCustomPatches;
@@ -165,7 +232,7 @@ public sealed class MixerViewModel : ObservableObject
     {
         int c = ch.Channel;
         if (ch.ListShown) { ch.ListShown = false; force = true; }   // list closed since it was last opened
-        var key = $"{Standard}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
+        var key = $"{Standard}/{ChannelMixer.VoiceMap}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
                   $"{ChannelMixer.RhythmPart[c]}/{ChannelMixer.RhythmOverride[c]}/{ChannelMixer.Override[c]}/" +
                   $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}/{HasCustomPatches}";
         if (!force && key == ch.InstrumentKey) return;
@@ -220,12 +287,21 @@ public sealed class MixerViewModel : ObservableObject
     };
 
     // Name of a sound on a channel, in the current standard (insertion descriptions).
-    public string InstrumentName(int c, int msb, int lsb, int program) =>
-        defs.Resolve(Standard, c, program, msb, lsb, ChannelMixer.Rhythm(c)).Name;
+    public string InstrumentName(int c, int msb, int lsb, int program) => ResolveSound(c, program, msb, lsb, ChannelMixer.Rhythm(c)).Name;
+
+    // Instrument of a sound on a channel. XG: the capital voice follows the voice map, also when it is the fallback
+    // of a variation the module does not have.
+    InstrumentInfo ResolveSound(int c, int program, int msb, int lsb, int rhythm)
+    {
+        var info = defs.Resolve(Standard, c, program, msb, EffectiveXgLsb(msb, lsb), rhythm);
+        if (info.Missing && !info.Drum && HasXgBanks && msb == 0 && ChannelMixer.VoiceMap == ChannelMixer.VoiceMapBasic)
+            info = info with { Name = defs.Resolve(Standard, c, program, 0, InstrumentDefinitions.XgBasicLsb, rhythm).Name };
+        return info;
+    }
 
     // Instrument requested by the file on a channel (ignoring the manual choice).
     InstrumentInfo GetFileInstrument(int c) =>
-        defs.Resolve(Standard, c, ChannelMixer.Program[c], ChannelMixer.BankMsb[c], ChannelMixer.BankLsb[c], ChannelMixer.RhythmPart[c]);
+        ResolveSound(c, ChannelMixer.Program[c], ChannelMixer.BankMsb[c], ChannelMixer.BankLsb[c], ChannelMixer.RhythmPart[c]);
 
     // Kit currently played by the GS drum part of a channel (the last one sent to any of its channels),
     // or null if the channel is not on a drum part or the kit is not known yet.
@@ -246,7 +322,7 @@ public sealed class MixerViewModel : ObservableObject
     InstrumentInfo GetCurrentInstrument(int c)
     {
         var (msb, lsb, program) = GetCurrentSound(c);
-        return defs.Resolve(Standard, c, program, msb, lsb, ChannelMixer.Rhythm(c));
+        return ResolveSound(c, program, msb, lsb, ChannelMixer.Rhythm(c));
     }
 
     // Sounds offered for a channel (drum kits on a drum part) and position of the current sound in that list (-1 if missing).
@@ -255,7 +331,12 @@ public sealed class MixerViewModel : ObservableObject
         var fileInfo = GetFileInstrument(c);
         var (msb, lsb, program) = GetCurrentSound(c);
         bool drum = GetCurrentInstrument(c).Drum;
-        var choices = defs.GetChoices(Standard, drum, lsb);
+        // XG: the list of the map of the sound; a capital voice is listed once per map (bank LSB 0), whatever
+        // bank asked for it.
+        int xgMap = HasXgBanks ? XgMapOfSound(msb, lsb, program) : 0;
+        if (HasXgBanks && IsXgCapital(msb, lsb)) lsb = 0;
+        if (HasMu50Map && !IsMu50ModeMap(xgMap)) xgMap = InstrumentDefinitions.XgMu50Map;
+        var choices = defs.GetChoices(Standard, drum, HasXgBanks ? xgMap : lsb, HasMu50Map);
         // GM2: the list has MSB 120 (kits) / 121 (sounds); a file without these banks plays the same sounds.
         if (HasGm2Banks) (msb, lsb) = drum ? (InstrumentDefinitions.Gm2DrumMsb, 0)
                                            : (InstrumentDefinitions.Gm2MelodicMsb, msb == InstrumentDefinitions.Gm2MelodicMsb ? lsb : 0);
@@ -333,9 +414,10 @@ public sealed class MixerViewModel : ObservableObject
             // A drum kit is shared by all the channels of a drum part: the choice applies to each of them.
             int drumPart = HasGsMaps ? ChannelMixer.Rhythm(c) : 0;
             var targets = drumPart > 0 ? DrumPartChannels(drumPart) : new List<int> { c };
-            foreach (int t in targets) ChannelMixer.SetOverride(output(), t, item.Msb, item.Lsb, item.Program);
+            int sentLsb = item.Lsb;
+            foreach (int t in targets) ChannelMixer.SetOverride(output(), t, item.Msb, sentLsb, item.Program);
             var others = targets.Where(t => t != c).Select(t => (t + 1).ToString()).ToList();
-            setStatus($"Channel {c + 1}: {item.Text.Trim(' ', '·').Trim()} (MSB {item.Msb} / LSB {item.Lsb} / PC {item.Program + 1})" +
+            setStatus($"Channel {c + 1}: {item.Text.Trim(' ', '·').Trim()} (MSB {item.Msb} / LSB {sentLsb} / PC {item.Program + 1})" +
                       (others.Count > 0 ? $" — also on channel {string.Join(", ", others)} (drum part {drumPart})" : ""));
             foreach (int t in targets.Where(t => t != c)) RefreshInstrument(Channels[t]);
         }
@@ -367,8 +449,8 @@ public sealed class MixerViewModel : ObservableObject
     static string KindName(int bank) => bank switch { 127 or InstrumentDefinitions.Gm2DrumMsb => "drum kit", 126 => "SFX kit", _ => "normal part" };
 
     // Moves a channel to normal sounds, drum kits or (XG) SFX kits. Already there: nothing changes. If the file's
-    // own instrument is of that kind, back to it; otherwise the first one of the kind (XG: GrandPno, StandKit,
-    // SFX Kit1; GM2: Acoustic Grand Piano, Standard Kit), to be changed in the list.
+    // own instrument is of that kind, back to it; otherwise the first one of the kind (the first piano, the
+    // Standard Kit, the first SFX kit), to be changed in the list.
     void SelectBankKind(int c, int bank)
     {
         if (CurrentBankKind(c) == bank)
@@ -389,7 +471,7 @@ public sealed class MixerViewModel : ObservableObject
     // Channels currently assigned to a GS drum part (1 or 2).
     static List<int> DrumPartChannels(int part) => Enumerable.Range(0, 16).Where(i => ChannelMixer.Rhythm(i) == part).ToList();
 
-    // Wheel on the closed list: next / previous sound (with Ctrl: next / previous program; with Shift: GS map).
+    // Wheel on the closed list: next / previous sound (with Ctrl: next / previous program; with Shift: map).
     internal void StepInstrumentOrMap(int c, WheelStep step)
     {
         if (step.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift)) StepMap(c, step.Direction);
@@ -427,40 +509,90 @@ public sealed class MixerViewModel : ObservableObject
         Refresh();
     }
 
-    // ---------- Sound Canvas GS maps ----------
+    // ---------- Maps: Sound Canvas maps in GS, MU2000 maps in XG ----------
 
-    // Maps only in GS (and None, played as GS by the SC-8850).
+    // GS maps in GS (and None, played as GS by the SC-8850).
     bool HasGsMaps => Standard is "GS" or "None" && defs.GsVoices.Count > 0;
+
+    // XG map of the sound of a channel; 0 on a drum kit (the maps are for the voices).
+    int XgMapOf(int c)
+    {
+        var (msb, lsb, program) = GetCurrentSound(c);
+        return msb is 126 or 127 ? 0 : XgMapOfSound(msb, lsb, program);
+    }
 
     static int MapFromLsb(int lsb) => lsb >= 1 && lsb <= 4 ? lsb : InstrumentDefinitions.DefaultGsMap;
 
-    // Map selector of a channel: map of the current sound, disabled outside GS.
+    // Map selector of a channel: map of the current sound; disabled outside GS and XG, and on an XG drum kit.
     void RefreshMap(ChannelViewModel ch)
     {
-        bool gs = HasGsMaps;
-        int map = gs ? MapFromLsb(GetCurrentSound(ch.Channel).Lsb) : 0;
-        var key = $"{gs}/{map}";
+        bool gs = HasGsMaps, xg = HasXgBanks;
+        int map = gs ? MapFromLsb(GetCurrentSound(ch.Channel).Lsb) : xg ? XgMapOf(ch.Channel) : 0;
+        var key = $"{gs}/{xg}/{map}/{ChannelMixer.VoiceMap}";
         if (key == ch.MapKey) return;
         ch.MapKey = key;
+        var items = HasMu50Map ? XgMapChoicesMu50 : xg ? XgMapChoices : GsMapChoices;
         Update(ch, () =>
         {
-            ch.MapEnabled = gs;
-            ch.SelectedMap = MapChoices.FirstOrDefault(m => m.Map == map);
-            ch.MapToolTip = gs ? $"Map of channel {ch.Channel + 1}: {InstrumentDefinitions.GsMapNames[map]}" : "Sound Canvas maps: GS only";
+            ch.MapItems = items;
+            ch.MapEnabled = map > 0;
+            ch.SelectedMap = items.FirstOrDefault(m => m.Map == map);
+            ch.MapToolTip = gs ? $"Map of channel {ch.Channel + 1}: {InstrumentDefinitions.GsMapNames[map]}"
+                          : xg ? (map > 0 ? $"Map of channel {ch.Channel + 1}: {InstrumentDefinitions.XgMapNames[map]}" : "Maps: not for drum kits")
+                          : "Maps: GS and XG only";
         });
     }
 
-    // Same sound in the next / previous map (SC-55 → SC-88 → SC-88Pro → SC-8850).
+    // Next / previous map: the same sound in GS (SC-55 → SC-88 → SC-88Pro → SC-8850); in XG, see SetXgMap.
     internal void StepMap(int c, int direction)
     {
-        if (!HasGsMaps) return;
-        int target = MapFromLsb(GetCurrentSound(c).Lsb) + direction;
-        if (target < 1 || target > 4) return;
-        SetChannelMap(c, target);
+        if (HasGsMaps)
+        {
+            int target = MapFromLsb(GetCurrentSound(c).Lsb) + direction;
+            if (target >= 1 && target <= 4) SetChannelMap(c, target);
+        }
+        else if (HasXgBanks)
+        {
+            // In the order of the list.
+            var items = Channels[c].MapItems;
+            int current = XgMapOf(c), index = current > 0 ? items.ToList().FindIndex(m => m.Map == current) : -1;
+            if (index >= 0 && index + direction >= 0 && index + direction < items.Count) SetChannelMap(c, items[index + direction].Map);
+        }
     }
 
-    // Moves a channel to another map while keeping the same sound (program and variation).
-    // If the variation does not exist in that map: base sound of the same family, then the capital tone.
+    // XG: moves a channel to another map of the MU2000.
+    // - From a voice of bank MSB 0 the MU50 does not have to the MU50 map: the capital voice of the same program
+    //   (plain bank LSB 0).
+    // - To another family (ModEx, SFX, Sampl, GM2, or back to the voices): the file's own sound if it is of that
+    //   family, otherwise its first sound, to be changed in the list.
+    void SetXgMap(int c, int target)
+    {
+        var (_, _, program) = GetCurrentSound(c);
+        int current = XgMapOf(c);
+        if (current == 0 || target == current) return;
+        var name = InstrumentDefinitions.XgMapNames[target];
+        if (current == InstrumentDefinitions.XgNativeMap && target == InstrumentDefinitions.XgMu50Map)
+        {
+            ChannelMixer.SetOverride(output(), c, 0, 0, program);
+            setStatus($"Channel {c + 1}: map {name} — {GetCurrentInstrument(c).Name}");
+        }
+        else if (!(ChannelMixer.BankMsb[c] is 126 or 127) && XgMapOfSound(ChannelMixer.BankMsb[c], ChannelMixer.BankLsb[c], ChannelMixer.Program[c]) == target)
+        {
+            ChannelMixer.ClearOverride(output(), c);
+            setStatus($"Channel {c + 1}: map {name} — file instrument");
+        }
+        else
+        {
+            var first = defs.GetChoices("XG", false, target, HasMu50Map).FirstOrDefault();
+            if (first == null) return;
+            ChannelMixer.SetOverride(output(), c, first.Msb, first.Lsb, first.Program);
+            setStatus($"Channel {c + 1}: map {name} — choose sound in list");
+        }
+        Channels[c].InstrumentKey = "";
+    }
+
+    // Moves a channel to another map. GS: the same sound (program and variation) in that map; if the variation
+    // does not exist there: base sound of the same family, then the capital tone. XG: see SetXgMap.
     internal void SetChannelMap(int c, int target)
     {
         var ch = Channels[c];
@@ -483,6 +615,7 @@ public sealed class MixerViewModel : ObservableObject
                 if (found != null) SelectInstrument(c, found);
             }
         }
+        else if (HasXgBanks) SetXgMap(c, target);
         Refresh();
     }
 
