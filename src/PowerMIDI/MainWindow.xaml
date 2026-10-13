@@ -5,7 +5,7 @@
         xmlns:vm="clr-namespace:PowerMIDI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
-        Title="PowerMIDI" Icon="PowerMIDI.ico" Width="1300" Height="660" MinWidth="1098" MinHeight="620"
+        Title="PowerMIDI" Icon="PowerMIDI.ico" Width="1172" Height="620" MinWidth="1098" MinHeight="620"
         Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource WindowTextBrush}" FontFamily="Segoe UI" FontSize="13"
         AllowDrop="True" WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance vm:MainViewModel}"
@@ -38,13 +38,28 @@
         <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
       </Style.Triggers>
     </Style>
-    <!-- Playlist: hovered or selected row on a light background, black text; double click plays the track. -->
+    <!-- Playlist: hovered or selected row in the colors of the theme; double click plays the track. -->
     <Style TargetType="ListViewItem">
       <EventSetter Event="MouseDoubleClick" Handler="OnPlaylistItemDoubleClick"/>
-      <Style.Triggers>
-        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-        <Trigger Property="IsSelected" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-      </Style.Triggers>
+      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+      <!-- Own template: the hovered and the selected rows in the colors of the theme (the default one draws them light). -->
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListViewItem">
+            <Border x:Name="Bd" Background="Transparent" Padding="0,2" SnapsToDevicePixels="True">
+              <GridViewRowPresenter VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TabHoverBrush}"/>
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TabSelectedBrush}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style x:Key="Transport" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
@@ -81,6 +96,35 @@
       <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
       <Setter Property="HorizontalContentAlignment" Value="Left"/>
       <Setter Property="Padding" Value="6,4"/>
+      <!-- Own template: the column separators (resize grips) of the default one are white. -->
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="GridViewColumnHeader">
+            <Grid>
+              <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="0,0,0,1"
+                      Padding="{TemplateBinding Padding}">
+                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"
+                                  RecognizesAccessKey="True"/>
+              </Border>
+              <Thumb x:Name="PART_HeaderGripper" HorizontalAlignment="Right" Width="9" Margin="0,0,-4,0" Cursor="SizeWE">
+                <Thumb.Template>
+                  <ControlTemplate TargetType="Thumb">
+                    <Border Background="Transparent">
+                      <Rectangle Width="1" HorizontalAlignment="Center" Fill="{DynamicResource LineBrush}"/>
+                    </Border>
+                  </ControlTemplate>
+                </Thumb.Template>
+              </Thumb>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <!-- The filler after the last column has no separator. -->
+              <Trigger Property="Role" Value="Padding">
+                <Setter TargetName="PART_HeaderGripper" Property="Visibility" Value="Collapsed"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <!-- Dark tabs: wider headers, light text; selected tab is lighter. -->
     <Style TargetType="TabItem">
@@ -587,6 +631,18 @@
     <ListView x:Name="PlaylistView" Grid.Row="1" Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource TextBrush}"
               BorderBrush="{DynamicResource LineBrush}" SelectionMode="Extended" ItemsSource="{Binding Playlist}"
               SelectedItem="{Binding SelectedTrack}" SelectionChanged="OnPlaylistSelectionChanged">
+      <!-- Own template: the default one lights the border up under the mouse and with the focus. -->
+      <ListView.Template>
+        <ControlTemplate TargetType="ListView">
+          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+            <ScrollViewer Style="{DynamicResource {x:Static GridView.GridViewScrollViewerStyleKey}}" Padding="{TemplateBinding Padding}"
+                          Focusable="False">
+              <ItemsPresenter/>
+            </ScrollViewer>
+          </Border>
+        </ControlTemplate>
+      </ListView.Template>
       <ListView.InputBindings>
         <KeyBinding Key="Return" Command="{Binding PlaySelectedCommand}"/>
         <KeyBinding Key="Delete" Command="{Binding RemoveCommand}"
@@ -596,7 +652,7 @@
         <GridView>
           <GridViewColumn Header="" Width="28" DisplayMemberBinding="{Binding Playing}"/>
           <GridViewColumn Header="#" Width="44" DisplayMemberBinding="{Binding Index}"/>
-          <GridViewColumn Header="File" Width="440" DisplayMemberBinding="{Binding Name}"/>
+          <GridViewColumn Header="File" Width="360" DisplayMemberBinding="{Binding Name}"/>
           <GridViewColumn Header="Format" Width="80" DisplayMemberBinding="{Binding Standard}"/>
           <GridViewColumn Header="Duration" Width="80" DisplayMemberBinding="{Binding Duration}"/>
         </GridView>

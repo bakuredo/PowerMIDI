@@ -13,7 +13,7 @@ namespace PowerMIDI;
 public static class Themes
 {
     static readonly string[] BuiltIn = { "Dark", "Light", "Blue", "Red", "Green", "SC-8850" };
-    public const string Default = "Dark";
+    public const string Default = "Blue";
 
     public static string Folder => Path.Combine(AppContext.BaseDirectory, "themes");
 

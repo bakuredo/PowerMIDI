@@ -6,7 +6,7 @@
         <ResourceDictionary>
             <!-- Colors of the interface: the first dictionary is the theme, replaced by Themes.Apply. -->
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="Themes/Dark.xaml"/>
+                <ResourceDictionary Source="Themes/Blue.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

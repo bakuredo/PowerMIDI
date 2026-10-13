@@ -214,6 +214,9 @@ public partial class MainWindow : Window, IMainView
         ini.Write(SettingsPath, "PowerMIDI settings (written on close).");
     }
 
+    // Position of the window at the first start (its size is the one of the XAML).
+    const double DefaultLeft = 312, DefaultTop = 270;
+
     // Applies PowerMIDI.ini at startup. Any missing or invalid value is ignored.
     void ImportSettings()
     {
@@ -232,6 +235,13 @@ public partial class MainWindow : Window, IMainView
                 WindowStartupLocation = WindowStartupLocation.Manual;
                 Left = left; Top = top; Width = width; Height = height;
             }
+        }
+        // No position remembered (first start): the default one if the window fits there on the main screen,
+        // otherwise centered (WindowStartupLocation of the XAML).
+        else if (SystemParameters.WorkArea.Contains(new Rect(DefaultLeft, DefaultTop, Width, Height)))
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = DefaultLeft; Top = DefaultTop;
         }
         if (ini.Get("Window", "Maximized") == "1") WindowState = WindowState.Maximized;
 
