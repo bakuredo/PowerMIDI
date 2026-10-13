@@ -130,7 +130,7 @@
                    Visibility="{Binding HasCustomPatches, Converter={StaticResource BoolToVisibility}}"
                    ToolTip="This file redefines MT-32 sounds: the names shown may not match what is heard."/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
-        <ComboBox Width="180" HorizontalAlignment="Left" SelectedIndex="{Binding ShownMenuIndex}"
+        <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}"
                   ToolTip="Controller set by the sliders">
           <!-- Order of the menu: see MixerViewModel.MenuOrder -->
           <ComboBoxItem Content="Modulation (CC1)"
@@ -158,6 +158,10 @@
           <ComboBoxItem Content="Vibrato Delay (CC78)"
                         ToolTip="Delay before the vibrato, relative to the original sound"/>
         </ComboBox>
+        <!-- XG voice map (XG mode only): which version of the capital voices the module plays, see MixerViewModel. -->
+        <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.VoiceMapNames}"
+                  SelectedIndex="{Binding VoiceMapIndex}" Visibility="{Binding IsXg, Converter={StaticResource BoolToVisibility}}"
+                  ToolTip="Voice map: version of XG base sounds (Auto: file choice)"/>
       </DockPanel>
       <!-- Speed and pitch of the playback (listening aids, see MainViewModel.Speed.cs). The tab's DataContext is the
            mixer: the bindings go to the window's. Right click: back to normal. -->
@@ -191,7 +195,7 @@
         <TextBlock Grid.Column="5" Text="{Binding TransposeText}" FontFamily="Consolas" TextAlignment="Right"/>
       </Grid>
       <!-- One row per channel: number · LED · map · instrument · slider · value · M -->
-      <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Channels}">
+      <ItemsControl ItemsSource="{Binding Channels}">
         <ItemsControl.ItemTemplate>
           <DataTemplate DataType="{x:Type vm:ChannelViewModel}">
             <Grid Height="26">
@@ -248,8 +252,9 @@
                         SelectedItem="{Binding SelectedInstrument}" IsDropDownOpen="{Binding IsListOpen}"
                         ToolTip="{Binding InstrumentToolTip}" b:Wheel.Command="{Binding InstrumentWheelCommand}"
                         MaxDropDownHeight="420" FontSize="12" Height="22" Margin="2,0,8,0">
+                <!-- Fixed width: a virtualized list would follow the names on screen while scrolling. -->
                 <ComboBox.ItemsPanel>
-                  <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                  <ItemsPanelTemplate><VirtualizingStackPanel Width="260"/></ItemsPanelTemplate>
                 </ComboBox.ItemsPanel>
                 <ComboBox.Style>
                   <Style TargetType="ComboBox">
@@ -322,23 +327,6 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <!-- XG voice map (XG mode only), right under the instrument list of channel 16 (same columns as the channel rows): which version of the capital voices the module plays, see MixerViewModel. -->
-      <Grid VerticalAlignment="Top" Margin="0,2,0,0">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="108"/>
-          <ColumnDefinition Width="170"/>
-        </Grid.ColumnDefinitions>
-        <Grid.Style>
-          <Style TargetType="Grid">
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Style.Triggers>
-              <DataTrigger Binding="{Binding IsXg}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
-            </Style.Triggers>
-          </Style>
-        </Grid.Style>
-        <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MixerViewModel.VoiceMapNames}" SelectedIndex="{Binding VoiceMapIndex}"
-                  FontSize="12" Height="22" Margin="2,0,8,0" ToolTip="Voice map: version of XG base sounds (Auto: file choice)"/>
-      </Grid>
     </DockPanel>
     </TabItem>
     <TabItem Header="Effects" DataContext="{Binding Effects}" d:DataContext="{d:DesignInstance vm:EffectsViewModel}">
@@ -376,7 +364,17 @@
               </Style>
             </ComboBox.Style>
           </ComboBox>
-          <TextBlock Grid.Column="2" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right" Foreground="{DynamicResource TextMutedBrush}"/>
+          <!-- Hidden when empty: the list then takes its column, and a TextBlock would catch the clicks over it. -->
+          <TextBlock Grid.Column="2" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding ValueText}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
         </Grid>
       </DataTemplate>
 
