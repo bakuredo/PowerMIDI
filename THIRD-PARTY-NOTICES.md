@@ -9,7 +9,7 @@ PowerMIDI uses the following third-party work.
 
 ## Domino module definition files
 
-Some files of the `instruments` folder use the module definition format of Domino sequencer by Takabo Soft
+Some files of the `instruments` folder use the module definition format from the English translation of Domino by Hans5958
 (http://takabosoft.com/).
 
 ## Trademarks
