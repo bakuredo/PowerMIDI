@@ -122,6 +122,7 @@ public sealed partial class MainViewModel : ObservableObject
         Shuffle = ini.Get("Playback", "Shuffle") == "1";
         if (ini.GetInt("Playback", "Repeat") is int repeat && repeat is >= 0 and <= 2) RepeatMode = repeat;
         Mixer.LoadVoiceMap(ini.Get("MIDI", "VoiceMap"));
+        Mixer.LoadGsDefaultMap(ini.Get("MIDI", "GsDefaultMap"));
     }
 
     public void WriteSettings(IniFile ini)
@@ -132,6 +133,7 @@ public sealed partial class MainViewModel : ObservableObject
         ini.Set("Playback", "Repeat", RepeatMode);   // 0 = off, 1 = playlist, 2 = track
         ini.Set("Playback", "LastFolder", lastFolder ?? "");
         ini.Set("MIDI", "VoiceMap", Mixer.VoiceMapSetting);
+        ini.Set("MIDI", "GsDefaultMap", Mixer.GsDefaultMapSetting);
     }
 
     // ---------- MIDI port ----------
@@ -199,6 +201,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         ChannelMixer.ApplyAll(output);
         ChannelMixer.ApplyVoiceMap(output);
+        ChannelMixer.ApplyGsDefaultMap(output);
         ChannelMixer.ReapplyOverrides(output);
         ChannelMixer.ApplyEffects(output);
     }

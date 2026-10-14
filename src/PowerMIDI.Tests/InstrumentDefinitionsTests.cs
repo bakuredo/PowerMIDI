@@ -3,6 +3,7 @@ using PowerMIDI.Core;
 namespace PowerMIDI.Tests;
 
 // The module definition files of the instruments folder (copied next to the tests).
+[Collection("ChannelMixer")]   // the GS default map of ChannelMixer names the sounds of bank LSB 0
 public class InstrumentDefinitionsTests
 {
     static readonly InstrumentDefinitions Defs = InstrumentDefinitions.Load(Path.Combine(AppContext.BaseDirectory, "instruments"));

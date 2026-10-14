@@ -202,6 +202,10 @@
         <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.VoiceMapNames}"
                   SelectedIndex="{Binding VoiceMapIndex}" Visibility="{Binding IsXg, Converter={StaticResource BoolToVisibility}}"
                   ToolTip="Voice map: version of XG base sounds (Auto: file choice)"/>
+        <!-- GS default map (GS mode only): map of the sounds whose bank LSB is 0, see MixerViewModel. -->
+        <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.GsDefaultMapNames}"
+                  SelectedIndex="{Binding GsDefaultMapIndex}" Visibility="{Binding IsGs, Converter={StaticResource BoolToVisibility}}"
+                  ToolTip="Default map: map of GS sounds without bank LSB (Auto: file choice)"/>
       </DockPanel>
       <!-- Speed and pitch of the playback (listening aids, see MainViewModel.Speed.cs). The tab's DataContext is the
            mixer: the bindings go to the window's. Right click: back to normal. -->

@@ -49,28 +49,31 @@ public sealed class MixerViewModel : ObservableObject
     public string Standard
     {
         get => standard;
-        set { if (Set(ref standard, value)) OnPropertyChanged(nameof(IsXg)); }
+        set { if (Set(ref standard, value)) { OnPropertyChanged(nameof(IsXg)); OnPropertyChanged(nameof(IsGs)); } }
     }
 
     // XG mode: the voice map list is shown under the channels.
     public bool IsXg => HasXgBanks;
 
-    // ---------- XG voice map (the list under the channels): Auto, MU Basic, MU100 Native ----------
+    // ---------- XG voice map (the list next to the Sliders one): Auto, MU100 Native, MU Basic ----------
     // It tells which version of the 128 capital voices bank LSB 0 plays (see ChannelMixer.VoiceMap): sent to the
     // module, and followed by the names and the maps shown. It belongs to the module, not to the track: kept from
     // one track to the next and remembered in PowerMIDI.ini; it is not written into the saved files.
-    public static readonly string[] VoiceMapNames = { "Auto", "MU Basic", "MU100 Native" };
-    static readonly string[] VoiceMapKeys = { "Auto", "Basic", "Native" };
+    public static readonly string[] VoiceMapNames = { "Auto", "MU100 Native", "MU Basic" };
+    static readonly string[] VoiceMapKeys = { "Auto", "Native", "Basic" };
+    // Voice map of an item of the list (ChannelMixer.VoiceMapNative = 1, VoiceMapBasic = 0; -1 = Auto) and back.
+    static int VoiceMapOfIndex(int index) => index == 0 ? -1 : 2 - index;
+    static int IndexOfVoiceMap(int map) => map < 0 ? 0 : 2 - map;
 
     public int VoiceMapIndex
     {
-        get => ChannelMixer.VoiceMapOverride + 1;
+        get => IndexOfVoiceMap(ChannelMixer.VoiceMapOverride);
         set
         {
             if (value < 0 || value >= VoiceMapNames.Length || value == VoiceMapIndex) return;
             Run(() =>
             {
-                ChannelMixer.SetVoiceMap(output(), value - 1);
+                ChannelMixer.SetVoiceMap(output(), VoiceMapOfIndex(value));
                 setStatus(value == 0 ? "XG voice map: Auto (file choice)" : $"XG voice map: {VoiceMapNames[value]}");
                 foreach (var ch in Channels) { ch.InstrumentKey = ""; ch.MapKey = ""; }
                 Refresh();
@@ -79,12 +82,48 @@ public sealed class MixerViewModel : ObservableObject
         }
     }
 
+    // ---------- GS default map (the same list, in GS mode): Auto, SC-8850, SC-88Pro, SC-88, SC-55 ----------
+    // Map played by bank LSB 0 (see ChannelMixer.GsDefaultMap): sent to the module, followed by the names and the
+    // map selectors. Kept from one track to the next, remembered in PowerMIDI.ini, not written into the saved files.
+    public static readonly string[] GsDefaultMapNames = { "Auto", "SC-8850", "SC-88Pro", "SC-88", "SC-55" };
+    // Map of an item of the list (the newest module first, as in the map selectors of the channels) and back.
+    static int GsMapOfIndex(int index) => index == 0 ? -1 : 5 - index;
+    static int GsIndexOfMap(int map) => map >= 1 ? 5 - map : 0;
+
+    public int GsDefaultMapIndex
+    {
+        get => GsIndexOfMap(ChannelMixer.GsDefaultMapOverride);
+        set
+        {
+            if (value < 0 || value >= GsDefaultMapNames.Length || value == GsDefaultMapIndex) return;
+            Run(() =>
+            {
+                ChannelMixer.SetGsDefaultMap(output(), GsMapOfIndex(value));
+                setStatus(value == 0 ? "GS default map: Auto (file choice)" : $"GS default map: {GsDefaultMapNames[value]}");
+                foreach (var ch in Channels) { ch.InstrumentKey = ""; ch.MapKey = ""; }
+                Refresh();
+            });
+            OnPropertyChanged();
+        }
+    }
+
+    public string GsDefaultMapSetting => GsDefaultMapNames[GsDefaultMapIndex];
+    public void LoadGsDefaultMap(string setting)
+    {
+        int index = Array.FindIndex(GsDefaultMapNames, k => string.Equals(k, setting, StringComparison.OrdinalIgnoreCase));
+        ChannelMixer.GsDefaultMapOverride = GsMapOfIndex(Math.Max(index, 0));
+        OnPropertyChanged(nameof(GsDefaultMapIndex));
+    }
+
+    // GS mode: the default map list is shown instead of the XG voice map one.
+    public bool IsGs => HasGsMaps;
+
     // Value written in PowerMIDI.ini, and read from it at startup (nothing is sent: no track yet).
     public string VoiceMapSetting => VoiceMapKeys[VoiceMapIndex];
     public void LoadVoiceMap(string setting)
     {
         int index = Array.FindIndex(VoiceMapKeys, k => string.Equals(k, setting, StringComparison.OrdinalIgnoreCase));
-        ChannelMixer.VoiceMapOverride = Math.Max(index, 0) - 1;
+        ChannelMixer.VoiceMapOverride = VoiceMapOfIndex(Math.Max(index, 0));
         OnPropertyChanged(nameof(VoiceMapIndex));
     }
 
@@ -228,7 +267,7 @@ public sealed class MixerViewModel : ObservableObject
     {
         int c = ch.Channel;
         if (ch.ListShown) { ch.ListShown = false; force = true; }   // list closed since it was last opened
-        var key = $"{Standard}/{ChannelMixer.VoiceMap}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
+        var key = $"{Standard}/{ChannelMixer.VoiceMap}/{ChannelMixer.GsDefaultMap}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
                   $"{ChannelMixer.RhythmPart[c]}/{ChannelMixer.RhythmOverride[c]}/{ChannelMixer.Override[c]}/" +
                   $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}/{ChannelMixer.SysExPatch[c]}/{Mt32Patches.Version}";
         if (!force && key == ch.InstrumentKey) return;
@@ -533,14 +572,14 @@ public sealed class MixerViewModel : ObservableObject
         return msb is 126 or 127 ? 0 : XgMapOfSound(msb, lsb, program);
     }
 
-    static int MapFromLsb(int lsb) => lsb >= 1 && lsb <= 4 ? lsb : InstrumentDefinitions.DefaultGsMap;
+    static int MapFromLsb(int lsb) => lsb >= 1 && lsb <= 4 ? lsb : ChannelMixer.GsDefaultMap;
 
     // Map selector of a channel: map of the current sound; disabled outside GS and XG, and on an XG drum kit.
     void RefreshMap(ChannelViewModel ch)
     {
         bool gs = HasGsMaps, xg = HasXgBanks;
         int map = gs ? MapFromLsb(GetCurrentSound(ch.Channel).Lsb) : xg ? XgMapOf(ch.Channel) : 0;
-        var key = $"{gs}/{xg}/{map}/{ChannelMixer.VoiceMap}";
+        var key = $"{gs}/{xg}/{map}/{ChannelMixer.VoiceMap}/{ChannelMixer.GsDefaultMap}";
         if (key == ch.MapKey) return;
         ch.MapKey = key;
         var items = HasMu50Map ? XgMapChoicesMu50 : xg ? XgMapChoices : GsMapChoices;

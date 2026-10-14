@@ -68,6 +68,7 @@ public static class ChannelMixer
                 device.SendEvent(MasterVolumeEvent());
                 ApplyAll(device);
                 ApplyVoiceMap(device);
+                ApplyGsDefaultMap(device);
                 ReapplyOverrides(device);
                 ApplyEffects(device);
             }
@@ -138,6 +139,7 @@ public static class ChannelMixer
         if (xg) BankMsb[9] = 127;
         DrumKitProgram[1] = DrumKitProgram[2] = -1;
         fileVoiceMap = VoiceMapNative;
+        fileGsDefaultMap = InstrumentDefinitions.DefaultGsMap;
         Mt32Effects.ResetFile();
         Mt32Patches.ResetFile();
         Gm2Effects.ResetFile();
@@ -318,6 +320,46 @@ public static class ChannelMixer
         return data != null ? new NormalSysExEvent(data) : null;
     }
 
+    // ---------- GS default map (SC-88 and later) ----------
+    // A part whose bank LSB (CC32) is 0 plays the map set by TONE MAP-0 NUMBER, DT1 40 4x 01 mm (part block x as
+    // for 40 1x; mm: 1 = SC-55, 2 = SC-88, 3 = SC-88Pro, 4 = SC-8850). After a GS Reset it is the native map of
+    // the module (the SC-8850's here: InstrumentDefinitions.DefaultGsMap). The one chosen in the interface is sent
+    // to the 16 parts and replaces the file's.
+    public static int GsDefaultMapOverride = -1;                          // chosen in the interface (-1 = Auto)
+    static int fileGsDefaultMap = InstrumentDefinitions.DefaultGsMap;     // last one set by the file
+
+    // Map of bank LSB 0 in effect: the one chosen in the interface, otherwise the file's.
+    public static int GsDefaultMap => GsDefaultMapOverride >= 1 ? GsDefaultMapOverride : fileGsDefaultMap;
+
+    static NormalSysExEvent GsDefaultMapEvent(int channel, int map)
+    {
+        int block = channel == 9 ? 0 : channel < 9 ? channel + 1 : channel;
+        var data = new byte[] { 0x41, 0x10, 0x42, 0x12, 0x40, (byte)(0x40 | block), 0x01, (byte)map, 0, 0xF7 };
+        MidiTools.FixRolandChecksum(data);
+        return new NormalSysExEvent(data);
+    }
+
+    static bool IsGsDefaultMapSysEx(byte[] d) =>
+        d.Length >= 10 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x40 && (d[5] & 0xF0) == 0x40 && d[6] == 0x01;
+
+    static void SendGsDefaultMap(IOutputDevice device, int map)
+    {
+        for (int channel = 0; channel < 16; channel++) device.SendEvent(GsDefaultMapEvent(channel, map));
+    }
+
+    // Chooses the default map (-1 = Auto: back to the file's) and sends it to the module in GS mode.
+    public static void SetGsDefaultMap(IOutputDevice device, int map)
+    {
+        GsDefaultMapOverride = map;
+        if (device != null && GsMode) SendGsDefaultMap(device, GsDefaultMap);
+    }
+
+    // The default map chosen in the interface (start of track, seek, port change, after a reset in file).
+    public static void ApplyGsDefaultMap(IOutputDevice device)
+    {
+        if (GsMode && GsDefaultMapOverride >= 1) SendGsDefaultMap(device, GsDefaultMapOverride);
+    }
+
     public static void SetController(IOutputDevice device, int k, int channel, int value)
     {
         OverrideCc[k, channel] = value;
@@ -405,6 +447,17 @@ public static class ChannelMixer
             {
                 fileVoiceMap = d[6] == VoiceMapBasic ? VoiceMapBasic : VoiceMapNative;
                 return VoiceMapOverride >= 0 ? VoiceMapEvent(VoiceMapOverride) : e;
+            }
+            // GS default map set by the file (one part per message; the last one counts for all): remembered;
+            // replaced if one is chosen in the interface.
+            if (IsGsDefaultMapSysEx(d))
+            {
+                if (d[7] is >= 1 and <= 4) fileGsDefaultMap = d[7];
+                if (GsDefaultMapOverride < 1) return e;
+                var data = (byte[])d.Clone();
+                data[7] = (byte)GsDefaultMapOverride;
+                MidiTools.FixRolandChecksum(data);
+                return new NormalSysExEvent(data);
             }
             if (MidiFileEditor.IsReset(e))
             {

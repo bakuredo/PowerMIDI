@@ -50,7 +50,7 @@ public sealed class InstrumentChoice
 public sealed class InstrumentDefinitions
 {
     public static readonly Dictionary<int, string> GsMapNames = new() { [1] = "SC-55", [2] = "SC-88", [3] = "SC-88Pro", [4] = "SC-8850" };
-    public const int DefaultGsMap = 4;   // map used when the file sends no LSB (CC32): the SC-8850's
+    public const int DefaultGsMap = 4;   // map of bank LSB 0 after a GS Reset (SC-8850; see ChannelMixer.GsDefaultMap)
 
     // XG maps of the MU2000 (map selector of a channel in XG mode). Unlike the GS maps, most of them are families
     // of sounds picked by the bank MSB. 2000: the voices of bank MSB 0, whose 128 capital voices have two versions
@@ -403,7 +403,7 @@ public sealed class InstrumentDefinitions
         {
             const string label = "GS";
             bool hasMap = lsb >= 1 && lsb <= 4;
-            int map = hasMap ? lsb : DefaultGsMap;
+            int map = hasMap ? lsb : ChannelMixer.GsDefaultMap;
             var mapText = hasMap ? $"map {GsMapNames[map]}" : $"map {GsMapNames[map]} (default)";
 
             if (rhythm > 0)
@@ -440,7 +440,7 @@ public sealed class InstrumentDefinitions
         bool gm2 = !mt32 && standard == "GM2" && Gm2Voices.Count > 0;
         bool useXg = !mt32 && !gm2 && standard == "XG" && XgVoices.Count > 0;
         bool useGs = !mt32 && !gm2 && !useXg && standard != "GM" && standard != "GM2" && GsVoices.Count > 0;
-        int map = useXg ? (XgMapNames.ContainsKey(lsb) ? lsb : XgNativeMap) : lsb >= 1 && lsb <= 4 ? lsb : DefaultGsMap;
+        int map = useXg ? (XgMapNames.ContainsKey(lsb) ? lsb : XgNativeMap) : lsb >= 1 && lsb <= 4 ? lsb : ChannelMixer.GsDefaultMap;
         mu50Only &= useXg;
         var cacheKey = $"{mt32}/{gm2}/{useXg}/{useGs}/{drum}/{map}/{mu50Only}";
         if (choiceCache.TryGetValue(cacheKey, out var cached)) return cached;
