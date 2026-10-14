@@ -42,6 +42,8 @@ public static class MidiFileEditor
     {
         var cc = e as ControlChangeEvent;
         if (cc == null) return -1;
+        // The portamento switch goes with a fixed Portamento Time (on, see ChannelMixer.PortamentoSwitchValue).
+        if (cc.ControlNumber == ChannelMixer.PortamentoSwitch && apply[ChannelMixer.PortamentoTime][cc.Channel]) return ChannelMixer.PortamentoTime;
         int k = ChannelMixer.ControllerIndex(cc.ControlNumber);
         return k >= 0 && apply[k][cc.Channel] ? k : -1;
     }
@@ -162,6 +164,8 @@ public static class MidiFileEditor
                     if (applyCc[c][ch])
                         events.Add(new ControlChangeEvent((SevenBitNumber)(byte)ChannelMixer.ControllerNumbers[c],
                                                           (SevenBitNumber)(byte)ccValues[c][ch]) { Channel = (FourBitNumber)(byte)ch });
+                if (applyCc[ChannelMixer.PortamentoTime][ch])
+                    events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoOn) { Channel = (FourBitNumber)(byte)ch });
                 foreach (var e in events)
                     items.Add(new Item { Event = new TimedEvent(e, time), Priority = 1, Index = items.Count });
             }

@@ -89,7 +89,6 @@ public static class MidiTools
     };
 
     // Messages to write into a file to force a mode: the mode's reset.
-    // None: no message (the file's resets are only removed).
     public static MidiEvent[] GetModeEvents(string mode)
     {
         return Resets.TryGetValue(mode, out var data) ? new MidiEvent[] { new NormalSysExEvent(data) } : Array.Empty<MidiEvent>();

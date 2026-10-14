@@ -18,13 +18,19 @@ public static class ChannelMixer
     // relative values, 64 = sound's original setting.
     // 13 = Modulation (CC1), absolute (0 = none); added last so that the other indexes stay the same
     // (the mixer list shows it first).
-    public static readonly int[] ControllerNumbers = { 7, 10, 91, 93, 94, 73, 75, 72, 74, 71, 76, 77, 78, 1 };
+    // 14 = Expression (CC11, after Volume in the menu), 15 = Portamento Time (CC5, last): absolute.
+    public static readonly int[] ControllerNumbers = { 7, 10, 91, 93, 94, 73, 75, 72, 74, 71, 76, 77, 78, 1, 11, 5 };
     public static readonly string[] ControllerNames =
         { "volume", "pan", "reverb", "chorus", "variation/delay", "attack", "decay", "release", "cutoff", "resonance",
-          "vibrato rate", "vibrato depth", "vibrato delay", "modulation" };
-    public static readonly int[] ControllerDefaults = { 100, 64, 40, 0, 0, 64, 64, 64, 64, 64, 64, 64, 64, 0 };   // values after a reset
-    public const int Modulation = 13;
-    const int Controllers = 14;
+          "vibrato rate", "vibrato depth", "vibrato delay", "modulation", "expression", "portamento time" };
+    public static readonly int[] ControllerDefaults = { 100, 64, 40, 0, 0, 64, 64, 64, 64, 64, 64, 64, 64, 0, 127, 0 };   // values after a reset
+    public const int Modulation = 13, Expression = 14, PortamentoTime = 15;
+    const int Controllers = 16;
+    // Portamento switch (CC65) of each channel: the file's. While Portamento Time is fixed in the interface, the
+    // portamento is on (127), so that the time is heard; back to the file's switch when it is no longer fixed.
+    static readonly int[] filePortamento = new int[16];
+    public const int PortamentoSwitch = 65, PortamentoOn = 127;
+    public static int PortamentoSwitchValue(int channel) => CcOverride[PortamentoTime, channel] ? PortamentoOn : filePortamento[channel];
     static readonly int[,] FileCc = new int[Controllers, 16];       // last value sent by file
     static readonly bool[,] CcOverride = new bool[Controllers, 16]; // value fixed in interface?
     static readonly int[,] OverrideCc = new int[Controllers, 16];   // fixed value
@@ -124,6 +130,7 @@ public static class ChannelMixer
         for (int i = 0; i < 16; i++)
         {
             for (int k = 0; k < Controllers; k++) FileCc[k, i] = ControllerDefaults[k];
+            filePortamento[i] = 0;
             fileMasterVolume = 127;
             Program[i] = 0;
             BankMsb[i] = 0;
@@ -377,6 +384,7 @@ public static class ChannelMixer
     public static void ApplyController(IOutputDevice device, int k, int channel)
     {
         device.SendEvent(Cc(channel, ControllerNumbers[k], Sent(k, channel)));
+        if (k == PortamentoTime) device.SendEvent(Cc(channel, PortamentoSwitch, PortamentoSwitchValue(channel)));
     }
 
     public static MidiEvent Callback(MidiEvent e, long rawTime, TimeSpan playbackTime)
@@ -388,7 +396,9 @@ public static class ChannelMixer
             switch ((int)cc.ControlNumber)
             {
                 case 1:
+                case 5:
                 case 7:
+                case 11:
                 case 10:
                 case 91:
                 case 93:
@@ -412,6 +422,9 @@ public static class ChannelMixer
                     BankLsb[channel] = cc.ControlValue;
                     if (Override[channel]) return Cc(channel, 32, OverrideLsb[channel]);
                     break;
+                case PortamentoSwitch:
+                    filePortamento[channel] = cc.ControlValue;
+                    return Cc(channel, PortamentoSwitch, PortamentoSwitchValue(channel));
             }
             return e;
         }

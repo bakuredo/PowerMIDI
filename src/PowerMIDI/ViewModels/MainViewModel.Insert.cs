@@ -294,6 +294,8 @@ public sealed partial class MainViewModel
                 int v = ChannelMixer.FixedValue(k, c);
                 if (s.CcFixed[k, c] && s.CcValue[k, c] == v) continue;
                 events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.ControllerNumbers[k], (SevenBitNumber)v) { Channel = (FourBitNumber)c }));
+                if (k == ChannelMixer.PortamentoTime)   // heard only with the portamento on
+                    events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoOn) { Channel = (FourBitNumber)c }));
                 parts.Add($"{MixerViewModel.ControllerNames[k]} {MixerViewModel.FormatControllerValue(k, v)}");
             }
             if (parts.Count > 0) texts.Add($"ch {c + 1}: {string.Join(", ", parts)}");

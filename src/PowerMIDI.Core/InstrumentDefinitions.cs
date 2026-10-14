@@ -399,7 +399,7 @@ public sealed class InstrumentDefinitions
             return new InstrumentInfo(name ?? GmProgramName(program), $"XG · {pcText}{vnote}", false, vnote != "");
         }
 
-        if (standard is "GS" or "None" && GsVoices.Count > 0)
+        if (standard == "GS" && GsVoices.Count > 0)
         {
             const string label = "GS";
             bool hasMap = lsb >= 1 && lsb <= 4;

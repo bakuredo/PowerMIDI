@@ -208,7 +208,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------- Mode ----------
 
-    // Auto, GS, XG, GM, GM2, MT-32 or None (the items of the Mode menu).
+    // Auto, GS, XG, GM, GM2 or MT-32 (the items of the Mode menu).
     string selectedMode = "Auto";
     public string SelectedMode
     {

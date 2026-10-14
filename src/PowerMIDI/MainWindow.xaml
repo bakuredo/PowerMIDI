@@ -223,6 +223,8 @@
           <ComboBoxItem Content="Modulation (CC1)"
                         ToolTip="Modulation wheel (usually vibrato)"/>
           <ComboBoxItem Content="Volume (CC7)"/>
+          <ComboBoxItem Content="Expression (CC11)"
+                        ToolTip="Volume within the channel volume (dynamics)"/>
           <ComboBoxItem Content="Pan (CC10)"/>
           <ComboBoxItem Content="Reverb (CC91)"/>
           <ComboBoxItem Content="Chorus (CC93)"/>
@@ -244,6 +246,8 @@
                         ToolTip="Vibrato depth, relative to the original sound"/>
           <ComboBoxItem Content="Vibrato Delay (CC78)"
                         ToolTip="Delay before the vibrato, relative to the original sound"/>
+          <ComboBoxItem Content="Portamento Time (CC5)"
+                        ToolTip="Glide time between notes (with portamento on)"/>
         </ComboBox>
         <!-- XG voice map (XG mode only): which version of the capital voices the module plays, see MixerViewModel. -->
         <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.VoiceMapNames}"
@@ -673,7 +677,6 @@
         <ComboBoxItem Content="GM2"/>
         <ComboBoxItem Content="MT-32"
                       ToolTip="Roland MT-32 / CM-32L"/>
-        <ComboBoxItem Content="None"/>
       </ComboBox>
       <ToggleButton Content="Clean" Margin="6,0,0,0" Padding="10,2" IsChecked="{Binding IsCleaned}" IsEnabled="{Binding CleanEnabled}"
                     ToolTip="With a forced mode, also removes the SysEx of the other modes."/>

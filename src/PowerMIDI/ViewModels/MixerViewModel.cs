@@ -12,12 +12,18 @@ public sealed class MixerViewModel : ObservableObject
     // Controllers shown by the sliders (ChannelMixer index; the "Sliders" menu gives it in the Tag of each item):
     // 0 = Volume (CC7), 1 = Pan (CC10), 2 = Reverb (CC91), 3 = Chorus (CC93), 4 = Variation / Delay (CC94),
     // 5 = Attack (CC73), 6 = Decay (CC75), 7 = Release (CC72), 8 = Cutoff (CC74), 9 = Resonance (CC71),
-    // 10 = Vibrato Rate (CC76), 11 = Vibrato Depth (CC77), 12 = Vibrato Delay (CC78), 13 = Modulation (CC1, first in the menu).
+    // 10 = Vibrato Rate (CC76), 11 = Vibrato Depth (CC77), 12 = Vibrato Delay (CC78), 13 = Modulation (CC1, first in the menu),
+    // 14 = Expression (CC11, after Volume in the menu), 15 = Portamento Time (CC5, last in the menu).
     public static readonly string[] ControllerNames = { "Volume", "Pan", "Reverb", "Chorus", "Variation / Delay", "Attack Time",
-        "Decay Time", "Release Time", "Filter Cutoff", "Filter Resonance", "Vibrato Rate", "Vibrato Depth", "Vibrato Delay", "Modulation" };
+        "Decay Time", "Release Time", "Filter Cutoff", "Filter Resonance", "Vibrato Rate", "Vibrato Depth", "Vibrato Delay", "Modulation", "Expression", "Portamento Time" };
     public static int ControllerCount => ControllerNames.Length;
 
     public static readonly MapChoice[] GsMapChoices = { new("8850", 4), new("Pro", 3), new("88", 2), new("55", 1) };
+    // GS default map chosen in the Mixer (the module played as an SC-88Pro, an SC-88…): only the maps that module
+    // has, its own and the older ones. Auto: all of them (SC-8850).
+    static int NewestGsMap => ChannelMixer.GsDefaultMapOverride >= 1 ? ChannelMixer.GsDefaultMapOverride : InstrumentDefinitions.DefaultGsMap;
+    static readonly MapChoice[][] gsMapChoicesUpTo = Enumerable.Range(0, 5).Select(n => GsMapChoices.Where(m => m.Map <= n).ToArray()).ToArray();
+    static MapChoice[] GsMapChoicesUpTo(int map) => gsMapChoicesUpTo[map];
     public static readonly MapChoice[] XgMapChoices = { new("2000", 2), new("MEx", 3), new("SFX", 4), new("Spl", 5), new("GM2", 6) };
     // With the MU Basic voice map: what the MU50 has.
     public static readonly MapChoice[] XgMapChoicesMu50 = { new("50", InstrumentDefinitions.XgMu50Map), new("SFX", 4) };
@@ -162,8 +168,10 @@ public sealed class MixerViewModel : ObservableObject
         }
     }
 
-    // Controller index of each item of the "Sliders" menu (Modulation first, then the ChannelMixer order).
-    static readonly int[] MenuOrder = new[] { ChannelMixer.Modulation }.Concat(Enumerable.Range(0, ChannelMixer.Modulation)).ToArray();
+    // Controller index of each item of the "Sliders" menu: Modulation, Volume, Expression, then the ChannelMixer order,
+    // Portamento Time last (the same order as the items of the menu in MainWindow.xaml).
+    static readonly int[] MenuOrder = new[] { ChannelMixer.Modulation, 0, ChannelMixer.Expression }
+        .Concat(Enumerable.Range(1, ChannelMixer.Modulation - 1)).Append(ChannelMixer.PortamentoTime).ToArray();
 
     // Selected item of the "Sliders" menu.
     public int ShownMenuIndex
@@ -217,7 +225,7 @@ public sealed class MixerViewModel : ObservableObject
     // envelope, filter and vibrato (index 5 to 12): relative to 64, from -64 to +63 (0 = original sound).
     public static string FormatControllerValue(int k, int value)
     {
-        if (k >= 5 && k != ChannelMixer.Modulation)
+        if (k >= 5 && k < ChannelMixer.Modulation)
         {
             int delta = value - 64;
             return delta > 0 ? $"+{delta}" : delta.ToString();
@@ -326,7 +334,7 @@ public sealed class MixerViewModel : ObservableObject
     {
         "XG" => GetCurrentSound(c).Msb is 126 or 127,
         "GM2" => InstrumentDefinitions.IsGm2Drum(c, GetCurrentSound(c).Msb),
-        "GS" or "None" or "MT-32" => ChannelMixer.Rhythm(c) > 0,
+        "GS" or "MT-32" => ChannelMixer.Rhythm(c) > 0,
         _ => c == 9,
     };
 
@@ -354,7 +362,7 @@ public sealed class MixerViewModel : ObservableObject
     // or null if the channel is not on a drum part or the kit is not known yet.
     (int Msb, int Lsb, int Program)? GetSharedKit(int c)
     {
-        if (Standard is not ("GS" or "None")) return null;
+        if (Standard != "GS") return null;
         int part = ChannelMixer.Rhythm(c);
         if (part is not (1 or 2) || ChannelMixer.DrumKitProgram[part] < 0) return null;
         return (ChannelMixer.DrumKitMsb[part], ChannelMixer.DrumKitLsb[part], ChannelMixer.DrumKitProgram[part]);
@@ -587,8 +595,8 @@ public sealed class MixerViewModel : ObservableObject
 
     // ---------- Maps: Sound Canvas maps in GS, MU2000 maps in XG ----------
 
-    // GS maps in GS (and None, played as GS by the SC-8850).
-    bool HasGsMaps => Standard is "GS" or "None" && defs.GsVoices.Count > 0;
+    // GS maps in GS.
+    bool HasGsMaps => Standard == "GS" && defs.GsVoices.Count > 0;
 
     // XG map of the sound of a channel; 0 on a drum kit (the maps are for the voices).
     int XgMapOf(int c)
@@ -607,7 +615,7 @@ public sealed class MixerViewModel : ObservableObject
         var key = $"{gs}/{xg}/{map}/{ChannelMixer.VoiceMap}/{ChannelMixer.GsDefaultMap}";
         if (key == ch.MapKey) return;
         ch.MapKey = key;
-        var items = HasMu50Map ? XgMapChoicesMu50 : xg ? XgMapChoices : GsMapChoices;
+        var items = HasMu50Map ? XgMapChoicesMu50 : xg ? XgMapChoices : GsMapChoicesUpTo(NewestGsMap);
         Update(ch, () =>
         {
             ch.MapItems = items;
@@ -625,7 +633,7 @@ public sealed class MixerViewModel : ObservableObject
         if (HasGsMaps)
         {
             int target = MapFromLsb(GetCurrentSound(c).Lsb) + direction;
-            if (target >= 1 && target <= 4) SetChannelMap(c, target);
+            if (target >= 1 && target <= NewestGsMap) SetChannelMap(c, target);
         }
         else if (HasXgBanks)
         {

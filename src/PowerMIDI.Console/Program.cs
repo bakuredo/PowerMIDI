@@ -17,7 +17,7 @@ using PowerMIDI.Core;
 Console.OutputEncoding = System.Text.Encoding.UTF8;   // "·", "←", "→" in the messages
 string path = null, device = null, mode = "Auto";
 bool recurse = false, shuffle = false, repeat = false, list = false;
-var modes = new[] { "Auto", "GS", "XG", "GM", "GM2", "MT-32", "None" };
+var modes = new[] { "Auto", "GS", "XG", "GM", "GM2", "MT-32" };
 
 for (int i = 0; i < args.Length; i++)
 {

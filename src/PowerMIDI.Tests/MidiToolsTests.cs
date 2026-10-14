@@ -46,10 +46,9 @@ public class MidiToolsTests
         Assert.Equal("GS", MidiTools.GetStandard(File(Reset("GM"), GsParameter())));
 
     [Fact]
-    public void Mode_events_are_the_reset_of_the_mode_and_none_has_no_event()
+    public void Mode_events_are_the_reset_of_the_mode()
     {
         Assert.Single(MidiTools.GetModeEvents("GS"));
-        Assert.Empty(MidiTools.GetModeEvents("None"));
     }
 
     [Fact]

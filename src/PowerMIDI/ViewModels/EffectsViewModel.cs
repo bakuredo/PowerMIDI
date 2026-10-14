@@ -307,9 +307,9 @@ public sealed class EffectsViewModel : ObservableObject
         }
     }
 
-    // GS effects in GS and None; MT-32 reverb in MT-32 (MT-32 SysEx, for a real MT-32 / CM-32L); XG effects in XG;
+    // GS effects in GS; MT-32 reverb in MT-32 (MT-32 SysEx, for a real MT-32 / CM-32L); XG effects in XG;
     // GM2 reverb and chorus in GM2 (universal SysEx).
-    string Mode => standard switch { "XG" => "XG", "MT-32" => "MT-32", "GM2" => "GM2", "GS" or "None" => "GS", _ => "" };
+    string Mode => standard switch { "XG" => "XG", "MT-32" => "MT-32", "GM2" => "GM2", "GS" => "GS", _ => "" };
     public bool IsAvailable => Mode != "";
     // Blocks of the current standard; none in a standard without effects (GM): showing the GS ones grayed out looked
     // as if the tab had not followed the mode.
