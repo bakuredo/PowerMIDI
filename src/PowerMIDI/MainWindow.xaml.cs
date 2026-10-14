@@ -67,6 +67,8 @@ public partial class MainWindow : Window, IMainView
     // Keyboard mode (a channel number clicked in the Mixer): letters play notes, Esc stops the mode.
     void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // Typing in a text box (search of the instrument list): no shortcut, no keyboard notes.
+        if (e.OriginalSource is System.Windows.Controls.TextBox) return;
         if (vm.KeyboardChannel >= 0 && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Windows)) == 0)
         {
             if (e.Key == Key.Escape) { Run(() => vm.ToggleKeyboardChannel(vm.KeyboardChannel)); e.Handled = true; return; }
@@ -112,6 +114,39 @@ public partial class MainWindow : Window, IMainView
 
     // Double click on a row: plays that track. (A mouse binding on the list itself does not work on the
     // rows: they handle the click for the selection.)
+    // Search box of an instrument list: focused when the list opens (after the list has focused its current item).
+    void OnInstrumentSearchVisible(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.TextBox box && box.IsVisible)
+            Dispatcher.BeginInvoke(() => { box.Focus(); Keyboard.Focus(box); }, System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    // Search box: Enter chooses the first sound found, Down goes to the list, Escape closes it.
+    void OnInstrumentSearchKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.TextBox { DataContext: ChannelViewModel ch } box) return;
+        var combo = box.TemplatedParent as System.Windows.Controls.ComboBox;
+        switch (e.Key)
+        {
+            case Key.Enter:
+                Run(() => ch.ChooseFirstMatch());
+                if (combo != null) combo.IsDropDownOpen = false;
+                e.Handled = true;
+                break;
+            case Key.Down:
+                var item = combo?.ItemContainerGenerator.ContainerFromItem(ch.SelectedInstrument ?? ch.InstrumentItems.FirstOrDefault())
+                           as System.Windows.Controls.ComboBoxItem
+                           ?? combo?.ItemContainerGenerator.ContainerFromIndex(0) as System.Windows.Controls.ComboBoxItem;
+                item?.Focus();
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                if (combo != null) combo.IsDropDownOpen = false;
+                e.Handled = true;
+                break;
+        }
+    }
+
     void OnPlaylistItemDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.ListViewItem { DataContext: PlaylistItem item }) return;

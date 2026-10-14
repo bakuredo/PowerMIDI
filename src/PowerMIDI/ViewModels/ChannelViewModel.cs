@@ -130,6 +130,20 @@ public sealed class ChannelViewModel : ObservableObject
         }
     }
 
+    // Search box of the open list: the sounds whose name contains it (all of them when empty).
+    internal IReadOnlyList<InstrumentChoice> AllItems = Array.Empty<InstrumentChoice>();
+    string searchText = "";
+    public string SearchText
+    {
+        get => searchText;
+        set
+        {
+            if (Set(ref searchText, value ?? "") && !Updating) mixer.Run(() => mixer.FilterInstrumentList(this));
+        }
+    }
+
+    // Enter in the search box.
+    internal void ChooseFirstMatch() => mixer.ChooseFirstMatch(this);
     bool isListOpen;
     public bool IsListOpen
     {

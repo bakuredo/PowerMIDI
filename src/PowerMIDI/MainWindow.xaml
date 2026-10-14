@@ -13,6 +13,53 @@
         Closing="OnClosing">
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+    <!-- Instrument list of a channel: the look of a Windows list, with a search box above the sounds (it filters
+         them while typing; see ChannelViewModel.SearchText). The colors of the closed list are Windows' own. -->
+    <ControlTemplate x:Key="InstrumentComboTemplate" TargetType="ComboBox">
+      <Grid SnapsToDevicePixels="True">
+        <ToggleButton Focusable="False" ClickMode="Press"
+                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+          <ToggleButton.Template>
+            <ControlTemplate TargetType="ToggleButton">
+              <Border x:Name="Bd" Background="#FFF0F0F0" BorderBrush="#FFACACAC" BorderThickness="1">
+                <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" Fill="#FF606060" Data="M0,0 L3.5,4 L7,0 Z"/>
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                  <Setter TargetName="Bd" Property="Background" Value="#FFE5F1FB"/>
+                  <Setter TargetName="Bd" Property="BorderBrush" Value="#FF7EB4EA"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                  <Setter TargetName="Bd" Property="Background" Value="#FFCCE4F7"/>
+                  <Setter TargetName="Bd" Property="BorderBrush" Value="#FF569DE5"/>
+                </Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </ToggleButton.Template>
+        </ToggleButton>
+        <ContentPresenter IsHitTestVisible="False" Margin="6,0,20,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                          Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
+        <Popup x:Name="PART_Popup" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+               Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+          <Border Background="White" BorderBrush="#FF828790" BorderThickness="1" MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                  MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+            <DockPanel>
+              <TextBox DockPanel.Dock="Top" Margin="3" Padding="2,1" FontWeight="Normal" Foreground="#FF1E1E1E"
+                       Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search sounds (Enter: first match)"
+                       IsVisibleChanged="OnInstrumentSearchVisible" PreviewKeyDown="OnInstrumentSearchKeyDown"/>
+              <ScrollViewer CanContentScroll="True">
+                <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+        </Popup>
+      </Grid>
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.6"/></Trigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate>
     <Style TargetType="Button">
       <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -303,6 +350,7 @@
                 <ComboBox.Style>
                   <Style TargetType="ComboBox">
                     <Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/>
+                    <Setter Property="Template" Value="{StaticResource InstrumentComboTemplate}"/>
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding InstrumentState}" Value="Unused"><Setter Property="Foreground" Value="{DynamicResource OnLightDisabledBrush}"/></DataTrigger>
                       <DataTrigger Binding="{Binding InstrumentState}" Value="Manual">

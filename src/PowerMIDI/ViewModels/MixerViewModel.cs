@@ -428,10 +428,35 @@ public sealed class MixerViewModel : ObservableObject
         items.AddRange(choices);
         Update(ch, () =>
         {
+            ch.AllItems = items;
+            ch.SearchText = "";
             ch.InstrumentItems = items;
             ch.SelectedInstrument = index >= 0 ? choices[index] : null;
         });
         ch.ListShown = true;
+    }
+
+    // Search box of the open list: the sounds whose name contains the text, without the file / assign entries;
+    // the current sound stays selected if it is one of them.
+    internal void FilterInstrumentList(ChannelViewModel ch)
+    {
+        var text = ch.SearchText.Trim();
+        var items = text == "" ? ch.AllItems
+                  : ch.AllItems.Where(i => !i.IsReset && i.AssignPart == null && i.AssignXgBank == null &&
+                                           i.Text.Contains(text, StringComparison.OrdinalIgnoreCase)).ToList();
+        var selected = ch.SelectedInstrument;
+        Update(ch, () =>
+        {
+            ch.InstrumentItems = items;
+            ch.SelectedInstrument = selected != null && items.Contains(selected) ? selected : null;
+        });
+    }
+
+    // Enter in the search box: the first sound found is chosen.
+    internal void ChooseFirstMatch(ChannelViewModel ch)
+    {
+        var first = ch.InstrumentItems.FirstOrDefault(i => !i.IsReset && i.AssignPart == null && i.AssignXgBank == null && !i.IsDisplay);
+        if (first != null && ch.SearchText.Trim() != "") ch.SelectedInstrument = first;
     }
 
     internal void SelectInstrument(int c, InstrumentChoice item)
