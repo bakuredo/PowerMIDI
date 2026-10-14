@@ -339,10 +339,10 @@ public sealed class MixerViewModel : ObservableObject
         var fileInfo = GetFileInstrument(c);
         var (msb, lsb, program) = GetCurrentSound(c);
         bool drum = GetCurrentInstrument(c).Drum;
-        // XG: the list of the map of the sound; a capital voice is listed once per map (bank LSB 0), whatever
-        // bank asked for it.
+        // XG: the list of the map of the sound. The MU50 map lists a capital voice once (bank LSB 0), whatever
+        // bank asked for it; the 2000 map has its three banks (0, 126 = MU100 Native, 127 = MU Basic).
         int xgMap = HasXgBanks ? XgMapOfSound(msb, lsb, program) : 0;
-        if (HasXgBanks && IsXgCapital(msb, lsb)) lsb = 0;
+        if (HasXgBanks && IsXgCapital(msb, lsb) && xgMap == InstrumentDefinitions.XgMu50Map) lsb = 0;
         if (HasMu50Map && !IsMu50ModeMap(xgMap)) xgMap = InstrumentDefinitions.XgMu50Map;
         var choices = defs.GetChoices(Standard, drum, HasXgBanks ? xgMap : lsb, HasMu50Map);
         // MT-32: the programs named by the patch table of the file.

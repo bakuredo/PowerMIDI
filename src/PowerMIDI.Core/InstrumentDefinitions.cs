@@ -55,7 +55,7 @@ public sealed class InstrumentDefinitions
     // XG maps of the MU2000 (map selector of a channel in XG mode). Unlike the GS maps, most of them are families
     // of sounds picked by the bank MSB. 2000: the voices of bank MSB 0, whose 128 capital voices have two versions
     // (bank LSB 0 = MU100 Native voices, the default of the module, also LSB 126; LSB 127 = MU Basic voices);
-    // the list shows the MU100 Native ones.
+    // the list has them as bank LSB 0 (MU100 Native names), then each one as LSB 126 and 127 after its variations.
     // MU50: the voices an XG Level 1 module also has (capital voices and part of the variations, marked MU50="1" in
     // the file), offered when the module plays the MU Basic voice map; its capital voices are plain bank LSB 0.
     // With that voice map, only the MU50 map, the SFX voices and the drum kits of the MU50 are offered.
@@ -75,7 +75,7 @@ public sealed class InstrumentDefinitions
     static bool IsInXgMap(int map, int msb, int lsb) => map switch
     {
         3 => msb == 48, 4 => msb == 64, XgSamplingMap => msb == 16, 6 => msb == 121,
-        _ => msb == 0 && lsb < XgNativeLsb,
+        _ => msb == 0,
     };
 
     public readonly Dictionary<int, string> GmVoices = new();

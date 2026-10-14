@@ -130,7 +130,10 @@ public class InstrumentDefinitionsTests
         var variations = native.Where(c => c.Lsb != 0).ToList();
         Assert.NotEmpty(variations);
         Assert.All(variations, c => Assert.StartsWith("      · ", c.Text));
-        Assert.DoesNotContain(native, c => c.Msb != 0 || c.Lsb >= InstrumentDefinitions.XgNativeLsb);
+        Assert.All(native, c => Assert.Equal(0, c.Msb));
+        // The two explicit versions of a capital voice, after its variations: LSB 126 (MU100 Native), 127 (MU Basic).
+        int piano = native.ToList().FindIndex(c => c.Program == 1);
+        Assert.Equal(new[] { ("      · Grand Piano #", 126), ("      · Grand Piano", 127) }, native.Take(piano).TakeLast(2).Select(c => (c.Text, c.Lsb)));
 
         // The other maps are families of sounds, each with its bank MSB.
         Assert.All(Map("MEx"), c => Assert.Equal(48, c.Msb));
