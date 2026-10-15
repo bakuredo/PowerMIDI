@@ -65,14 +65,14 @@ public sealed class InstrumentDefinitions
     public const int XgBasicLsb = 127, XgNativeLsb = 126;
 
     // Map of an XG voice (not of a drum kit); a bank the MU2000 does not have counts as the default map.
-    public static int XgMap(int msb, int lsb) => msb switch { 48 => 3, 64 => 4, 16 => 5, 121 => 6, _ => XgNativeMap };
+    public static int XgMap(int msb) => msb switch { 48 => 3, 64 => 4, 16 => 5, 121 => 6, _ => XgNativeMap };
 
     // Map of an XG voice when the MU50 map is offered (MU Basic voice map): a voice the MU50 has belongs to it,
     // unless its bank asks for the MU100 Native version of the capital voice (LSB 126).
     public int XgMap(int msb, int lsb, int program, bool withMu50) =>
-        withMu50 && msb == 0 && lsb != XgNativeLsb && XgMu50Voices.Contains((0, lsb == XgBasicLsb ? 0 : lsb, program)) ? XgMu50Map : XgMap(msb, lsb);
+        withMu50 && msb == 0 && lsb != XgNativeLsb && XgMu50Voices.Contains((0, lsb == XgBasicLsb ? 0 : lsb, program)) ? XgMu50Map : XgMap(msb);
 
-    static bool IsInXgMap(int map, int msb, int lsb) => map switch
+    static bool IsInXgMap(int map, int msb) => map switch
     {
         3 => msb == 48, 4 => msb == 64, XgSamplingMap => msb == 16, 6 => msb == 121,
         _ => msb == 0,
@@ -474,7 +474,7 @@ public sealed class InstrumentDefinitions
         else if (useXg && map == XgMu50Map)
             raw.AddRange(XgMu50Voices.Where(k => k.Msb == 0).Select(k => (0, k.Lsb, k.Program,
                 k.Lsb == 0 && XgVoices.TryGetValue((0, XgBasicLsb, k.Program), out var basic) ? basic : XgVoices[k])));
-        else if (useXg) raw.AddRange(XgVoices.Where(kv => IsInXgMap(map, kv.Key.Msb, kv.Key.Lsb) && (!mu50Only || XgMu50Voices.Contains(kv.Key))).Select(kv => (kv.Key.Msb, kv.Key.Lsb, kv.Key.Program, kv.Value)));
+        else if (useXg) raw.AddRange(XgVoices.Where(kv => IsInXgMap(map, kv.Key.Msb) && (!mu50Only || XgMu50Voices.Contains(kv.Key))).Select(kv => (kv.Key.Msb, kv.Key.Lsb, kv.Key.Program, kv.Value)));
         else if (useGs && drum) raw.AddRange(GsDrums.Where(kv => kv.Key.Map == map).Select(kv => (0, map, kv.Key.Program, kv.Value)));
         else if (useGs) raw.AddRange(GsVoices.Where(kv => kv.Key.Map == map).Select(kv => (kv.Key.Msb, map, kv.Key.Program, kv.Value)));
         else if (drum && GmDrums.Count > 0) raw.AddRange(GmDrums.Select(kv => (0, 0, kv.Key, kv.Value)));

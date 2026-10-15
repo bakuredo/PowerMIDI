@@ -28,40 +28,25 @@ public static class Mt32DrumParams
 
     const int RhythmTemp = (0x03 << 14) | (0x01 << 7) | 0x10;
 
-    static readonly int[,] file = new int[Keys, Count];
-    static readonly bool[,] isFixed = new bool[Keys, Count];
-    static readonly int[,] fixedValue = new int[Keys, Count];
-    static int fixedCount;
+    // Values by note (one group; note index = note - 24) and parameter; after a reset, those of the module's rhythm map
+    // (unknown: -1).
+    static readonly ValueStore store = new(1, Keys, Count, (g, k, p) => -1);
 
-    static Mt32DrumParams() { ResetFile(); }
-
-    public static void ResetFile()
-    {
-        for (int k = 0; k < Keys; k++)
-            for (int p = 0; p < Count; p++) file[k, p] = -1;
-    }
+    public static void ResetFile() => store.ResetFile();
 
     // Values by note (24-108).
-    public static int FileValue(int note, int p) => file[note - FirstKey, p];
-    public static bool IsFixed(int note, int p) => isFixed[note - FirstKey, p];
-    public static int FixedValue(int note, int p) => fixedValue[note - FirstKey, p];
-    public static int Value(int note, int p) => IsFixed(note, p) ? FixedValue(note, p) : FileValue(note, p);
-    public static bool HasFixed => fixedCount > 0;
-    public static bool IsNoteFixed(int note) => Enumerable.Range(0, Count).Any(p => IsFixed(note, p));
+    public static int FileValue(int note, int p) => store.File(0, note - FirstKey, p);
+    public static bool IsFixed(int note, int p) => store.IsFixed(0, note - FirstKey, p);
+    public static int FixedValue(int note, int p) => store.FixedValue(0, note - FirstKey, p);
+    public static int Value(int note, int p) => store.Value(0, note - FirstKey, p);
+    public static bool HasFixed => store.HasFixed;
+    public static bool IsNoteFixed(int note) => store.IsNoteFixed(0, note - FirstKey);
 
-    public static IEnumerable<(int Note, int Param, int Value)> Fixed()
-    {
-        for (int k = 0; k < Keys; k++)
-            for (int p = 0; p < Count; p++)
-                if (isFixed[k, p]) yield return (k + FirstKey, p, fixedValue[k, p]);
-    }
+    public static IEnumerable<(int Note, int Param, int Value)> Fixed() => store.Fixed().Select(x => (x.N + FirstKey, x.P, x.Value));
 
     public static void Set(IOutputDevice device, int note, int p, int value)
     {
-        int k = note - FirstKey;
-        if (!isFixed[k, p]) fixedCount++;
-        isFixed[k, p] = true;
-        fixedValue[k, p] = value;
+        store.Fix(0, note - FirstKey, p, value);
         device?.SendEvent(ParamEvent(note, p, value));
     }
 
@@ -69,14 +54,8 @@ public static class Mt32DrumParams
     // the module's rhythm map, unknown here, cannot be: the module keeps the fixed one until its next reset).
     public static void Clear(IOutputDevice device, int note = -1, int param = -1)
     {
-        for (int k = 0; k < Keys; k++)
-            for (int p = 0; p < Count; p++)
-            {
-                if (!isFixed[k, p] || (note >= 0 && k != note - FirstKey) || (param >= 0 && p != param)) continue;
-                isFixed[k, p] = false;
-                fixedCount--;
-                if (file[k, p] >= 0) device?.SendEvent(ParamEvent(k + FirstKey, p, file[k, p]));
-            }
+        foreach (var (_, k, p) in store.Unfix(0, note >= 0 ? note - FirstKey : -1, param))
+            if (FileValue(k + FirstKey, p) >= 0) device?.SendEvent(ParamEvent(k + FirstKey, p, FileValue(k + FirstKey, p)));
     }
 
     public static void Apply(IOutputDevice device)
@@ -111,9 +90,9 @@ public static class Mt32DrumParams
         byte[] data = null;
         foreach (var (pos, k, p) in Positions(d))
         {
-            if (!isFixed[k, p] || d[pos] == fixedValue[k, p]) continue;
+            if (!store.IsFixed(0, k, p) || d[pos] == store.FixedValue(0, k, p)) continue;
             data ??= (byte[])d.Clone();
-            data[pos] = (byte)fixedValue[k, p];
+            data[pos] = (byte)store.FixedValue(0, k, p);
         }
         if (data != null) MidiTools.FixRolandChecksum(data);
         return data;
@@ -122,7 +101,7 @@ public static class Mt32DrumParams
     // MT-32 DT1 played from the file: stores its values; returns it with the fixed values (null = unchanged).
     public static byte[] Read(byte[] d)
     {
-        foreach (var (pos, k, p) in Positions(d)) file[k, p] = Math.Min(d[pos], Max[p]);
+        foreach (var (pos, k, p) in Positions(d)) store.SetFile(0, k, p, Math.Min(d[pos], Max[p]));
         return WithFixedValues(d);
     }
 }

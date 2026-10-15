@@ -173,7 +173,7 @@ public static class GsXgEffects
     internal static List<int[]> ValueBytes(byte[] d, out bool gs, out int dataCount)
     {
         gs = false; dataCount = 0;
-        int first, start, address, hi = 0x01;
+        int first, start, address, hi;
         // GS: areas 40 01 (reverb, chorus, delay), 40 02 (EQ), 40 03 (EFX) and 40 4x (parts: EQ per channel
         // 40 4x 20, EFX per channel 40 4x 22).
         if (d.Length >= 10 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x40 &&

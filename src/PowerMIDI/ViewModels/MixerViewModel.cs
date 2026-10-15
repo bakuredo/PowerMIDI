@@ -147,7 +147,7 @@ public sealed class MixerViewModel : ObservableObject
 
     // XG map of a voice (see InstrumentDefinitions.XgMapNames).
     int XgMapOfSound(int msb, int lsb, int program) =>
-        HasMu50Map ? defs.XgMap(msb, lsb, program, true) : InstrumentDefinitions.XgMap(msb, lsb);
+        HasMu50Map ? defs.XgMap(msb, lsb, program, true) : InstrumentDefinitions.XgMap(msb);
 
     // With the MU50 map (MU Basic voice map), the lists only offer what the MU50 has: the MU50 map, the SFX voices
     // and the drum kits it has. A voice of another map is still named, with no map selected.

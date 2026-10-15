@@ -288,7 +288,7 @@ public sealed class EffectsViewModel : ObservableObject
             var group = GsXgEffects.IsXg(fx) ? xgBlocks : gsBlocks;
             if (!blocks.TryGetValue(b, out var block))
             {
-                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : GsXgEffects.IsXg(fx) ? "Part" : "Channels", ShowTitle = false,
+                block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = GsXgEffects.IsXg(fx) ? "Part" : "Channels", ShowTitle = false,
                                                    TabTitle = b == GsXgEffects.XgEqBlock ? "Multi EQ" : b >= GsXgEffects.InsBlockFirst ? $"Ins {b - GsXgEffects.InsBlockFirst + 1}" : BlockNames[b].Split(" (")[0] };
                 blocks[b] = block;
                 if (b == 5) variationBlock = block;
@@ -500,8 +500,8 @@ public sealed class EffectsViewModel : ObservableObject
         }
         gsBlocks.Add(gsDrumBlock);
 
-        // GS Part page: the settings of a channel (buttons), in sections: its EQ switch (40 4x 20, the GS EQ's, which the
-        // EQ page showed as channel buttons), tuning, play.
+        // GS Part page: the settings of a channel (buttons), in sections: its EQ switch (40 4x 20: the part goes through the
+        // GS EQ of the EQ page), tuning, play.
         blocks[7].Channels.Clear();
         gsPartBlock = new EffectBlockViewModel { Title = "Part settings", TabTitle = "Part", ShowTitle = false, IsFirst = true, ChannelsLabel = "Channel" };
         for (int c = 0; c < 16; c++)
@@ -557,6 +557,17 @@ public sealed class EffectsViewModel : ObservableObject
                 };
             group[0].IsSelected = true;
         }
+
+        // Texts of the Part and Drums settings (Insert mode), with the names and units of these pages.
+        ModuleSettings.XgPart.Describe = (k, v) => DescribePart(k.A, k.C, v);
+        ModuleSettings.XgPartModes.Describe = (k, v) => DescribePartMode(k.A, v);
+        ModuleSettings.XgDrums.Describe = (k, v) => DescribeDrum(k.A, k.B, k.C, v);
+        ModuleSettings.GsPart.Describe = (k, v) => DescribeGsPart(k.A, k.C, v);
+        ModuleSettings.GsDrums.Describe = (k, v) => DescribeGsDrum(k.A, k.B, k.C, v);
+        ModuleSettings.Gm2Part.Describe = (k, v) => DescribeGm2Part(k.A, k.C, v);
+        ModuleSettings.Gm2Drums.Describe = (k, v) => DescribeGm2Drum(k.A, k.B, k.C, v);
+        ModuleSettings.Mt32Part.Describe = (k, v) => DescribeMt32Part(k.A, k.C, v);
+        ModuleSettings.Mt32Drums.Describe = (k, v) => DescribeMt32Drum(k.B, k.C, v);
     }
 
     public ICommand ResetCommand { get; }
@@ -694,15 +705,7 @@ public sealed class EffectsViewModel : ObservableObject
         foreach (bool typeFirst in new[] { true, false })
             for (int p = 0; p < Gm2Effects.Count; p++)
                 if (Gm2Effects.IsFixed(p) && Gm2Effects.IsType(p) == typeFirst) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? device : null, p);
-        XgDrumSetup.ClearPartMode(ChannelMixer.XgMode ? device : null);
-        foreach (int m in GsDrumMap.Clear(ChannelMixer.GsMode ? device : null)) ChannelMixer.ResetGsDrumMap(device, m);
-        GsPartParams.Clear(ChannelMixer.GsMode ? device : null);
-        Gm2DrumParams.Clear(ChannelMixer.Gm2Mode ? device : null);
-        Gm2PartParams.Clear(ChannelMixer.Gm2Mode ? device : null);
-        Mt32PartParams.Clear(ChannelMixer.Mt32Mode ? device : null);
-        Mt32DrumParams.Clear(ChannelMixer.Mt32Mode ? device : null);
-        XgPartParams.Clear(ChannelMixer.XgMode ? device : null);
-        XgDrumSetup.Clear(ChannelMixer.XgMode ? device : null);
+        foreach (var m in ModuleSettings.All) m.ClearAll(m.IsActive() ? device : null);   // Part and Drums pages
         Refresh();
     }
 
@@ -717,15 +720,7 @@ public sealed class EffectsViewModel : ObservableObject
             if (Mt32Effects.IsFixed(p)) { Mt32Effects.Clear(null, p); had = true; }
         for (int p = 0; p < Gm2Effects.Count; p++)
             if (Gm2Effects.IsFixed(p)) { Gm2Effects.Clear(null, p); had = true; }
-        if (XgDrumSetup.HasFixed) { XgDrumSetup.Clear(null); had = true; }
-        if (XgDrumSetup.HasPartModes) { XgDrumSetup.ClearPartMode(null); had = true; }
-        if (GsDrumMap.HasFixed) { GsDrumMap.Clear(null); had = true; }
-        if (GsPartParams.HasFixed) { GsPartParams.Clear(null); had = true; }
-        if (Gm2DrumParams.HasFixed) { Gm2DrumParams.Clear(null); had = true; }
-        if (Gm2PartParams.HasFixed) { Gm2PartParams.Clear(null); had = true; }
-        if (Mt32PartParams.HasFixed) { Mt32PartParams.Clear(null); had = true; }
-        if (Mt32DrumParams.HasFixed) { Mt32DrumParams.Clear(null); had = true; }
-        if (XgPartParams.HasFixed) { XgPartParams.Clear(null); had = true; }
+        foreach (var m in ModuleSettings.All.Where(m => m.HasFixed)) { m.ClearAll(null); had = true; }   // Part and Drums pages
         return had;
     }
 

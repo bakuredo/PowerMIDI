@@ -10,7 +10,7 @@ namespace PowerMIDI.Core;
 // - RPN 00 00 (pitch bend range, 0..24 semitones = Bend Pitch Control 40..58), RPN 00 01 (fine tuning: its MSB);
 // - CC126 / CC127 (mono / poly).
 // Reset by a GS Reset or a GM On. Values fixed in the interface replace the file's. The EQ of a part (40 4x 20) stays
-// in GsXgEffects (it was in the EQ tab); the Part page only shows it.
+// in GsXgEffects; the Part page shows it.
 public static class GsPartParams
 {
     public sealed record Param(string Group, string Name, int Block, int Address, int Default, int Min, int Max, bool TwoNibbles = false);
@@ -34,29 +34,21 @@ public static class GsPartParams
     public static int Count => Params.Length;
     public const int KeyShift = 0, OffsetFine = 1, FineTune = 2, BendRange = 3, MonoPoly = 4, AssignMode = 5, KeyRangeLow = 8, KeyRangeHigh = 9;
 
-    static readonly int[,] file = new int[16, Params.Length];
-    static readonly bool[,] isFixed = new bool[16, Params.Length];
-    static readonly int[,] fixedValue = new int[16, Params.Length];
+    // Values by channel (group) and parameter (one note).
+    static readonly ValueStore store = new(16, 1, Params.Length, (c, n, p) => Params[p].Default);
 
-    static GsPartParams() { ResetFile(); }
+    public static void ResetFile() => store.ResetFile();
 
-    public static void ResetFile()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++) file[c, p] = Params[p].Default;
-    }
-
-    public static int FileValue(int c, int p) => file[c, p];
-    public static bool IsFixed(int c, int p) => isFixed[c, p];
-    public static int FixedValue(int c, int p) => fixedValue[c, p];
-    public static int Value(int c, int p) => isFixed[c, p] ? fixedValue[c, p] : file[c, p];
-    public static bool IsChannelFixed(int c) => Enumerable.Range(0, Count).Any(p => isFixed[c, p]);
-    public static bool HasFixed => Enumerable.Range(0, 16).Any(IsChannelFixed);
+    public static int FileValue(int c, int p) => store.File(c, 0, p);
+    public static bool IsFixed(int c, int p) => store.IsFixed(c, 0, p);
+    public static int FixedValue(int c, int p) => store.FixedValue(c, 0, p);
+    public static int Value(int c, int p) => store.Value(c, 0, p);
+    public static bool IsChannelFixed(int c) => store.IsGroupFixed(c);
+    public static bool HasFixed => store.HasFixed;
 
     public static void Set(IOutputDevice device, int c, int p, int value)
     {
-        isFixed[c, p] = true;
-        fixedValue[c, p] = value;
+        store.Fix(c, 0, p, value);
         device?.SendEvent(ParamEvent(c, p, value));
     }
 
@@ -64,13 +56,8 @@ public static class GsPartParams
     // assign mode never set by the file cannot be: the module keeps the fixed one until the next reset).
     public static void Clear(IOutputDevice device, int channel = -1, int param = -1)
     {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++)
-            {
-                if (!isFixed[c, p] || (channel >= 0 && c != channel) || (param >= 0 && p != param)) continue;
-                isFixed[c, p] = false;
-                if (file[c, p] >= 0) device?.SendEvent(ParamEvent(c, p, file[c, p]));
-            }
+        foreach (var (c, _, p) in store.Unfix(channel, -1, param))
+            if (FileValue(c, p) >= 0) device?.SendEvent(ParamEvent(c, p, FileValue(c, p)));
     }
 
     public static void Apply(IOutputDevice device)
@@ -78,12 +65,7 @@ public static class GsPartParams
         foreach (var e in FixedEvents()) device.SendEvent(e);
     }
 
-    public static IEnumerable<(int Channel, int Param, int Value)> Fixed()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++)
-                if (isFixed[c, p]) yield return (c, p, fixedValue[c, p]);
-    }
+    public static IEnumerable<(int Channel, int Param, int Value)> Fixed() => store.Fixed().Select(x => (x.G, x.P, x.Value));
 
     public static IEnumerable<MidiEvent> FixedEvents() => Fixed().Select(x => (MidiEvent)ParamEvent(x.Channel, x.Param, x.Value));
 
@@ -135,9 +117,9 @@ public static class GsPartParams
         byte[] data = null;
         foreach (var (pos, p, shift) in Positions(d, out int c))
         {
-            if (!isFixed[c, p] || d[pos] == ByteOf(p, fixedValue[c, p], shift)) continue;
+            if (!IsFixed(c, p) || d[pos] == ByteOf(p, FixedValue(c, p), shift)) continue;
             data ??= (byte[])d.Clone();
-            data[pos] = (byte)ByteOf(p, fixedValue[c, p], shift);
+            data[pos] = (byte)ByteOf(p, FixedValue(c, p), shift);
         }
         if (data != null) MidiTools.FixRolandChecksum(data);
         return data;
@@ -147,7 +129,7 @@ public static class GsPartParams
     public static byte[] Read(byte[] d)
     {
         foreach (var (pos, p, shift) in Positions(d, out int c))
-            file[c, p] = Params[p].TwoNibbles ? Math.Max(file[c, p], 0) & ~(0x0F << shift) | (d[pos] & 0x0F) << shift : d[pos];
+            store.SetFile(c, 0, p, Params[p].TwoNibbles ? Math.Max(FileValue(c, p), 0) & ~(0x0F << shift) | (d[pos] & 0x0F) << shift : d[pos]);
         return WithFixedValues(d);
     }
 
@@ -161,8 +143,8 @@ public static class GsPartParams
     public static MidiEvent FixDataEntry(ControlChangeEvent cc, DataEntry entry)
     {
         int p = ParamOf(entry), c = cc.Channel;
-        if (p < 0 || !isFixed[c, p]) return null;
-        int value = p == BendRange ? fixedValue[c, p] - 0x40 : fixedValue[c, p];
+        if (p < 0 || !IsFixed(c, p)) return null;
+        int value = p == BendRange ? FixedValue(c, p) - 0x40 : FixedValue(c, p);
         return new ControlChangeEvent((SevenBitNumber)6, (SevenBitNumber)value) { Channel = cc.Channel };
     }
 
@@ -171,7 +153,7 @@ public static class GsPartParams
     {
         int p = ParamOf(entry);
         if (p < 0) return null;
-        file[cc.Channel, p] = FromDataEntry(p, cc.ControlValue);
+        store.SetFile(cc.Channel, 0, p, FromDataEntry(p, cc.ControlValue));
         return FixDataEntry(cc, entry);
     }
 
@@ -179,13 +161,13 @@ public static class GsPartParams
     public static MidiEvent FixMonoPoly(ControlChangeEvent cc)
     {
         int c = cc.Channel, mode = cc.ControlNumber == 127 ? 1 : 0;
-        if (!isFixed[c, MonoPoly] || fixedValue[c, MonoPoly] == mode) return null;
-        return new ControlChangeEvent((SevenBitNumber)(fixedValue[c, MonoPoly] == 1 ? 127 : 126), (SevenBitNumber)0) { Channel = cc.Channel };
+        if (!IsFixed(c, MonoPoly) || FixedValue(c, MonoPoly) == mode) return null;
+        return new ControlChangeEvent((SevenBitNumber)(FixedValue(c, MonoPoly) == 1 ? 127 : 126), (SevenBitNumber)0) { Channel = cc.Channel };
     }
 
     public static MidiEvent ReadMonoPoly(ControlChangeEvent cc)
     {
-        file[cc.Channel, MonoPoly] = cc.ControlNumber == 127 ? 1 : 0;
+        store.SetFile(cc.Channel, 0, MonoPoly, cc.ControlNumber == 127 ? 1 : 0);
         return FixMonoPoly(cc);
     }
 }

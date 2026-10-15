@@ -1,0 +1,69 @@
+using PowerMIDI.Core;
+
+namespace PowerMIDI.Tests;
+
+// Settings modules of the Part and Drums pages (ModuleSettings): each one sets, lists, sends and clears its values the
+// same way, which the Insert mode, the save and the Reset button rely on.
+[Collection("ChannelMixer")]   // shared static state: not in parallel with the other tests that use it
+public class ModuleSettingsTests
+{
+    // A valid value of each module: key and value.
+    static readonly (SettingsModule Module, SettingKey Key, int Value)[] Samples =
+    {
+        (ModuleSettings.XgPart, new(2, 0, XgPartParams.BassGain), 70),
+        (ModuleSettings.XgPartModes, new(10), 3),
+        (ModuleSettings.XgDrums, new(0, 38, 0), 70),
+        (ModuleSettings.GsPart, new(2, 0, GsPartParams.KeyShift), 70),
+        (ModuleSettings.GsDrums, new(0, 38, 1), 100),
+        (ModuleSettings.Gm2Part, new(2, 0, Gm2PartParams.BendRange), 5),
+        (ModuleSettings.Gm2Drums, new(9, 38, Gm2DrumParams.Pan), 64),
+        (ModuleSettings.Mt32Part, new(0, 0, Mt32PartParams.KeyShift), 30),
+        (ModuleSettings.Mt32Drums, new(0, 38, Mt32DrumParams.Level), 50),
+    };
+
+    [Fact]
+    public void Every_module_sets_lists_sends_and_clears_its_values()
+    {
+        Assert.Equal(Samples.Length, ModuleSettings.All.Length);
+        try
+        {
+            foreach (var (m, key, value) in Samples)
+            {
+                Assert.False(m.HasFixed, m.Name);
+                m.Set(null, key, value);
+                Assert.True(m.HasFixed, m.Name);
+                Assert.Equal(new[] { (key, value) }, m.Fixed());
+                Assert.NotEmpty(m.Events(key, value));
+                Assert.NotNull(m.Write);
+                m.Clear(null, key);
+                Assert.False(m.HasFixed, m.Name);
+            }
+            // The XG part modes and drum setups share their writer (one pass in the saved file).
+            Assert.Equal(ModuleSettings.XgPartModes.Write, ModuleSettings.XgDrums.Write);
+            Assert.Equal(8, ModuleSettings.All.Select(m => m.Write).Distinct().Count());
+        }
+        finally
+        {
+            foreach (var m in ModuleSettings.All) m.ClearAll(null);
+        }
+    }
+
+    [Fact]
+    public void Clear_all_and_reset()
+    {
+        try
+        {
+            foreach (var (m, key, value) in Samples) m.Set(null, key, value);
+            Assert.All(ModuleSettings.All, m => Assert.True(m.HasFixed, m.Name));
+            ModuleSettings.ResetFiles();   // the file's values: the fixed ones stay
+            Assert.All(ModuleSettings.All, m => Assert.True(m.HasFixed, m.Name));
+            foreach (var m in ModuleSettings.All) m.ClearAll(null);
+            Assert.All(ModuleSettings.All, m => Assert.False(m.HasFixed, m.Name));
+        }
+        finally
+        {
+            foreach (var m in ModuleSettings.All) m.ClearAll(null);
+            ModuleSettings.ResetFiles();
+        }
+    }
+}

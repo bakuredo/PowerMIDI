@@ -1,4 +1,3 @@
-using Melanchall.DryWetMidi.Core;
 using PowerMIDI.Core;
 
 namespace PowerMIDI.ViewModels;
@@ -37,15 +36,9 @@ public sealed partial class MainViewModel
         var forceMode = isForced ? selectedMode : null;
         bool mt32 = Mixer.Standard == "MT-32" && Mt32Effects.HasFixed;   // MT-32 reverb values fixed in the Effects tab
         bool gm2 = Mixer.Standard == "GM2" && Gm2Effects.HasFixed;       // GM2 reverb / chorus values fixed there
-        bool drums = Mixer.Standard == "XG" && (XgDrumSetup.HasFixed || XgDrumSetup.HasPartModes);   // XG drum setups and part modes
-        bool partEq = Mixer.Standard == "XG" && XgPartParams.HasFixed;      // XG part settings
-        bool gsDrums = Mixer.Standard == "GS" && GsDrumMap.HasFixed;       // GS drum maps
-        bool gsPart = Mixer.Standard == "GS" && GsPartParams.HasFixed;     // GS part settings
-        bool gm2Drums = Mixer.Standard == "GM2" && Gm2DrumParams.HasFixed; // GM2 drum settings
-        bool gm2Part = Mixer.Standard == "GM2" && Gm2PartParams.HasFixed;  // GM2 part settings (RPN)
-        bool mt32Part = Mixer.Standard == "MT-32" && Mt32PartParams.HasFixed; // MT-32 part settings
-        bool mt32Drums = Mixer.Standard == "MT-32" && Mt32DrumParams.HasFixed; // MT-32 rhythm setup
-        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && !gsDrums && !gsPart && !gm2Drums && !gm2Part && !mt32Part && !mt32Drums && insertions.Count == 0)
+        // Part and Drums pages of the Effects tab: the modules of the mode of the track that have fixed values.
+        var modules = ModuleSettings.All.Where(m => m.Standard == Mixer.Standard && m.HasFixed).ToList();
+        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && modules.Count == 0 && insertions.Count == 0)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
@@ -92,14 +85,8 @@ public sealed partial class MainViewModel
         if (hasEffects) report.Add(MidiFileEditor.ApplyEffects(midi, applyFx, fxValues));
         if (mt32) report.Add(MidiFileEditor.WriteMt32Reverb(midi));
         if (gm2) report.Add(MidiFileEditor.WriteGm2Effects(midi));
-        if (drums) report.Add(MidiFileEditor.WriteXgDrumSetup(midi));
-        if (partEq) report.Add(MidiFileEditor.WriteXgPartParams(midi));
-        if (gsDrums) report.Add(MidiFileEditor.WriteGsDrumMap(midi));
-        if (gsPart) report.Add(MidiFileEditor.WriteGsPartParams(midi));
-        if (gm2Drums) report.Add(MidiFileEditor.WriteGm2DrumParams(midi));
-        if (gm2Part) report.Add(MidiFileEditor.WriteGm2PartParams(midi));
-        if (mt32Part) report.Add(MidiFileEditor.WriteMt32PartParams(midi));
-        if (mt32Drums) report.Add(MidiFileEditor.WriteMt32DrumParams(midi));
+        // Part and Drums pages (the XG part modes and drum setups share one writer).
+        foreach (var write in modules.Select(m => m.Write).Distinct()) report.Add(write(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
         if (forceMode != null)
         {
@@ -148,16 +135,8 @@ public sealed partial class MainViewModel
             if (Mt32Effects.IsFixed(p)) parts.Add($"m{p}={Mt32Effects.FixedValue(p)}");
         for (int p = 0; p < Gm2Effects.Count; p++)
             if (Gm2Effects.IsFixed(p)) parts.Add($"g{p}={Gm2Effects.FixedValue(p)}");
-        foreach (var (s, n, p, v) in XgDrumSetup.Fixed()) parts.Add($"d{s}/{n}/{p}={v}");
-        for (int c = 0; c < 16; c++)
-            if (XgDrumSetup.PartModeOverride[c] >= 0) parts.Add($"pm{c}={XgDrumSetup.PartModeOverride[c]}");
-        foreach (var (c, p, v) in XgPartParams.Fixed()) parts.Add($"pe{c}/{p}={v}");
-        foreach (var (m, n, p, v) in GsDrumMap.Fixed()) parts.Add($"gd{m}/{n}/{p}={v}");
-        foreach (var (c, p, v) in GsPartParams.Fixed()) parts.Add($"gp{c}/{p}={v}");
-        foreach (var (c, n, p, v) in Gm2DrumParams.Fixed()) parts.Add($"kd{c}/{n}/{p}={v}");
-        foreach (var (c, p, v) in Gm2PartParams.Fixed()) parts.Add($"rp{c}/{p}={v}");
-        foreach (var (part, p, v) in Mt32PartParams.Fixed()) parts.Add($"mp{part}/{p}={v}");
-        foreach (var (n, p, v) in Mt32DrumParams.Fixed()) parts.Add($"md{n}/{p}={v}");
+        foreach (var m in ModuleSettings.All)
+            foreach (var (key, v) in m.Fixed()) parts.Add($"{m.Name}{key.A}/{key.B}/{key.C}={v}");
         if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");
         if (withInsertions) foreach (var insertion in insertions) parts.Add($"ins{insertion.Tick}={insertion.Description}");
         return string.Join(";", parts);

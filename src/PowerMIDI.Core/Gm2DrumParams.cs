@@ -17,41 +17,24 @@ public static class Gm2DrumParams
     public static readonly int[] Defaults = { 64, -1, -1, -1 };
     public const int Level = 0, Pan = 1;
 
-    static readonly int[,,] file = new int[16, 128, Count];
-    static readonly bool[,,] isFixed = new bool[16, 128, Count];
-    static readonly int[,,] fixedValue = new int[16, 128, Count];
-    static int fixedCount;
+    // Values by channel (group), note and parameter.
+    static readonly ValueStore store = new(16, 128, Count, (c, n, p) => Defaults[p]);
 
-    static Gm2DrumParams() { ResetFile(); }
+    public static void ResetFile() => store.ResetFile();
 
-    public static void ResetFile()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int n = 0; n < 128; n++)
-                for (int p = 0; p < Count; p++) file[c, n, p] = Defaults[p];
-    }
+    public static int FileValue(int c, int n, int p) => store.File(c, n, p);
+    public static bool IsFixed(int c, int n, int p) => store.IsFixed(c, n, p);
+    public static int FixedValue(int c, int n, int p) => store.FixedValue(c, n, p);
+    public static int Value(int c, int n, int p) => store.Value(c, n, p);
+    public static bool HasFixed => store.HasFixed;
+    public static bool IsNoteFixed(int c, int n) => store.IsNoteFixed(c, n);
+    public static bool IsChannelFixed(int c) => store.IsGroupFixed(c);
 
-    public static int FileValue(int c, int n, int p) => file[c, n, p];
-    public static bool IsFixed(int c, int n, int p) => isFixed[c, n, p];
-    public static int FixedValue(int c, int n, int p) => fixedValue[c, n, p];
-    public static int Value(int c, int n, int p) => isFixed[c, n, p] ? fixedValue[c, n, p] : file[c, n, p];
-    public static bool HasFixed => fixedCount > 0;
-    public static bool IsNoteFixed(int c, int n) => Enumerable.Range(0, Count).Any(p => isFixed[c, n, p]);
-    public static bool IsChannelFixed(int c) => Enumerable.Range(0, 128).Any(n => IsNoteFixed(c, n));
-
-    public static IEnumerable<(int Channel, int Note, int Param, int Value)> Fixed()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int n = 0; n < 128; n++)
-                for (int p = 0; p < Count; p++)
-                    if (isFixed[c, n, p]) yield return (c, n, p, fixedValue[c, n, p]);
-    }
+    public static IEnumerable<(int Channel, int Note, int Param, int Value)> Fixed() => store.Fixed();
 
     public static void Set(IOutputDevice device, int c, int n, int p, int value)
     {
-        if (!isFixed[c, n, p]) fixedCount++;
-        isFixed[c, n, p] = true;
-        fixedValue[c, n, p] = value;
+        store.Fix(c, n, p, value);
         device?.SendEvent(ParamEvent(c, n, p, value));
     }
 
@@ -60,15 +43,8 @@ public static class Gm2DrumParams
     // next reset.
     public static void Clear(IOutputDevice device, int channel = -1, int note = -1, int param = -1)
     {
-        for (int c = 0; c < 16; c++)
-            for (int n = 0; n < 128; n++)
-                for (int p = 0; p < Count; p++)
-                {
-                    if (!isFixed[c, n, p] || (channel >= 0 && c != channel) || (note >= 0 && n != note) || (param >= 0 && p != param)) continue;
-                    isFixed[c, n, p] = false;
-                    fixedCount--;
-                    if (file[c, n, p] >= 0) device?.SendEvent(ParamEvent(c, n, p, file[c, n, p]));
-                }
+        foreach (var (c, n, p) in store.Unfix(channel, note, param))
+            if (FileValue(c, n, p) >= 0) device?.SendEvent(ParamEvent(c, n, p, FileValue(c, n, p)));
     }
 
     public static void Apply(IOutputDevice device)
@@ -76,14 +52,10 @@ public static class Gm2DrumParams
         foreach (var e in FixedEvents()) device.SendEvent(e);
     }
 
-    public static IEnumerable<MidiEvent> FixedEvents() => Enumerable.Range(0, 16).SelectMany(FixedEvents);
+    public static IEnumerable<MidiEvent> FixedEvents() => Fixed().Select(x => (MidiEvent)ParamEvent(x.Channel, x.Note, x.Param, x.Value));
 
-    public static IEnumerable<MidiEvent> FixedEvents(int c)
-    {
-        for (int n = 0; n < 128; n++)
-            for (int p = 0; p < Count; p++)
-                if (isFixed[c, n, p]) yield return ParamEvent(c, n, p, fixedValue[c, n, p]);
-    }
+    public static IEnumerable<MidiEvent> FixedEvents(int c) =>
+        Fixed().Where(x => x.Channel == c).Select(x => (MidiEvent)ParamEvent(x.Channel, x.Note, x.Param, x.Value));
 
     public static NormalSysExEvent ParamEvent(int c, int n, int p, int value) =>
         new(new byte[] { 0x7F, 0x7F, 0x0A, 0x01, (byte)c, (byte)n, (byte)Controllers[p], (byte)value, 0xF7 });
@@ -113,9 +85,9 @@ public static class Gm2DrumParams
         byte[] data = null;
         foreach (var (pos, p) in Positions(d, out int c, out int n))
         {
-            if (!isFixed[c, n, p] || d[pos] == fixedValue[c, n, p]) continue;
+            if (!IsFixed(c, n, p) || d[pos] == FixedValue(c, n, p)) continue;
             data ??= (byte[])d.Clone();
-            data[pos] = (byte)fixedValue[c, n, p];
+            data[pos] = (byte)FixedValue(c, n, p);
         }
         return data;
     }
@@ -125,7 +97,7 @@ public static class Gm2DrumParams
     {
         var positions = Positions(d, out int c, out int n);
         if (positions.Count == 0) return null;
-        foreach (var (pos, p) in positions) file[c, n, p] = d[pos];
+        foreach (var (pos, p) in positions) store.SetFile(c, n, p, d[pos]);
         var data = WithFixedValues(d);
         return data != null ? new NormalSysExEvent(data) : null;
     }

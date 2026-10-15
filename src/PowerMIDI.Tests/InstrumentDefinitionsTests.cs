@@ -98,19 +98,16 @@ public class InstrumentDefinitionsTests
         Assert.False(Defs.Resolve("MT-32", 0, 127, 0, 0, 0).Missing);
     }
 
-    // XG (MU2000): the bank gives the map of a voice.
+    // XG (MU2000): the bank MSB gives the map of a voice.
     [Theory]
-    [InlineData(0, 0, "2000")]
-    [InlineData(0, 126, "2000")]
-    [InlineData(0, 40, "2000")]
-    [InlineData(0, 127, "2000")]
-    [InlineData(48, 8, "MEx")]
-    [InlineData(64, 0, "SFX")]
-    [InlineData(16, 1, "Spl")]
-    [InlineData(121, 3, "GM2")]
-    [InlineData(5, 0, "2000")]      // a bank the module does not have
-    public void Xg_map_of_a_bank(int msb, int lsb, string map) =>
-        Assert.Equal(map, InstrumentDefinitions.XgMapNames[InstrumentDefinitions.XgMap(msb, lsb)]);
+    [InlineData(0, "2000")]        // every bank LSB, 126 and 127 (MU100 Native / MU Basic) included
+    [InlineData(48, "MEx")]
+    [InlineData(64, "SFX")]
+    [InlineData(16, "Spl")]
+    [InlineData(121, "GM2")]
+    [InlineData(5, "2000")]        // a bank the module does not have
+    public void Xg_map_of_a_bank(int msb, string map) =>
+        Assert.Equal(map, InstrumentDefinitions.XgMapNames[InstrumentDefinitions.XgMap(msb)]);
 
     [Fact]
     public void Xg_choices_follow_the_map()

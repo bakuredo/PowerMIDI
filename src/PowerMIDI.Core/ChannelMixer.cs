@@ -198,17 +198,10 @@ public static class ChannelMixer
         fileGsDefaultMap = InstrumentDefinitions.DefaultGsMap;
         Mt32Effects.ResetFile();
         Mt32Patches.ResetFile();
-        Mt32PartParams.ResetFile();
-        Mt32DrumParams.ResetFile();
         ModuleDisplay.Clear();
         Gm2Effects.ResetFile();
         GsXgEffects.ResetFile();
-        XgDrumSetup.ResetFile();
-        XgPartParams.ResetFile();
-        GsDrumMap.ResetFile();
-        GsPartParams.ResetFile();
-        Gm2DrumParams.ResetFile();
-        Gm2PartParams.ResetFile();
+        ModuleSettings.ResetFiles();   // Part and Drums pages of the Effects tab
         nrpn.Reset();
     }
 
@@ -271,10 +264,9 @@ public static class ChannelMixer
     public static void ApplyEffects(IOutputDevice device)
     {
         GsXgEffects.Apply(device);
-        if (Mt32Mode) { Mt32Effects.Apply(device); Mt32PartParams.Apply(device); Mt32DrumParams.Apply(device); }
-        if (Gm2Mode) { Gm2Effects.Apply(device); Gm2DrumParams.Apply(device); Gm2PartParams.Apply(device); }
-        if (XgMode) { XgDrumSetup.Apply(device); XgPartParams.Apply(device); }
-        if (GsMode) { GsDrumMap.Apply(device); GsPartParams.Apply(device); }
+        if (Mt32Mode) Mt32Effects.Apply(device);
+        if (Gm2Mode) Gm2Effects.Apply(device);
+        ModuleSettings.Apply(device);   // Part and Drums pages of the Effects tab, in the mode of the track
     }
 
     public static int FileValue(int k, int channel) { return FileCc[k, channel]; }

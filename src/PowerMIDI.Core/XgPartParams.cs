@@ -37,44 +37,29 @@ public static class XgPartParams
     };
     public static int Count => Params.Length;
     public const int BassGain = 0, TrebleGain = 2, NoteShift = 4, Detune = 5, BendRange = 6, MonoPoly = 7, HighPass = 11;
-    public static bool IsEq(int p) => Params[p].Group == "EQ";
 
-    static readonly int[,] file = new int[16, Params.Length];
-    static readonly bool[,] isFixed = new bool[16, Params.Length];
-    static readonly int[,] fixedValue = new int[16, Params.Length];
+    // Values by channel (group) and parameter (one note).
+    static readonly ValueStore store = new(16, 1, Params.Length, (c, n, p) => Params[p].Default);
 
-    static XgPartParams() { ResetFile(); }
+    public static void ResetFile() => store.ResetFile();
 
-    public static void ResetFile()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++) file[c, p] = Params[p].Default;
-    }
-
-    public static int FileValue(int c, int p) => file[c, p];
-    public static bool IsFixed(int c, int p) => isFixed[c, p];
-    public static int FixedValue(int c, int p) => fixedValue[c, p];
-    public static int Value(int c, int p) => isFixed[c, p] ? fixedValue[c, p] : file[c, p];
-    public static bool IsChannelFixed(int c) => Enumerable.Range(0, Count).Any(p => isFixed[c, p]);
-    public static bool HasFixed => Enumerable.Range(0, 16).Any(IsChannelFixed);
+    public static int FileValue(int c, int p) => store.File(c, 0, p);
+    public static bool IsFixed(int c, int p) => store.IsFixed(c, 0, p);
+    public static int FixedValue(int c, int p) => store.FixedValue(c, 0, p);
+    public static int Value(int c, int p) => store.Value(c, 0, p);
+    public static bool IsChannelFixed(int c) => store.IsGroupFixed(c);
+    public static bool HasFixed => store.HasFixed;
 
     public static void Set(IOutputDevice device, int c, int p, int value)
     {
-        isFixed[c, p] = true;
-        fixedValue[c, p] = value;
+        store.Fix(c, 0, p, value);
         device?.SendEvent(ParamEvent(c, p, value));
     }
 
     // Back to the file for one parameter, a channel or everything (-1 = all): the file's values are sent again.
     public static void Clear(IOutputDevice device, int channel = -1, int param = -1)
     {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++)
-            {
-                if (!isFixed[c, p] || (channel >= 0 && c != channel) || (param >= 0 && p != param)) continue;
-                isFixed[c, p] = false;
-                device?.SendEvent(ParamEvent(c, p, file[c, p]));
-            }
+        foreach (var (c, _, p) in store.Unfix(channel, -1, param)) device?.SendEvent(ParamEvent(c, p, FileValue(c, p)));
     }
 
     // Sends the fixed values (start of track, seek, port change, after a reset).
@@ -83,12 +68,7 @@ public static class XgPartParams
         foreach (var e in FixedEvents()) device.SendEvent(e);
     }
 
-    public static IEnumerable<(int Channel, int Param, int Value)> Fixed()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++)
-                if (isFixed[c, p]) yield return (c, p, fixedValue[c, p]);
-    }
+    public static IEnumerable<(int Channel, int Param, int Value)> Fixed() => store.Fixed().Select(x => (x.G, x.P, x.Value));
 
     public static IEnumerable<MidiEvent> FixedEvents() => Fixed().Select(x => (MidiEvent)ParamEvent(x.Channel, x.Param, x.Value));
 
@@ -130,9 +110,9 @@ public static class XgPartParams
         byte[] data = null;
         foreach (var (pos, p, shift) in Positions(d, out int c))
         {
-            if (!isFixed[c, p] || d[pos] == ByteOf(p, fixedValue[c, p], shift)) continue;
+            if (!IsFixed(c, p) || d[pos] == ByteOf(p, FixedValue(c, p), shift)) continue;
             data ??= (byte[])d.Clone();
-            data[pos] = (byte)ByteOf(p, fixedValue[c, p], shift);
+            data[pos] = (byte)ByteOf(p, FixedValue(c, p), shift);
         }
         return data;
     }
@@ -141,7 +121,7 @@ public static class XgPartParams
     public static byte[] Read(byte[] d)
     {
         foreach (var (pos, p, shift) in Positions(d, out int c))
-            file[c, p] = Params[p].TwoNibbles ? file[c, p] & ~(0x0F << shift) | (d[pos] & 0x0F) << shift : d[pos];
+            store.SetFile(c, 0, p, Params[p].TwoNibbles ? FileValue(c, p) & ~(0x0F << shift) | (d[pos] & 0x0F) << shift : d[pos]);
         return WithFixedValues(d);
     }
 
@@ -159,8 +139,8 @@ public static class XgPartParams
     {
         again = null;
         int p = ParamOf(entry), c = cc.Channel;
-        if (p < 0 || !isFixed[c, p]) return null;
-        int value = fixedValue[c, p];
+        if (p < 0 || !IsFixed(c, p)) return null;
+        int value = FixedValue(c, p);
         if (p == BendRange)
         {
             if (value < 0x40) again = ParamEvent(c, p, value);
@@ -175,7 +155,7 @@ public static class XgPartParams
         again = null;
         int p = ParamOf(entry);
         if (p < 0) return null;
-        file[cc.Channel, p] = FromDataEntry(p, cc.ControlValue);
+        store.SetFile(cc.Channel, 0, p, FromDataEntry(p, cc.ControlValue));
         return FixDataEntry(cc, entry, out again);
     }
 
@@ -183,14 +163,14 @@ public static class XgPartParams
     public static MidiEvent FixMonoPoly(ControlChangeEvent cc)
     {
         int c = cc.Channel, mode = cc.ControlNumber == 127 ? 1 : 0;
-        if (!isFixed[c, MonoPoly] || fixedValue[c, MonoPoly] == mode) return null;
-        return new ControlChangeEvent((SevenBitNumber)(fixedValue[c, MonoPoly] == 1 ? 127 : 126), (SevenBitNumber)0) { Channel = cc.Channel };
+        if (!IsFixed(c, MonoPoly) || FixedValue(c, MonoPoly) == mode) return null;
+        return new ControlChangeEvent((SevenBitNumber)(FixedValue(c, MonoPoly) == 1 ? 127 : 126), (SevenBitNumber)0) { Channel = cc.Channel };
     }
 
     // CC126 / CC127 played from the file: stored, and replaced by the fixed mode (null = unchanged).
     public static MidiEvent ReadMonoPoly(ControlChangeEvent cc)
     {
-        file[cc.Channel, MonoPoly] = cc.ControlNumber == 127 ? 1 : 0;
+        store.SetFile(cc.Channel, 0, MonoPoly, cc.ControlNumber == 127 ? 1 : 0);
         return FixMonoPoly(cc);
     }
 }

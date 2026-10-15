@@ -22,34 +22,23 @@ public static class Mt32PartParams
 
     const int PatchTemp = 0x03 << 14, SystemArea = 0x10 << 14;
 
-    static readonly int[,] file = new int[Parts, Count];
-    static readonly bool[,] isFixed = new bool[Parts, Count];
-    static readonly int[,] fixedValue = new int[Parts, Count];
+    // Values by part (group) and parameter (one note); after a reset, the patch values are unknown (-1).
+    static readonly ValueStore store = new(Parts, 1, Count, (part, n, p) => p == PartialReserve ? DefaultReserve[part] : -1);
 
-    static Mt32PartParams() { ResetFile(); }
+    public static void ResetFile() => store.ResetFile();
 
-    public static void ResetFile()
-    {
-        for (int part = 0; part < Parts; part++)
-        {
-            for (int p = 0; p < PartialReserve; p++) file[part, p] = -1;
-            file[part, PartialReserve] = DefaultReserve[part];
-        }
-    }
-
-    public static int FileValue(int part, int p) => file[part, p];
-    public static bool IsFixed(int part, int p) => isFixed[part, p];
-    public static int FixedValue(int part, int p) => fixedValue[part, p];
-    public static int Value(int part, int p) => isFixed[part, p] ? fixedValue[part, p] : file[part, p];
-    public static bool IsPartFixed(int part) => Enumerable.Range(0, Count).Any(p => isFixed[part, p]);
-    public static bool HasFixed => Enumerable.Range(0, Parts).Any(IsPartFixed);
+    public static int FileValue(int part, int p) => store.File(part, 0, p);
+    public static bool IsFixed(int part, int p) => store.IsFixed(part, 0, p);
+    public static int FixedValue(int part, int p) => store.FixedValue(part, 0, p);
+    public static int Value(int part, int p) => store.Value(part, 0, p);
+    public static bool IsPartFixed(int part) => store.IsGroupFixed(part);
+    public static bool HasFixed => store.HasFixed;
     // Partials reserved by all the parts (the MT-32 has 32).
     public static int ReserveTotal => Enumerable.Range(0, Parts).Sum(part => Math.Max(0, Value(part, PartialReserve)));
 
     public static void Set(IOutputDevice device, int part, int p, int value)
     {
-        isFixed[part, p] = true;
-        fixedValue[part, p] = value;
+        store.Fix(part, 0, p, value);
         device?.SendEvent(ParamEvent(part, p, value));
     }
 
@@ -57,13 +46,8 @@ public static class Mt32PartParams
     // the patch, unknown here, cannot be: the module keeps the fixed one until the part's next Program Change).
     public static void Clear(IOutputDevice device, int part = -1, int param = -1)
     {
-        for (int q = 0; q < Parts; q++)
-            for (int p = 0; p < Count; p++)
-            {
-                if (!isFixed[q, p] || (part >= 0 && q != part) || (param >= 0 && p != param)) continue;
-                isFixed[q, p] = false;
-                if (file[q, p] >= 0) device?.SendEvent(ParamEvent(q, p, file[q, p]));
-            }
+        foreach (var (q, _, p) in store.Unfix(part, -1, param))
+            if (FileValue(q, p) >= 0) device?.SendEvent(ParamEvent(q, p, FileValue(q, p)));
     }
 
     public static void Apply(IOutputDevice device)
@@ -71,18 +55,13 @@ public static class Mt32PartParams
         foreach (var e in FixedEvents()) device.SendEvent(e);
     }
 
-    public static IEnumerable<(int Part, int Param, int Value)> Fixed()
-    {
-        for (int part = 0; part < Parts; part++)
-            for (int p = 0; p < Count; p++)
-                if (isFixed[part, p]) yield return (part, p, fixedValue[part, p]);
-    }
+    public static IEnumerable<(int Part, int Param, int Value)> Fixed() => store.Fixed().Select(x => (x.G, x.P, x.Value));
 
     public static IEnumerable<MidiEvent> FixedEvents() => Fixed().Select(x => (MidiEvent)ParamEvent(x.Part, x.Param, x.Value));
 
     // The fixed patch values of a part (sent again after its Program Change).
     public static IEnumerable<MidiEvent> FixedPatchEvents(int part) =>
-        Enumerable.Range(0, PartialReserve).Where(p => isFixed[part, p]).Select(p => (MidiEvent)ParamEvent(part, p, fixedValue[part, p]));
+        Enumerable.Range(0, PartialReserve).Where(p => IsFixed(part, p)).Select(p => (MidiEvent)ParamEvent(part, p, FixedValue(part, p)));
 
     static int AddressOf(int part, int p) => p == PartialReserve ? SystemArea + 4 + part : PatchTemp + 16 * part + 2 + p;
 
@@ -119,9 +98,9 @@ public static class Mt32PartParams
         byte[] data = null;
         foreach (var (pos, part, p) in Positions(d))
         {
-            if (!isFixed[part, p] || d[pos] == fixedValue[part, p]) continue;
+            if (!IsFixed(part, p) || d[pos] == FixedValue(part, p)) continue;
             data ??= (byte[])d.Clone();
-            data[pos] = (byte)fixedValue[part, p];
+            data[pos] = (byte)FixedValue(part, p);
         }
         if (data != null) MidiTools.FixRolandChecksum(data);
         return data;
@@ -130,7 +109,7 @@ public static class Mt32PartParams
     // MT-32 DT1 played from the file: stores its values; returns it with the fixed values (null = unchanged).
     public static byte[] Read(byte[] d)
     {
-        foreach (var (pos, part, p) in Positions(d)) file[part, p] = Math.Min(d[pos], Max[p]);
+        foreach (var (pos, part, p) in Positions(d)) store.SetFile(part, 0, p, Math.Min(d[pos], Max[p]));
         return WithFixedValues(d);
     }
 
@@ -140,7 +119,7 @@ public static class Mt32PartParams
     {
         int part = PartOf(channel);
         if (part < 0) return -1;
-        for (int p = 0; p < PartialReserve; p++) file[part, p] = -1;
-        return Enumerable.Range(0, PartialReserve).Any(p => isFixed[part, p]) ? part : -1;
+        for (int p = 0; p < PartialReserve; p++) store.SetFile(part, 0, p, -1);
+        return Enumerable.Range(0, PartialReserve).Any(p => IsFixed(part, p)) ? part : -1;
     }
 }

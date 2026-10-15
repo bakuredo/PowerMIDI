@@ -26,42 +26,29 @@ public static class Gm2PartParams
     public const int BendRange = 0, FineTune = 1, CoarseTune = 2, ModDepthRange = 3;
     static bool HasLsb(int p) => p == ModDepthRange;
 
-    static readonly int[,] file = new int[16, Params.Length];
-    static readonly bool[,] isFixed = new bool[16, Params.Length];
-    static readonly int[,] fixedValue = new int[16, Params.Length];
+    // Values by channel (group) and parameter (one note).
+    static readonly ValueStore store = new(16, 1, Params.Length, (c, n, p) => Params[p].Default);
 
-    static Gm2PartParams() { ResetFile(); }
+    public static void ResetFile() => store.ResetFile();
 
-    public static void ResetFile()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++) file[c, p] = Params[p].Default;
-    }
-
-    public static int FileValue(int c, int p) => file[c, p];
-    public static bool IsFixed(int c, int p) => isFixed[c, p];
-    public static int FixedValue(int c, int p) => fixedValue[c, p];
-    public static int Value(int c, int p) => isFixed[c, p] ? fixedValue[c, p] : file[c, p];
-    public static bool IsChannelFixed(int c) => Enumerable.Range(0, Count).Any(p => isFixed[c, p]);
-    public static bool HasFixed => Enumerable.Range(0, 16).Any(IsChannelFixed);
+    public static int FileValue(int c, int p) => store.File(c, 0, p);
+    public static bool IsFixed(int c, int p) => store.IsFixed(c, 0, p);
+    public static int FixedValue(int c, int p) => store.FixedValue(c, 0, p);
+    public static int Value(int c, int p) => store.Value(c, 0, p);
+    public static bool IsChannelFixed(int c) => store.IsGroupFixed(c);
+    public static bool HasFixed => store.HasFixed;
 
     public static void Set(IOutputDevice device, int c, int p, int value)
     {
-        isFixed[c, p] = true;
-        fixedValue[c, p] = value;
+        store.Fix(c, 0, p, value);
         if (device != null) foreach (var e in ParamEvents(c, p, value)) device.SendEvent(e);
     }
 
     // Back to the file for one parameter, a channel or everything (-1 = all): the file's values are sent again.
     public static void Clear(IOutputDevice device, int channel = -1, int param = -1)
     {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++)
-            {
-                if (!isFixed[c, p] || (channel >= 0 && c != channel) || (param >= 0 && p != param)) continue;
-                isFixed[c, p] = false;
-                if (device != null) foreach (var e in ParamEvents(c, p, file[c, p])) device.SendEvent(e);
-            }
+        foreach (var (c, _, p) in store.Unfix(channel, -1, param))
+            if (device != null) foreach (var e in ParamEvents(c, p, FileValue(c, p))) device.SendEvent(e);
     }
 
     public static void Apply(IOutputDevice device)
@@ -69,12 +56,7 @@ public static class Gm2PartParams
         foreach (var e in FixedEvents()) device.SendEvent(e);
     }
 
-    public static IEnumerable<(int Channel, int Param, int Value)> Fixed()
-    {
-        for (int c = 0; c < 16; c++)
-            for (int p = 0; p < Count; p++)
-                if (isFixed[c, p]) yield return (c, p, fixedValue[c, p]);
-    }
+    public static IEnumerable<(int Channel, int Param, int Value)> Fixed() => store.Fixed().Select(x => (x.G, x.P, x.Value));
 
     public static IEnumerable<MidiEvent> FixedEvents() => Fixed().SelectMany(x => ParamEvents(x.Channel, x.Param, x.Value));
 
@@ -110,8 +92,8 @@ public static class Gm2PartParams
     public static MidiEvent FixDataEntry(ControlChangeEvent cc, DataEntry entry)
     {
         int p = ParamOf(entry), c = cc.Channel;
-        if (p < 0 || !isFixed[c, p]) return null;
-        int v = fixedValue[c, p];
+        if (p < 0 || !IsFixed(c, p)) return null;
+        int v = FixedValue(c, p);
         return Cc(c, cc.ControlNumber, !HasLsb(p) ? v : entry.Fine ? v & 0x7F : v >> 7);
     }
 
@@ -122,8 +104,8 @@ public static class Gm2PartParams
         again = null;
         int p = ParamOf(entry), c = cc.Channel;
         if (p < 0) return null;
-        file[c, p] = Entered(p, file[c, p], entry, cc.ControlValue);
-        if (isFixed[c, p] && HasLsb(p) && !entry.Fine) again = Cc(c, 38, fixedValue[c, p] & 0x7F);
+        store.SetFile(c, 0, p, Entered(p, FileValue(c, p), entry, cc.ControlValue));
+        if (IsFixed(c, p) && HasLsb(p) && !entry.Fine) again = Cc(c, 38, FixedValue(c, p) & 0x7F);
         return FixDataEntry(cc, entry);
     }
 }

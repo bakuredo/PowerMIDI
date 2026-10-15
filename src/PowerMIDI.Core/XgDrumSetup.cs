@@ -26,10 +26,8 @@ public static class XgDrumSetup
     public const int Pan = 8;
     public static bool IsOffset(int p) => p < 7;   // -64..0..+63
 
-    static readonly int[,,] file = new int[Setups, 128, Count];
-    static readonly bool[,,] isFixed = new bool[Setups, 128, Count];
-    static readonly int[,,] fixedValue = new int[Setups, 128, Count];
-    static int fixedCount;
+    // Values by setup (group), note and parameter.
+    static readonly ValueStore store = new(Setups, 128, Count, (s, n, p) => Defaults[p]);
 
     // PART MODE of each channel (part = channel): 0 normal, 1 drum, 2..5 drum setup 1..4. The file's, and the one
     // chosen in the interface (-1 = the file's), which replaces it.
@@ -55,36 +53,27 @@ public static class XgDrumSetup
 
     static void ResetSetup(int s)
     {
-        for (int n = 0; n < 128; n++)
-            for (int p = 0; p < Count; p++) file[s, n, p] = Defaults[p];
+        store.ResetGroup(s);
         Version++;
     }
 
     // Setup (0-3) used by a channel, or -1.
     public static int SetupOf(int channel) => PartMode(channel) is >= 2 and <= 5 ? PartMode(channel) - 2 : -1;
 
-    public static int FileValue(int s, int n, int p) => file[s, n, p];
-    public static bool IsFixed(int s, int n, int p) => isFixed[s, n, p];
-    public static int FixedValue(int s, int n, int p) => fixedValue[s, n, p];
-    public static int Value(int s, int n, int p) => isFixed[s, n, p] ? fixedValue[s, n, p] : file[s, n, p];
-    public static bool HasFixed => fixedCount > 0;
-    public static bool IsNoteFixed(int s, int n) => Enumerable.Range(0, Count).Any(p => isFixed[s, n, p]);
-    public static bool IsSetupFixed(int s) => Enumerable.Range(0, 128).Any(n => IsNoteFixed(s, n));
+    public static int FileValue(int s, int n, int p) => store.File(s, n, p);
+    public static bool IsFixed(int s, int n, int p) => store.IsFixed(s, n, p);
+    public static int FixedValue(int s, int n, int p) => store.FixedValue(s, n, p);
+    public static int Value(int s, int n, int p) => store.Value(s, n, p);
+    public static bool HasFixed => store.HasFixed;
+    public static bool IsNoteFixed(int s, int n) => store.IsNoteFixed(s, n);
+    public static bool IsSetupFixed(int s) => store.IsGroupFixed(s);
 
     // Fixed values, as (setup, note, parameter, value).
-    public static IEnumerable<(int Setup, int Note, int Param, int Value)> Fixed()
-    {
-        for (int s = 0; s < Setups; s++)
-            for (int n = 0; n < 128; n++)
-                for (int p = 0; p < Count; p++)
-                    if (isFixed[s, n, p]) yield return (s, n, p, fixedValue[s, n, p]);
-    }
+    public static IEnumerable<(int Setup, int Note, int Param, int Value)> Fixed() => store.Fixed();
 
     public static void Set(IOutputDevice device, int s, int n, int p, int value)
     {
-        if (!isFixed[s, n, p]) fixedCount++;
-        isFixed[s, n, p] = true;
-        fixedValue[s, n, p] = value;
+        store.Fix(s, n, p, value);
         device?.SendEvent(ParamEvent(s, n, p, value));
     }
 
@@ -93,28 +82,17 @@ public static class XgDrumSetup
     // and the file's values and the remaining fixed ones are written again.
     public static void Clear(IOutputDevice device, int setup = -1, int note = -1, int param = -1)
     {
-        for (int s = 0; s < Setups; s++)
+        foreach (var cleared in store.Unfix(setup, note, param).GroupBy(x => x.G))
         {
-            if (setup >= 0 && s != setup) continue;
-            var cleared = new List<(int Note, int Param)>();
-            for (int n = 0; n < 128; n++)
-                for (int p = 0; p < Count; p++)
-                    if (isFixed[s, n, p] && (note < 0 || n == note) && (param < 0 || p == param))
-                    {
-                        isFixed[s, n, p] = false;
-                        fixedCount--;
-                        cleared.Add((n, p));
-                    }
-            if (device == null || cleared.Count == 0) continue;
-            if (cleared.All(x => file[s, x.Note, x.Param] >= 0))
+            int s = cleared.Key;
+            if (device == null) continue;
+            if (cleared.All(x => FileValue(s, x.N, x.P) >= 0))
             {
-                foreach (var (n, p) in cleared) device.SendEvent(ParamEvent(s, n, p, file[s, n, p]));
+                foreach (var (_, n, p) in cleared) device.SendEvent(ParamEvent(s, n, p, FileValue(s, n, p)));
                 continue;
             }
             device.SendEvent(ResetEvent(s));
-            for (int n = 0; n < 128; n++)
-                for (int p = 0; p < Count; p++)
-                    if (isFixed[s, n, p] || file[s, n, p] != Defaults[p]) device.SendEvent(ParamEvent(s, n, p, Value(s, n, p)));
+            foreach (var (n, p, v) in store.Known(s)) device.SendEvent(ParamEvent(s, n, p, v));
         }
     }
 
@@ -129,14 +107,10 @@ public static class XgDrumSetup
         foreach (var e in FixedEvents(s)) device.SendEvent(e);
     }
 
-    public static IEnumerable<MidiEvent> FixedEvents() => Enumerable.Range(0, Setups).SelectMany(FixedEvents);
+    public static IEnumerable<MidiEvent> FixedEvents() => Fixed().Select(x => (MidiEvent)ParamEvent(x.Setup, x.Note, x.Param, x.Value));
 
-    public static IEnumerable<MidiEvent> FixedEvents(int s)
-    {
-        for (int n = 0; n < 128; n++)
-            for (int p = 0; p < Count; p++)
-                if (isFixed[s, n, p]) yield return ParamEvent(s, n, p, fixedValue[s, n, p]);
-    }
+    public static IEnumerable<MidiEvent> FixedEvents(int s) =>
+        Fixed().Where(x => x.Setup == s).Select(x => (MidiEvent)ParamEvent(x.Setup, x.Note, x.Param, x.Value));
 
     // ---------- Messages ----------
 
@@ -174,9 +148,9 @@ public static class XgDrumSetup
         byte[] data = null;
         foreach (var (pos, p) in Positions(d))
         {
-            if (!isFixed[s, d[4], p] || d[pos] == fixedValue[s, d[4], p]) continue;
+            if (!IsFixed(s, d[4], p) || d[pos] == FixedValue(s, d[4], p)) continue;
             data ??= (byte[])d.Clone();
-            data[pos] = (byte)fixedValue[s, d[4], p];
+            data[pos] = (byte)FixedValue(s, d[4], p);
         }
         return data;
     }
@@ -191,7 +165,7 @@ public static class XgDrumSetup
         if (reset >= 0) { ResetSetup(reset); if (!IsSetupFixed(reset)) reset = -1; return null; }
         int s = SetupOf(d);
         if (s < 0) return null;
-        foreach (var (pos, p) in Positions(d)) file[s, d[4], p] = d[pos];
+        foreach (var (pos, p) in Positions(d)) store.SetFile(s, d[4], p, d[pos]);
         Version++;
         var data = WithFixedValues(d);
         return data != null ? new NormalSysExEvent(data) : null;
@@ -254,13 +228,13 @@ public static class XgDrumSetup
     public static MidiEvent FixNrpn(int s, int n, List<int> ps, ControlChangeEvent cc, out MidiEvent again)
     {
         again = null;
-        var fixedPs = ps.Where(p => isFixed[s, n, p]).ToList();
+        var fixedPs = ps.Where(p => IsFixed(s, n, p)).ToList();
         if (fixedPs.Count == 0) return null;
         if (fixedPs.Count == 1 && ps.Count == 2)   // one decay fixed: the other keeps the file's value
             again = ParamEvent(s, n, ps.First(p => p != fixedPs[0]), cc.ControlValue);
-        else if (fixedPs.Count == 2 && fixedValue[s, n, fixedPs[0]] != fixedValue[s, n, fixedPs[1]])
-            again = ParamEvent(s, n, fixedPs[1], fixedValue[s, n, fixedPs[1]]);
-        return new ControlChangeEvent((SevenBitNumber)6, (SevenBitNumber)fixedValue[s, n, fixedPs[0]]) { Channel = cc.Channel };
+        else if (fixedPs.Count == 2 && FixedValue(s, n, fixedPs[0]) != FixedValue(s, n, fixedPs[1]))
+            again = ParamEvent(s, n, fixedPs[1], FixedValue(s, n, fixedPs[1]));
+        return new ControlChangeEvent((SevenBitNumber)6, (SevenBitNumber)FixedValue(s, n, fixedPs[0])) { Channel = cc.Channel };
     }
 
     // NRPN data entry played from the file: a drum setup value is stored, and replaced by the fixed one (see FixNrpn;
@@ -269,7 +243,7 @@ public static class XgDrumSetup
     {
         again = null;
         if (NrpnParams(cc.Channel, nrpn, SetupOf) is not var (s, n, ps)) return null;
-        foreach (int p in ps) file[s, n, p] = cc.ControlValue;
+        foreach (int p in ps) store.SetFile(s, n, p, cc.ControlValue);
         Version++;
         return FixNrpn(s, n, ps, cc, out again);
     }
