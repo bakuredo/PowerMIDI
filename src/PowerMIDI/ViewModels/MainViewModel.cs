@@ -657,6 +657,13 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var pb = midi.GetPlayback(output);
         pb.InterruptNotesOnStop = true;
+        // Every Note On and Note Off of the file is played, as the file has them. By default the playback library keeps
+        // one active note per key: it drops the Note On of a key already held, and the Note Off of a key it does not
+        // hold. Both are needed: a note started again on a held key (two Note On, two Note Off, e.g. sttng.mid at
+        // 0:29) keeps one voice per Note On in the module; a note whose Note Off was skipped at a loop end (see
+        // MainViewModel.Loop.cs) stays active for the library, which would not play it again.
+        pb.SendNoteOnEventsForActiveNotes = true;
+        pb.SendNoteOffEventsForNonActiveNotes = true;
         // After a seek, resends the up-to-date programs, controllers and pitch bend.
         pb.TrackProgram = true;
         pb.TrackControlValue = true;

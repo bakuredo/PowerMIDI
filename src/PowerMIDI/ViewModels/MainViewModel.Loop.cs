@@ -29,9 +29,6 @@ public sealed partial class MainViewModel
     {
         loop = MidiTools.GetLoop(midi);
         pb.RepeatStarted += (_, _) => { loopsDone++; RestoreLoopStart(); };
-        // A note whose Note Off was skipped at the loop end (see loopEndNotes) stays active for the playback library,
-        // which would then not play it again: its Note On is played anyway.
-        pb.SendNoteOnEventsForActiveNotes = true;
         loopRestore = null;
         loopEndNotes = null;
         if (loop is { } l)
