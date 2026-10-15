@@ -16,8 +16,8 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
   drop messages of other modes. Custom SysEx patches detected from XG and MT-32 modes.
 - **Mixer**: Mute/Solo, activity and one controller slider per channel (modulation, volume, pan, reverb,
   chorus, delay / variation, filter and envelope settings), with instrument names for each mode.
-- **Effects**: Reverb, Chorus, Delay, EQ, EFX, Drums, Part in GS mode - Reverb, Chorus, Variation, Insertion, Multi-EQ, Drums, Part in XG
-  Reverb, Drums, Part in MT-32 - Reverb, Chorus, Part in GM2.
+- **Effects**: Reverb, Chorus, Delay, EQ, EFX, Drums, Part in GS mode - Reverb, Chorus, Variation, Insertion, Multi-EQ, Drums, Part in XG -
+  Reverb, Drums, Part in MT-32 - Reverb, Chorus, Drums, Part in GM2.
 - **Saving**: Changed settings (in blue) are written into a copy of MIDI file, for whole track or at a position
   of track (Insert mode).
 - **File loops markers**: `loopStart` / `loopEnd`, `[` / `]` markers and CC111 are followed.
