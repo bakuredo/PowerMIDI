@@ -603,43 +603,22 @@ public sealed partial class EffectsViewModel : ObservableObject
         for (int p = 0; p < Mt32Effects.Count; p++)
         {
             var vm = mt32Params[p];
-            int v = Mt32Effects.Value(p);
+            int v = Mt32Effects.Value(p), fileValue = Mt32Effects.FileValue(p);
             bool isFixed = Mt32Effects.IsFixed(p);
             int part = p - Mt32Effects.PartFirst;
             int channel = part >= 0 ? Mt32Effects.PartChannel[part] : -1;
-            int fileValue = Mt32Effects.FileValue(p);
             var key = $"{v}/{isFixed}/{fileValue}/{channel}";   // the file value shows in the tooltip of a fixed value
-            if (key == vm.Key) continue;
-            vm.Key = key;
-            vm.Updating = true;
-            try
+            if (vm is EffectChannelViewModel button)   // reverb switch of a part: its channel in the tooltip
             {
-                vm.IsFixed = isFixed;
-                var fileText = p == 0 ? Mt32Effects.ModeNames[fileValue] : part >= 0 ? (fileValue != 0 ? "on" : "off") : fileValue.ToString();
-                var fixedText = isFixed ? $"Fixed (file: {fileText})" : "File value";
-                switch (vm)
-                {
-                    case EffectListViewModel list:
-                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
-                        list.ToolTip = fixedText;
-                        break;
-                    case EffectSliderViewModel slider:
-                        slider.Value = v;
-                        slider.ValueText = v.ToString();
-                        slider.ValueState = isFixed ? ValueState.Fixed : ValueState.File;
-                        slider.ToolTip = fixedText;
-                        break;
-                    case EffectChannelViewModel button:
-                        button.IsChecked = v != 0;
-                        var name = part < 8 ? $"Part {part + 1}" : "Rhythm part";
-                        var where = channel <= 15 ? $"channel {channel + 1}" : "no channel";
-                        button.ToolTip = $"{name} ({where}): reverb {(v != 0 ? "on" : "off")}";
-                        break;
-                }
+                var where = channel <= 15 ? $"channel {channel + 1}" : "no channel";
+                button.Show(key, v != 0, isFixed, $"{(part < 8 ? $"Part {part + 1}" : "Rhythm part")} ({where}): reverb {(v != 0 ? "on" : "off")}");
             }
-            finally { vm.Updating = false; }
+            else
+            {
+                var fileText = p == 0 ? Mt32Effects.ModeNames[fileValue] : fileValue.ToString();
+                vm.Show(key, v, isFixed, isFixed ? $"Fixed (file: {fileText})" : "File value", v.ToString());
+            }
         }
-
     }
 
     // GM2 page: values from Gm2Effects (fixed in blue, "auto" in gray = set by the type).
@@ -647,33 +626,11 @@ public sealed partial class EffectsViewModel : ObservableObject
     {
         for (int p = 0; p < Gm2Effects.Count; p++)
         {
-            var vm = gm2Params[p];
-            int v = Gm2Effects.Value(p);
+            int v = Gm2Effects.Value(p), fileValue = Gm2Effects.FileValue(p);
             bool isFixed = Gm2Effects.IsFixed(p);
-            int fileValue = Gm2Effects.FileValue(p);
-            var key = $"{v}/{isFixed}/{fileValue}";
-            if (key == vm.Key) continue;
-            vm.Key = key;
-            vm.Updating = true;
-            try
-            {
-                vm.IsFixed = isFixed;
-                var fileText = fileValue < 0 ? "the type's default" : FormatGm2(p, fileValue);
-                vm.ToolTip = isFixed ? $"Fixed (file: {fileText})" : fileValue < 0 ? "Set by the module according to the type" : "File value";
-                switch (vm)
-                {
-                    case EffectListViewModel list:
-                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
-                        list.ValueText = list.SelectedChoice == null ? v.ToString() : "";
-                        break;
-                    case EffectSliderViewModel slider:
-                        if (v >= 0) slider.Value = v;
-                        slider.ValueText = FormatGm2(p, v);
-                        slider.ValueState = isFixed ? ValueState.Fixed : v < 0 ? ValueState.Auto : ValueState.File;
-                        break;
-                }
-            }
-            finally { vm.Updating = false; }
+            var toolTip = isFixed ? $"Fixed (file: {(fileValue < 0 ? "the type's default" : FormatGm2(p, fileValue))})"
+                        : fileValue < 0 ? "Set by the module according to the type" : "File value";
+            gm2Params[p].Show($"{v}/{isFixed}/{fileValue}", v, isFixed, toolTip, FormatGm2(p, v), autoPosition: null);
         }
     }
 
@@ -740,17 +697,7 @@ public sealed partial class EffectsViewModel : ObservableObject
             var type = FormatEffectValue(first, GsXgEffects.Value(first));
             int part = GsXgEffects.Value(first + 1);
             var tip = $"Insertion {n + 1}: {type}, " + (part is >= 0 and < 64 ? $"part {part + 1}" : part is 64 or 65 ? "A/D input" : "no part");
-            var key = $"{on}/{isFixed}/{tip}";
-            if (key == button.Key) continue;
-            button.Key = key;
-            button.Updating = true;
-            try
-            {
-                button.IsChecked = on;
-                button.IsFixed = isFixed;
-                button.ToolTip = tip;
-            }
-            finally { button.Updating = false; }
+            button.Show($"{on}/{isFixed}/{tip}", on, isFixed, tip);
         }
     }
 
@@ -766,17 +713,7 @@ public sealed partial class EffectsViewModel : ObservableObject
         {
             int v = GsXgEffects.Value(button.Index);
             bool on = v == button.Part, isFixed = on && GsXgEffects.IsFixed(button.Index);
-            var key = $"{on}/{isFixed}";
-            if (key == button.Key) continue;
-            button.Key = key;
-            button.Updating = true;
-            try
-            {
-                button.IsFixed = isFixed;
-                button.IsChecked = on;
-                button.ToolTip = $"Part {button.Part + 1}: " + (on ? "goes through the effect" : "no effect");
-            }
-            finally { button.Updating = false; }
+            button.Show($"{on}/{isFixed}", on, isFixed, $"Part {button.Part + 1}: " + (on ? "goes through the effect" : "no effect"));
         }
     }
 

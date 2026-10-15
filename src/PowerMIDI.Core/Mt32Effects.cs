@@ -22,18 +22,17 @@ public static class Mt32Effects
     // State after an MT-32 reset: Room, time 5, level 3, reverb on every part.
     public static readonly int[] Defaults = { 0, 5, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
 
-    static readonly int[] file = new int[Count];
-    static readonly bool[] isFixed = new bool[Count];
-    static readonly int[] fixedValue = new int[Count];
+    // Values by parameter (one group, one note).
+    static readonly ValueStore store = new(1, 1, Count, (g, n, p) => Defaults[p]);
     // MIDI channel (0-15, 16 = off) of parts 1-8 (index 0-7) and of the rhythm part (index 8).
     public static readonly int[] PartChannel = new int[9];
 
-    static Mt32Effects() { ResetFile(); }
+    static Mt32Effects() { DefaultChannels(PartChannel); }
 
     // MT-32 reset (start of a track): the file's values go back to the defaults.
     public static void ResetFile()
     {
-        Array.Copy(Defaults, file, Count);
+        store.ResetFile();
         DefaultChannels(PartChannel);
     }
 
@@ -43,24 +42,23 @@ public static class Mt32Effects
         channels[8] = 9;
     }
 
-    public static int FileValue(int p) => file[p];
-    public static bool IsFixed(int p) => isFixed[p];
-    public static int FixedValue(int p) => fixedValue[p];
-    public static int Value(int p) => isFixed[p] ? fixedValue[p] : file[p];
-    public static bool HasFixed => isFixed.Any(f => f);
+    public static int FileValue(int p) => store.File(0, 0, p);
+    public static bool IsFixed(int p) => store.IsFixed(0, 0, p);
+    public static int FixedValue(int p) => store.FixedValue(0, 0, p);
+    public static int Value(int p) => store.Value(0, 0, p);
+    public static bool HasFixed => store.HasFixed;
 
     public static void Set(IOutputDevice device, int p, int value)
     {
-        isFixed[p] = true;
-        fixedValue[p] = value;
+        store.Fix(0, 0, p, value);
         if (device != null) foreach (var e in ParamEvents(p, value)) device.SendEvent(e);
     }
 
     // Back to the file: its value is sent again.
     public static void Clear(IOutputDevice device, int p)
     {
-        isFixed[p] = false;
-        if (device != null) foreach (var e in ParamEvents(p, file[p])) device.SendEvent(e);
+        store.Unfix(0, 0, p);
+        if (device != null) foreach (var e in ParamEvents(p, FileValue(p))) device.SendEvent(e);
     }
 
     // Sends the fixed values (start of track, seek, port change, after a reset).
@@ -95,8 +93,8 @@ public static class Mt32Effects
 
     public static IEnumerable<MidiEvent> FixedEvents()
     {
-        for (int p = 0; p < Count; p++)
-            if (isFixed[p]) foreach (var e in ParamEvents(p, fixedValue[p])) yield return e;
+        foreach (var (_, _, p, value) in store.Fixed())
+            foreach (var e in ParamEvents(p, value)) yield return e;
     }
 
     // ---------- Reading MT-32 SysEx ----------
@@ -135,9 +133,9 @@ public static class Mt32Effects
         byte[] data = null;
         foreach (var (position, param) in positions)
         {
-            if (!isFixed[param] || d[position] == fixedValue[param]) continue;
+            if (!IsFixed(param) || d[position] == FixedValue(param)) continue;
             data ??= (byte[])d.Clone();
-            data[position] = (byte)fixedValue[param];
+            data[position] = (byte)FixedValue(param);
         }
         if (data != null) MidiTools.FixRolandChecksum(data);
         return data;
@@ -148,7 +146,9 @@ public static class Mt32Effects
     public static MidiEvent Read(byte[] d)
     {
         var positions = new List<(int Position, int Param)>();
-        if (ApplyBytes(d, file, PartChannel, positions) == Changes.None) return null;
+        var values = store.Files(0, 0);
+        if (ApplyBytes(d, values, PartChannel, positions) == Changes.None) return null;
+        store.SetFiles(0, 0, values);
         var data = WithFixedValues(d, positions);
         return data != null ? new NormalSysExEvent(data) : null;
     }

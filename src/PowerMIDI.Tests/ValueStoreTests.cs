@@ -37,6 +37,19 @@ public class ValueStoreTests
     }
 
     [Fact]
+    public void File_values_of_a_note_as_array()
+    {
+        var s = Store();
+        s.SetFile(1, 2, 1, 30);
+        var values = s.Files(1, 2);
+        Assert.Equal(new[] { 64, 30 }, values);
+        values[0] = 10;                                                  // a copy: the store is unchanged
+        Assert.Equal(64, s.File(1, 2, 0));
+        s.SetFiles(1, 2, values);
+        Assert.Equal((10, 30, 64), (s.File(1, 2, 0), s.File(1, 2, 1), s.File(1, 1, 0)));
+    }
+
+    [Fact]
     public void Known_values_of_a_group()
     {
         var s = Store();

@@ -41,6 +41,36 @@ public abstract class EffectParamViewModel : ObservableObject
     string toolTip;
     public string ToolTip { get => toolTip; internal set => Set(ref toolTip, value); }
 
+    // Shows a value (-1 = unknown: "auto") with its text and tooltip, a fixed one in blue. A list selects its choice
+    // (the text when the value is not in it); a slider moves to the value, or to autoPosition when it is unknown (null:
+    // left where it is). Nothing is done if key, what the display depends on, has not changed.
+    internal void Show(string key, int value, bool isFixed, string toolTip, string text, double? autoPosition = 0, bool visible = true)
+    {
+        if (key == Key) return;
+        Key = key;
+        Updating = true;
+        try
+        {
+            IsVisible = visible;
+            IsFixed = isFixed;
+            ToolTip = toolTip;
+            switch (this)
+            {
+                case EffectListViewModel list:
+                    list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == value);
+                    list.ValueText = value < 0 ? "auto" : list.SelectedChoice == null ? text : "";
+                    break;
+                case EffectSliderViewModel slider:
+                    if (value >= 0) slider.Value = value;
+                    else if (autoPosition is double position) slider.Value = position;
+                    slider.ValueText = text;
+                    slider.ValueState = isFixed ? ValueState.Fixed : value < 0 ? ValueState.Auto : ValueState.File;
+                    break;
+            }
+        }
+        finally { Updating = false; }
+    }
+
     // Sets a value chosen by the user (ignored while the view model updates itself).
     protected void Fix(int value)
     {
@@ -129,6 +159,23 @@ public sealed class EffectChannelViewModel : EffectParamViewModel
     {
         Part = channel;
         this.offValue = offValue;
+    }
+
+    // Shows the state of the button: pressed or not, fixed (blue), visible, its tooltip. Nothing is done if key, what
+    // the display depends on, has not changed.
+    internal void Show(string key, bool on, bool isFixed, string toolTip, bool visible = true)
+    {
+        if (key == Key) return;
+        Key = key;
+        Updating = true;
+        try
+        {
+            IsChecked = on;
+            IsFixed = isFixed;
+            IsVisible = visible;
+            ToolTip = toolTip;
+        }
+        finally { Updating = false; }
     }
 
     public string Number { get; }

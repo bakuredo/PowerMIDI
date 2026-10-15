@@ -21,20 +21,17 @@ public static class Gm2Effects
     // State after a GM2 System On: Large Hall, Chorus 3, the other parameters set by the types.
     public static readonly int[] Defaults = { 4, -1, 2, -1, -1, -1, -1 };
 
-    static readonly int[] file = new int[Count];
-    static readonly bool[] isFixed = new bool[Count];
-    static readonly int[] fixedValue = new int[Count];
-
-    static Gm2Effects() { ResetFile(); }
+    // Values by parameter (one group, one note).
+    static readonly ValueStore store = new(1, 1, Count, (g, n, p) => Defaults[p]);
 
     // GM2 System On (start of a track, reset in the file): the file's values go back to the defaults.
-    public static void ResetFile() => Array.Copy(Defaults, file, Count);
+    public static void ResetFile() => store.ResetFile();
 
-    public static int FileValue(int p) => file[p];
-    public static bool IsFixed(int p) => isFixed[p];
-    public static int FixedValue(int p) => fixedValue[p];
-    public static int Value(int p) => isFixed[p] ? fixedValue[p] : file[p];
-    public static bool HasFixed => isFixed.Any(f => f);
+    public static int FileValue(int p) => store.File(0, 0, p);
+    public static bool IsFixed(int p) => store.IsFixed(0, 0, p);
+    public static int FixedValue(int p) => store.FixedValue(0, 0, p);
+    public static int Value(int p) => store.Value(0, 0, p);
+    public static bool HasFixed => store.HasFixed;
 
     public static bool IsType(int p) => p is ReverbType or ChorusType;
     // Block of a parameter: 0 = reverb, 1 = chorus.
@@ -42,9 +39,8 @@ public static class Gm2Effects
 
     public static void Set(IOutputDevice device, int p, int value)
     {
-        isFixed[p] = true;
-        fixedValue[p] = value;
-        if (IsType(p)) TypeChanged(file, p);
+        store.Fix(0, 0, p, value);
+        if (IsType(p)) TypeChanged(p);
         if (device == null) return;
         device.SendEvent(ParamEvent(p, value));
         if (IsType(p)) SendFixedParams(device, Block(p));   // the type has just reset them in the module
@@ -53,9 +49,9 @@ public static class Gm2Effects
     // Back to the file: its value is sent again (if it is known).
     public static void Clear(IOutputDevice device, int p)
     {
-        isFixed[p] = false;
-        if (device == null || file[p] < 0) return;
-        device.SendEvent(ParamEvent(p, file[p]));
+        store.Unfix(0, 0, p);
+        if (device == null || FileValue(p) < 0) return;
+        device.SendEvent(ParamEvent(p, FileValue(p)));
         if (IsType(p)) SendFixedParams(device, Block(p));
     }
 
@@ -72,9 +68,16 @@ public static class Gm2Effects
 
     // Fixed parameters of a block (not its type).
     static MidiEvent[] FixedParamEvents(int block) =>
-        Enumerable.Range(0, Count).Where(p => Block(p) == block && !IsType(p) && isFixed[p]).Select(p => (MidiEvent)ParamEvent(p, fixedValue[p])).ToArray();
+        Enumerable.Range(0, Count).Where(p => Block(p) == block && !IsType(p) && IsFixed(p)).Select(p => (MidiEvent)ParamEvent(p, FixedValue(p))).ToArray();
 
     // A type has just changed: the other parameters of its block go back to the type's defaults.
+    static void TypeChanged(int type)
+    {
+        var values = store.Files(0, 0);
+        TypeChanged(values, type);
+        store.SetFiles(0, 0, values);
+    }
+
     static void TypeChanged(int[] values, int type)
     {
         for (int p = 0; p < Count; p++)
@@ -96,7 +99,7 @@ public static class Gm2Effects
     {
         foreach (bool types in new[] { true, false })
             for (int p = 0; p < Count; p++)
-                if (isFixed[p] && IsType(p) == types) yield return ParamEvent(p, fixedValue[p]);
+                if (IsFixed(p) && IsType(p) == types) yield return ParamEvent(p, FixedValue(p));
     }
 
     // ---------- Reading GM2 SysEx ----------
@@ -128,9 +131,9 @@ public static class Gm2Effects
         byte[] data = null;
         foreach (var (position, param) in positions)
         {
-            if (!isFixed[param] || d[position] == fixedValue[param]) continue;
+            if (!IsFixed(param) || d[position] == FixedValue(param)) continue;
             data ??= (byte[])d.Clone();
-            data[position] = (byte)fixedValue[param];
+            data[position] = (byte)FixedValue(param);
         }
         return data;
     }
@@ -143,7 +146,9 @@ public static class Gm2Effects
         // Port read first: the first use of ChannelMixer resets the effect values (static initialization).
         var device = ChannelMixer.Device;
         var positions = new List<(int Position, int Param)>();
-        if (!ApplyBytes(d, file, positions)) return null;
+        var values = store.Files(0, 0);
+        if (!ApplyBytes(d, values, positions)) return null;
+        store.SetFiles(0, 0, values);
         foreach (int block in positions.Where(x => IsType(x.Param)).Select(x => Block(x.Param)).Distinct())
             if (device != null) ChannelMixer.SendLater(FixedParamEvents(block));
         var data = WithFixedValues(d, positions);

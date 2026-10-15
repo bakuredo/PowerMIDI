@@ -24,6 +24,9 @@ public sealed class ValueStore
 
     public int File(int g, int n, int p) => file[Index(g, n, p)];
     public void SetFile(int g, int n, int p, int value) => file[Index(g, n, p)] = value;
+    // File values of a note's parameters as an array (to read a message into a copy), and back.
+    public int[] Files(int g, int n) => file.AsSpan(Index(g, n, 0), count).ToArray();
+    public void SetFiles(int g, int n, int[] values) => values.AsSpan(0, count).CopyTo(file.AsSpan(Index(g, n, 0), count));
     public bool IsFixed(int g, int n, int p) => isFixed[Index(g, n, p)];
     public int FixedValue(int g, int n, int p) => fixedValue[Index(g, n, p)];
     public int Value(int g, int n, int p) => IsFixed(g, n, p) ? FixedValue(g, n, p) : File(g, n, p);

@@ -102,9 +102,8 @@ public static class GsXgEffects
     static int[] Range(int start, int n) => Enumerable.Range(start, n).ToArray();
     static int[] Range2(int start, int n) => Enumerable.Range(0, n).Select(i => start + 2 * i).ToArray();
     static int[] InsEach(Func<int, int[]> part) => Enumerable.Range(0, InsCount).SelectMany(part).ToArray();
-    static readonly int[] effectFile = new int[Count];      // file value (-1 = unknown: set by type)
-    static readonly bool[] effectFixed = new bool[Count];   // fixed in interface?
-    static readonly int[] effectFixedValue = new int[Count];
+    // Values by parameter (one group, one note); file value -1 = unknown (set by the type).
+    static readonly ValueStore store = new(1, 1, Count, (g, n, e) => Defaults[e]);
 
     public static bool IsXg(int e) { return (Block[e] >= 3 && Block[e] <= 5) || e >= InsFirst; }
     public static bool IsInsertion(int e) { return e >= InsFirst && e < XgEqFirst; }
@@ -121,15 +120,13 @@ public static class GsXgEffects
     }
     static int Size(int e) { return Max[e] > 127 ? 2 : 1; }
     public static bool IsType(int e) { return Array.IndexOf(TypeParams, e) >= 0; }
-    public static int FileValue(int e) { return effectFile[e]; }
-    public static bool IsFixed(int e) { return effectFixed[e]; }
-    public static int FixedValue(int e) { return effectFixedValue[e]; }
-    public static int Value(int e) { return effectFixed[e] ? effectFixedValue[e] : effectFile[e]; }
+    public static int FileValue(int e) => store.File(0, 0, e);
+    public static bool IsFixed(int e) => store.IsFixed(0, 0, e);
+    public static int FixedValue(int e) => store.FixedValue(0, 0, e);
+    public static int Value(int e) => store.Value(0, 0, e);
+    public static bool HasFixed => store.HasFixed;
 
-    public static void ResetFile()
-    {
-        for (int e = 0; e < Count; e++) effectFile[e] = Defaults[e];
-    }
+    public static void ResetFile() => store.ResetFile();
 
     // SysEx message for an effect parameter (GS: Roland checksum; XG: 2-byte type).
     // insertionType: type the insertion effect has when the message is played (default: the current one); it
@@ -229,7 +226,7 @@ public static class GsXgEffects
     static void TypeChanged(int macro)
     {
         for (int e = 0; e < Count; e++)
-            if (e != macro && Block[e] == Block[macro] && TypeDependent[e]) effectFile[e] = -1;
+            if (e != macro && Block[e] == Block[macro] && TypeDependent[e]) store.SetFile(0, 0, e, -1);
     }
 
     // Resends a block's fixed parameters (after its type, which may have overwritten them in module).
@@ -240,12 +237,11 @@ public static class GsXgEffects
 
     // Fixed parameters of a block (not its type).
     static MidiEvent[] FixedParamEvents(int block) =>
-        Enumerable.Range(0, Count).Where(e => Block[e] == block && !IsType(e) && effectFixed[e]).Select(e => (MidiEvent)ParamEvent(e, effectFixedValue[e])).ToArray();
+        Enumerable.Range(0, Count).Where(e => Block[e] == block && !IsType(e) && IsFixed(e)).Select(e => (MidiEvent)ParamEvent(e, FixedValue(e))).ToArray();
 
     public static void Set(IOutputDevice device, int e, int value)
     {
-        effectFixed[e] = true;
-        effectFixedValue[e] = value;
+        store.Fix(0, 0, e, value);
         if (IsType(e)) TypeChanged(e);
         if (device == null) return;
         device.SendEvent(ParamEvent(e, value));
@@ -255,9 +251,9 @@ public static class GsXgEffects
     // Hands a parameter back to file: resends file value if it is known.
     public static void Clear(IOutputDevice device, int e)
     {
-        effectFixed[e] = false;
-        if (device == null || effectFile[e] < 0) return;
-        device.SendEvent(ParamEvent(e, effectFile[e]));
+        store.Unfix(0, 0, e);
+        if (device == null || FileValue(e) < 0) return;
+        device.SendEvent(ParamEvent(e, FileValue(e)));
         if (IsType(e)) { TypeChanged(e); SendFixedParams(device, Block[e]); }
     }
 
@@ -267,7 +263,7 @@ public static class GsXgEffects
         for (int block = 0; block < Blocks; block++)
         {
             for (int e = 0; e < Count; e++)
-                if (Block[e] == block && IsType(e) && effectFixed[e]) device.SendEvent(ParamEvent(e, effectFixedValue[e]));
+                if (Block[e] == block && IsType(e) && IsFixed(e)) device.SendEvent(ParamEvent(e, FixedValue(e)));
             SendFixedParams(device, block);
         }
     }
@@ -286,12 +282,10 @@ public static class GsXgEffects
         foreach (var b in bytes)
         {
             int pos = b[0], e = b[1], part = b[2];
-            int old = effectFile[e] < 0 ? 0 : effectFile[e];
-            if (Size(e) == 1 || part == 2) effectFile[e] = d[pos];
-            else if (part == 0) effectFile[e] = d[pos] * 128 + old % 128;
-            else effectFile[e] = (old / 128) * 128 + d[pos];
+            int old = Math.Max(0, FileValue(e));
+            store.SetFile(0, 0, e, Size(e) == 1 || part == 2 ? d[pos] : part == 0 ? d[pos] * 128 + old % 128 : old / 128 * 128 + d[pos]);
             if (IsType(e) && !macroBlocks.Contains(Block[e])) { TypeChanged(e); macroBlocks.Add(Block[e]); }
-            if (effectFixed[e]) { data[pos] = ValueByte(e, part, effectFixedValue[e]); changed = true; }
+            if (IsFixed(e)) { data[pos] = ValueByte(e, part, FixedValue(e)); changed = true; }
         }
         // Type changed by file: fixed parameters of this block are resent right after.
         if (device != null)
@@ -301,6 +295,4 @@ public static class GsXgEffects
         return new NormalSysExEvent(data);
     }
 
-    // State after a reset: the file's values are the defaults.
-    static GsXgEffects() { ResetFile(); }
 }

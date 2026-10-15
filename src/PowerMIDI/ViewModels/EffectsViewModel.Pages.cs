@@ -126,21 +126,10 @@ public sealed partial class EffectsViewModel
     {
         for (int c = 0; c < 16; c++)
         {
-            var button = drumPartButtons[c];
-            int mode = XgDrumSetup.PartMode(c);
+            int mode = XgDrumSetup.PartMode(c), fileMode = XgDrumSetup.FilePartMode(c);
             bool on = mode == 2 + xgDrums.Group, isFixed = XgDrumSetup.PartModeOverride[c] >= 0;
-            var key = $"{on}/{isFixed}/{mode}/{XgDrumSetup.FilePartMode(c)}";
-            if (key == button.Key) continue;
-            button.Key = key;
-            button.Updating = true;
-            try
-            {
-                button.IsChecked = on;
-                button.IsFixed = isFixed;
-                button.ToolTip = $"Channel {c + 1}: {PartModeName(mode)}" +
-                                 (isFixed ? $" (file: {PartModeName(XgDrumSetup.FilePartMode(c))})" : "");
-            }
-            finally { button.Updating = false; }
+            drumPartButtons[c].Show($"{on}/{isFixed}/{mode}/{fileMode}", on, isFixed,
+                                    $"Channel {c + 1}: {PartModeName(mode)}" + (isFixed ? $" (file: {PartModeName(fileMode)})" : ""));
         }
     }
 

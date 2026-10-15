@@ -183,18 +183,7 @@ public sealed class SettingsPage
         {
             int g = button.Part;
             bool on = g == Group, isFixed = IsGroupFixed(g) || OwnFixed(g), visible = GroupVisible?.Invoke(g) ?? true;
-            var key = $"{on}/{isFixed}/{visible}/{GroupKey?.Invoke(g)}";
-            if (key == button.Key) continue;
-            button.Key = key;
-            button.Updating = true;
-            try
-            {
-                button.IsChecked = on;
-                button.IsFixed = isFixed;
-                button.IsVisible = visible;
-                button.ToolTip = GroupToolTip(g);
-            }
-            finally { button.Updating = false; }
+            button.Show($"{on}/{isFixed}/{visible}/{GroupKey?.Invoke(g)}", on, isFixed, GroupToolTip(g), visible);
         }
 
         if (HasNotes) RefreshNotes();
@@ -226,30 +215,9 @@ public sealed class SettingsPage
             bool isFixed = param.OwnIsFixed?.Invoke(Group) ?? IsFixed(Group, n, p);
             bool visible = param.Visible?.Invoke(Group) ?? true;
             var suffix = param.ToolTipSuffix?.Invoke() ?? "";
-            var key = $"{Group}/{n}/{v}/{isFixed}/{fileValue}/{visible}/{suffix}";
-            if (key == row.Key) continue;
-            row.Key = key;
-            row.Updating = true;
-            try
-            {
-                row.IsVisible = visible;
-                row.IsFixed = isFixed;
-                row.ToolTip = (isFixed ? $"Fixed (file: {(fileValue < 0 ? AutoText.ToLowerInvariant() : param.Text(fileValue))})"
-                               : v < 0 ? AutoText : "File value") + suffix;
-                switch (row)
-                {
-                    case EffectListViewModel list:
-                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
-                        list.ValueText = v < 0 ? "auto" : "";
-                        break;
-                    case EffectSliderViewModel slider:
-                        slider.Value = v >= 0 ? v : param.AutoPosition;
-                        slider.ValueText = param.Text(v);
-                        slider.ValueState = isFixed ? ValueState.Fixed : v < 0 ? ValueState.Auto : ValueState.File;
-                        break;
-                }
-            }
-            finally { row.Updating = false; }
+            var toolTip = (isFixed ? $"Fixed (file: {(fileValue < 0 ? AutoText.ToLowerInvariant() : param.Text(fileValue))})"
+                           : v < 0 ? AutoText : "File value") + suffix;
+            row.Show($"{Group}/{n}/{v}/{isFixed}/{fileValue}/{visible}/{suffix}", v, isFixed, toolTip, param.Text(v), param.AutoPosition, visible);
         }
     }
 
