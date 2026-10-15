@@ -124,7 +124,6 @@ public static class GsXgEffects
     public static bool IsFixed(int e) => store.IsFixed(0, 0, e);
     public static int FixedValue(int e) => store.FixedValue(0, 0, e);
     public static int Value(int e) => store.Value(0, 0, e);
-    public static bool HasFixed => store.HasFixed;
 
     public static void ResetFile() => store.ResetFile();
 

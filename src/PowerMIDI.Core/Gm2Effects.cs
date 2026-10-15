@@ -31,7 +31,6 @@ public static class Gm2Effects
     public static bool IsFixed(int p) => store.IsFixed(0, 0, p);
     public static int FixedValue(int p) => store.FixedValue(0, 0, p);
     public static int Value(int p) => store.Value(0, 0, p);
-    public static bool HasFixed => store.HasFixed;
 
     public static bool IsType(int p) => p is ReverbType or ChorusType;
     // Block of a parameter: 0 = reverb, 1 = chorus.

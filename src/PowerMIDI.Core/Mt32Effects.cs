@@ -46,7 +46,6 @@ public static class Mt32Effects
     public static bool IsFixed(int p) => store.IsFixed(0, 0, p);
     public static int FixedValue(int p) => store.FixedValue(0, 0, p);
     public static int Value(int p) => store.Value(0, 0, p);
-    public static bool HasFixed => store.HasFixed;
 
     public static void Set(IOutputDevice device, int p, int value)
     {
