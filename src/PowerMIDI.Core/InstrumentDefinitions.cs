@@ -86,6 +86,7 @@ public sealed class InstrumentDefinitions
     public const int Gm2MelodicMsb = 121, Gm2DrumMsb = 120;
     public readonly Dictionary<int, string> Mt32Voices = new();   // 128 preset patches (no banks on an MT-32)
     public readonly Dictionary<int, string> Mt32Drums = new();    // the rhythm part
+    public readonly Dictionary<int, string> Mt32DrumTones = new();   // names of the notes of the rhythm part
     public readonly Dictionary<(int Map, int Msb, int Program), string> GsVoices = new();
     public readonly Dictionary<(int Map, int Program), string> GsDrums = new();
     public readonly Dictionary<(int Map, int Program), Dictionary<int, string>> GsDrumTones = new();   // names of the notes of each kit
@@ -152,7 +153,10 @@ public sealed class InstrumentDefinitions
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/InstrumentList/Map/PC"))
                 defs.Mt32Voices[int.Parse(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/DrumSetList/Map/PC"))
+            {
                 defs.Mt32Drums[int.Parse(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
+                foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) defs.Mt32DrumTones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
+            }
         }
 
         var gsFile = Path.Combine(dir, "GS.xml");

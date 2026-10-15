@@ -149,6 +149,24 @@ public sealed class EffectsViewModel : ObservableObject
     const int Mt32Base = 1000;
     readonly EffectParamViewModel[] mt32Params = new EffectParamViewModel[Mt32Effects.Count];
 
+    // MT-32 Part page: part buttons (index Mt32PartIndex, value = part 0-7, 8 = rhythm part) and the parameters of that
+    // part (Mt32PartParamBase + p, see Mt32PartParams).
+    const int Mt32PartIndex = 10000, Mt32PartParamBase = 10010;
+    EffectBlockViewModel mt32PartBlock;
+    readonly List<EffectChannelViewModel> mt32PartButtons = new();
+    readonly EffectParamViewModel[] mt32PartParams = new EffectParamViewModel[Mt32PartParams.Count];
+    int mt32Part;
+
+    // MT-32 Drums page: the rhythm part (one button, its channel in the tooltip; index Mt32DrumPartIndex), the note
+    // (Mt32DrumNoteIndex) and its rhythm setup (Mt32DrumParamBase + p, see Mt32DrumParams).
+    const int Mt32DrumPartIndex = 11000, Mt32DrumNoteIndex = 11001, Mt32DrumParamBase = 11010;
+    EffectBlockViewModel mt32DrumBlock;
+    EffectChannelViewModel mt32RhythmButton;
+    EffectListViewModel mt32DrumNote;
+    readonly EffectParamViewModel[] mt32DrumParams = new EffectParamViewModel[Mt32DrumParams.Count];
+    int mt32DrumNoteNumber = 38;
+    string mt32DrumNotesKey = "", mt32TimbresKey = "";
+
     // GM2 page: parameter p of Gm2Effects has the index Gm2Base + p.
     const int Gm2Base = 2000;
     readonly EffectParamViewModel[] gm2Params = new EffectParamViewModel[Gm2Effects.Count];
@@ -319,7 +337,7 @@ public sealed class EffectsViewModel : ObservableObject
         variation.Insert(variation.IndexOf(parameters[40]) + 1, variationParts);
 
         // MT-32 page: the reverb (mode, time, level) and the reverb switch of parts 1-8 and of the rhythm part.
-        var reverb = new EffectBlockViewModel { Title = "Reverb", IsFirst = true, ChannelsLabel = "Reverb per part" };
+        var reverb = new EffectBlockViewModel { Title = "Reverb", TabTitle = "Reverb", ShowTitle = false, IsFirst = true, ChannelsLabel = "Reverb per part" };
         mt32Params[0] = new EffectListViewModel(this, Mt32Base, Mt32Effects.ModeNames.Select((n, i) => new EffectChoice(n, i)).ToList()) { Label = "Mode" };
         mt32Params[1] = new EffectSliderViewModel(this, Mt32Base + 1) { Label = "Time", Minimum = 0, Maximum = 7 };
         mt32Params[2] = new EffectSliderViewModel(this, Mt32Base + 2) { Label = "Level", Minimum = 0, Maximum = 7 };
@@ -331,6 +349,41 @@ public sealed class EffectsViewModel : ObservableObject
             reverb.Channels.Add(button);
         }
         mt32Blocks.Add(reverb);
+
+        // MT-32 Part page: a part (buttons 1-8, R: the rhythm part), its patch values and its partial reserve.
+        mt32PartBlock = new EffectBlockViewModel { Title = "Part settings", TabTitle = "Part", ShowTitle = false, IsFirst = true, ChannelsLabel = "Part" };
+        for (int part = 0; part < Mt32PartParams.Parts; part++)
+        {
+            var button = new EffectChannelViewModel(this, Mt32PartIndex, part, -1, part < 8 ? (part + 1).ToString() : "R");
+            mt32PartButtons.Add(button);
+            mt32PartBlock.Channels.Add(button);
+        }
+        for (int p = 0; p < Mt32PartParams.Count; p++)
+        {
+            mt32PartParams[p] = p == Mt32PartParams.AssignMode
+                ? new EffectListViewModel(this, Mt32PartParamBase + p, IndexedChoices("POLY 1", "POLY 2", "POLY 3", "POLY 4")) { Label = Mt32PartParams.Names[p] }
+                : new EffectSliderViewModel(this, Mt32PartParamBase + p) { Label = Mt32PartParams.Names[p], Minimum = 0, Maximum = Mt32PartParams.Max[p] };
+            mt32PartBlock.Params.Add(mt32PartParams[p]);
+        }
+        mt32Blocks.Add(mt32PartBlock);
+
+        // MT-32 Drums page (between Reverb and Part): a note of the rhythm part, its timbre, level, pan and reverb.
+        mt32DrumBlock = new EffectBlockViewModel { Title = "Rhythm setup", TabTitle = "Drums", ShowTitle = false, IsFirst = true, ChannelsLabel = "Rhythm part", HasFollow = true };
+        mt32RhythmButton = new EffectChannelViewModel(this, Mt32DrumPartIndex, 0, -1, "R");
+        mt32DrumBlock.Channels.Add(mt32RhythmButton);
+        mt32DrumNote = new EffectListViewModel(this, Mt32DrumNoteIndex, Array.Empty<EffectChoice>()) { Label = "Note" };
+        mt32DrumBlock.Params.Add(mt32DrumNote);
+        for (int p = 0; p < Mt32DrumParams.Count; p++)
+        {
+            mt32DrumParams[p] = p switch
+            {
+                Mt32DrumParams.Timbre => new EffectListViewModel(this, Mt32DrumParamBase + p, Array.Empty<EffectChoice>()) { Label = Mt32DrumParams.Names[p] },
+                Mt32DrumParams.Reverb => new EffectListViewModel(this, Mt32DrumParamBase + p, IndexedChoices("Off", "On")) { Label = Mt32DrumParams.Names[p] },
+                _ => new EffectSliderViewModel(this, Mt32DrumParamBase + p) { Label = Mt32DrumParams.Names[p], Minimum = 0, Maximum = Mt32DrumParams.Max[p] },
+            };
+            mt32DrumBlock.Params.Add(mt32DrumParams[p]);
+        }
+        mt32Blocks.Insert(1, mt32DrumBlock);
 
         // GM2 page: Reverb (type, time) and Chorus (type, rate, depth, feedback, send to reverb).
         for (int p = 0; p < Gm2Effects.Count; p++)
@@ -493,7 +546,7 @@ public sealed class EffectsViewModel : ObservableObject
         xgTabs.Insert(XgBlocksWithoutInsertion, insertionTab);   // after Reverb, Chorus, Variation
 
         // GS and XG: one block at a time, chosen in the tab strip (see Tabs); the first one at start.
-        foreach (var group in new[] { gsBlocks, xgTabs, gm2Blocks })
+        foreach (var group in new[] { gsBlocks, xgTabs, gm2Blocks, mt32Blocks })
         {
             foreach (var block in group)
                 block.Selected = () =>
@@ -535,16 +588,17 @@ public sealed class EffectsViewModel : ObservableObject
     static readonly EffectBlockViewModel[] NoBlocks = Array.Empty<EffectBlockViewModel>();
     public IReadOnlyList<EffectBlockViewModel> Blocks =>
         Mode switch { "XG" => xgBlocks, "MT-32" => mt32Blocks, "GM2" => gm2Blocks, "GS" => gsBlocks, _ => NoBlocks };
-    // Layout: GS, XG and GM2, the block of the tab strip at full width (see Tabs); MT-32, the reverb alone at full width.
+    // Layout: the block of the tab strip at full width (see Tabs).
     public IEnumerable<EffectBlockViewModel> OtherBlocks =>
         !HasTabs ? Blocks
         : selectedTabs[TabGroup] == insertionTab ? new[] { insertionSelector, insertionBlocks[insertion] }
         : new[] { selectedTabs[TabGroup] };
-    IReadOnlyList<EffectBlockViewModel> TabGroup => Mode switch { "XG" => xgTabs, "GM2" => gm2Blocks, _ => gsBlocks };
+    IReadOnlyList<EffectBlockViewModel> TabGroup => Mode switch { "XG" => xgTabs, "GM2" => gm2Blocks, "MT-32" => mt32Blocks, _ => gsBlocks };
 
     // GS, XG and GM2: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX, Drums,
-    // Part; XG: Reverb, Chorus, Variation, Insertion (1 to 4), Multi EQ, Drums, Part; GM2: Reverb, Chorus, Drums, Part).
-    public bool HasTabs => Mode is "GS" or "XG" or "GM2";
+    // Part; XG: Reverb, Chorus, Variation, Insertion (1 to 4), Multi EQ, Drums, Part; GM2: Reverb, Chorus, Drums, Part;
+    // MT-32: Reverb, Drums, Part).
+    public bool HasTabs => Mode is "GS" or "XG" or "GM2" or "MT-32";
     public IReadOnlyList<EffectBlockViewModel> Tabs =>
         !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgTabs.Take(XgBlocksWithoutInsertion).Append(drumBlock).Append(partBlock).ToList() : TabGroup;
     // The XG insertion effects and Multi EQ are not offered with the MU Basic voice map: an XG Level 1 module has none
@@ -582,7 +636,9 @@ public sealed class EffectsViewModel : ObservableObject
     // of an XG effect, which the type does not set, are kept.
     internal void SetEffect(int fx, int value)
     {
-        if (fx >= Gm2PartChannelIndex) SetGm2Part(fx, value);
+        if (fx >= Mt32DrumPartIndex) SetMt32Drum(fx, value);
+        else if (fx >= Mt32PartIndex) SetMt32Part(fx, value);
+        else if (fx >= Gm2PartChannelIndex) SetGm2Part(fx, value);
         else if (fx >= Gm2DrumChannelIndex) SetGm2Drum(fx, value);
         else         if (fx >= GsPartChannelIndex) SetGsPart(fx, value);
         else if (fx >= GsDrumMapIndex) SetGsDrum(fx, value);
@@ -611,7 +667,9 @@ public sealed class EffectsViewModel : ObservableObject
 
     internal void ClearEffect(int fx)
     {
-        if (fx >= Gm2PartChannelIndex) ClearGm2Part(fx);
+        if (fx >= Mt32DrumPartIndex) ClearMt32Drum(fx);
+        else if (fx >= Mt32PartIndex) ClearMt32Part(fx);
+        else if (fx >= Gm2PartChannelIndex) ClearGm2Part(fx);
         else if (fx >= Gm2DrumChannelIndex) ClearGm2Drum(fx);
         else         if (fx >= GsPartChannelIndex) ClearGsPart(fx);
         else if (fx >= GsDrumMapIndex) ClearGsDrum(fx);
@@ -641,6 +699,8 @@ public sealed class EffectsViewModel : ObservableObject
         GsPartParams.Clear(ChannelMixer.GsMode ? device : null);
         Gm2DrumParams.Clear(ChannelMixer.Gm2Mode ? device : null);
         Gm2PartParams.Clear(ChannelMixer.Gm2Mode ? device : null);
+        Mt32PartParams.Clear(ChannelMixer.Mt32Mode ? device : null);
+        Mt32DrumParams.Clear(ChannelMixer.Mt32Mode ? device : null);
         XgPartParams.Clear(ChannelMixer.XgMode ? device : null);
         XgDrumSetup.Clear(ChannelMixer.XgMode ? device : null);
         Refresh();
@@ -663,6 +723,8 @@ public sealed class EffectsViewModel : ObservableObject
         if (GsPartParams.HasFixed) { GsPartParams.Clear(null); had = true; }
         if (Gm2DrumParams.HasFixed) { Gm2DrumParams.Clear(null); had = true; }
         if (Gm2PartParams.HasFixed) { Gm2PartParams.Clear(null); had = true; }
+        if (Mt32PartParams.HasFixed) { Mt32PartParams.Clear(null); had = true; }
+        if (Mt32DrumParams.HasFixed) { Mt32DrumParams.Clear(null); had = true; }
         if (XgPartParams.HasFixed) { XgPartParams.Clear(null); had = true; }
         return had;
     }
@@ -889,7 +951,7 @@ public sealed class EffectsViewModel : ObservableObject
     {
         playedNotes.Clear();
         while (ChannelMixer.PlayedNotes.TryDequeue(out var note)) playedNotes.Add(note);
-        ChannelMixer.CollectNotes = drumBlock.Follow || gsDrumBlock.Follow || gm2DrumBlock.Follow;
+        ChannelMixer.CollectNotes = drumBlock.Follow || gsDrumBlock.Follow || gm2DrumBlock.Follow || mt32DrumBlock.Follow;
     }
 
     // Follow: among the notes played since the last refresh on the channels of the page (inChannel), between first and
@@ -1011,6 +1073,222 @@ public sealed class EffectsViewModel : ObservableObject
                                : v < 0 ? "Kit default" : "File value";
             }
             finally { slider.Updating = false; }
+        }
+    }
+
+    // ---------- MT-32 Drums page ----------
+
+    void SetMt32Drum(int fx, int value)
+    {
+        if (fx == Mt32DrumPartIndex) mt32RhythmButton.Key = "";   // the only button: stays pressed
+        else if (fx == Mt32DrumNoteIndex) mt32DrumNoteNumber = value;
+        else Mt32DrumParams.Set(ChannelMixer.Mt32Mode ? output() : null, mt32DrumNoteNumber, fx - Mt32DrumParamBase, value);
+    }
+
+    // Right click: back to the file for a parameter, for the note (on the list) or for the whole rhythm part (its button).
+    void ClearMt32Drum(int fx)
+    {
+        var device = ChannelMixer.Mt32Mode ? output() : null;
+        if (fx == Mt32DrumPartIndex) Mt32DrumParams.Clear(device);
+        else if (fx == Mt32DrumNoteIndex) Mt32DrumParams.Clear(device, mt32DrumNoteNumber);
+        else Mt32DrumParams.Clear(device, mt32DrumNoteNumber, fx - Mt32DrumParamBase);
+    }
+
+    // Name of a timbre of the rhythm setup: memory timbres (M1-M64, names loaded by the file), rhythm timbres (R1-R30).
+    static string Mt32TimbreName(int v) =>
+        v < 64 ? $"M{v + 1}" + (Mt32Patches.MemoryTimbreName(v) is { } name ? $" · {name}" : "")
+        : v < Mt32DrumParams.TimbreOff ? $"R{v - 63} · {Mt32DrumParams.RhythmTimbreNames[v - 64]}" : "Off";
+
+    // Level 0..100, pan R7..C..L7 (0..14 = right..left), reverb off / on; -1 = the module's rhythm map ("auto").
+    static string FormatMt32Drum(int p, int v)
+    {
+        if (v < 0) return "auto";
+        return p switch
+        {
+            Mt32DrumParams.Timbre => Mt32TimbreName(v),
+            Mt32DrumParams.Pan => v == 7 ? "C" : v < 7 ? $"R{7 - v}" : $"L{v - 7}",
+            Mt32DrumParams.Reverb => v == 0 ? "Off" : "On",
+            _ => v.ToString(),
+        };
+    }
+
+    public string DescribeMt32Drum(int n, int p, int v) => $"MT-32 rhythm note {n} ({NoteName(n)}) {Mt32DrumParams.Names[p]}: {FormatMt32Drum(p, v)}";
+
+    // MT-32 Drums page: the rhythm part button (its channel in the tooltip), the notes (fixed ones marked •; Follow: the
+    // last ones played on its channel), the timbre list (names of the memory timbres loaded by the file) and the values.
+    void RefreshMt32Drums()
+    {
+        int channel = Mt32Effects.PartChannel[Mt32PartParams.RhythmPart];
+        var buttonKey = $"{channel}/{Mt32DrumParams.HasFixed}";
+        if (buttonKey != mt32RhythmButton.Key)
+        {
+            mt32RhythmButton.Key = buttonKey;
+            mt32RhythmButton.Updating = true;
+            try
+            {
+                mt32RhythmButton.IsChecked = true;
+                mt32RhythmButton.IsFixed = Mt32DrumParams.HasFixed;
+                mt32RhythmButton.ToolTip = $"Rhythm part ({(channel <= 15 ? $"channel {channel + 1}" : "no channel")}). Right click: all notes back to file";
+            }
+            finally { mt32RhythmButton.Updating = false; }
+        }
+
+        if (mt32DrumBlock.Follow && FollowNote(c => c == channel, Mt32DrumParams.FirstKey, Mt32DrumParams.LastKey) is int played) mt32DrumNoteNumber = played;
+        mt32DrumNoteNumber = Math.Clamp(mt32DrumNoteNumber, Mt32DrumParams.FirstKey, Mt32DrumParams.LastKey);
+
+        var tones = defs.Mt32DrumTones;
+        var fixedNotes = Enumerable.Range(Mt32DrumParams.FirstKey, Mt32DrumParams.Keys).Where(Mt32DrumParams.IsNoteFixed).ToList();
+        var notesKey = $"{string.Join(",", fixedNotes)}/{mt32DrumNoteNumber}";
+        if (notesKey != mt32DrumNotesKey)
+        {
+            mt32DrumNotesKey = notesKey;
+            mt32DrumNote.Updating = true;
+            try
+            {
+                mt32DrumNote.Choices = Enumerable.Range(Mt32DrumParams.FirstKey, Mt32DrumParams.Keys)
+                    .Select(n => new EffectChoice($"{n} {NoteName(n)}" + (tones.TryGetValue(n, out var name) ? $" · {name}" : "") +
+                                                  (fixedNotes.Contains(n) ? " •" : ""), n)).ToList();
+                mt32DrumNote.SelectedChoice = mt32DrumNote.Choices.FirstOrDefault(c => c.Value == mt32DrumNoteNumber);
+                mt32DrumNote.IsFixed = fixedNotes.Contains(mt32DrumNoteNumber);
+                mt32DrumNote.ToolTip = "Right click: note back to file";
+            }
+            finally { mt32DrumNote.Updating = false; }
+        }
+
+        // Timbre list: rebuilt when the file loads memory timbres (their names).
+        var timbres = (EffectListViewModel)mt32DrumParams[Mt32DrumParams.Timbre];
+        var timbresKey = Mt32Patches.Version.ToString();
+        if (timbresKey != mt32TimbresKey)
+        {
+            mt32TimbresKey = timbresKey;
+            timbres.Updating = true;
+            try { timbres.Choices = Enumerable.Range(0, Mt32DrumParams.TimbreOff + 1).Select(v => new EffectChoice(Mt32TimbreName(v), v)).ToList(); }
+            finally { timbres.Updating = false; }
+            timbres.Key = "";
+        }
+
+        for (int p = 0; p < Mt32DrumParams.Count; p++)
+        {
+            var vm = mt32DrumParams[p];
+            int v = Mt32DrumParams.Value(mt32DrumNoteNumber, p), fileValue = Mt32DrumParams.FileValue(mt32DrumNoteNumber, p);
+            bool isFixed = Mt32DrumParams.IsFixed(mt32DrumNoteNumber, p);
+            var key = $"{mt32DrumNoteNumber}/{v}/{isFixed}/{fileValue}";
+            if (key == vm.Key) continue;
+            vm.Key = key;
+            vm.Updating = true;
+            try
+            {
+                vm.IsFixed = isFixed;
+                vm.ToolTip = isFixed ? $"Fixed (file: {(fileValue < 0 ? "module's rhythm map" : FormatMt32Drum(p, fileValue))})"
+                           : v < 0 ? "Module's rhythm map" : "File value";
+                switch (vm)
+                {
+                    case EffectListViewModel list:
+                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
+                        list.ValueText = v < 0 ? "auto" : "";
+                        break;
+                    case EffectSliderViewModel slider:
+                        slider.Value = v >= 0 ? v : p == Mt32DrumParams.Pan ? 7 : 0;
+                        slider.ValueText = FormatMt32Drum(p, v);
+                        slider.ValueState = isFixed ? ValueState.Fixed : v < 0 ? ValueState.Auto : ValueState.File;
+                        break;
+                }
+            }
+            finally { vm.Updating = false; }
+        }
+    }
+
+    // ---------- MT-32 Part page ----------
+
+    void SetMt32Part(int fx, int value)
+    {
+        if (fx == Mt32PartIndex)
+        {
+            if (value >= 0) mt32Part = value;
+            foreach (var button in mt32PartButtons) button.Key = "";   // pressed again: stays pressed
+        }
+        else Mt32PartParams.Set(ChannelMixer.Mt32Mode ? output() : null, mt32Part, fx - Mt32PartParamBase, value);
+    }
+
+    // Right click: back to the file for a parameter, or for the whole part (on its button).
+    void ClearMt32Part(int fx)
+    {
+        var device = ChannelMixer.Mt32Mode ? output() : null;
+        if (fx == Mt32PartIndex) Mt32PartParams.Clear(device, mt32Part);
+        else Mt32PartParams.Clear(device, mt32Part, fx - Mt32PartParamBase);
+    }
+
+    // Key shift in semitones and fine tune in cents (both centered), bender range in semitones, partial reserve as a
+    // number of partials; -1 = the patch's ("auto").
+    static string FormatMt32Part(int p, int v)
+    {
+        static string Signed(int d) => d > 0 ? $"+{d}" : d.ToString();
+        if (v < 0) return "auto";
+        return p switch
+        {
+            Mt32PartParams.KeyShift => Signed(v - 24) + " st",
+            Mt32PartParams.FineTune => Signed(v - 50) + " ct",
+            Mt32PartParams.BenderRange => $"{v} st",
+            Mt32PartParams.AssignMode => $"POLY {v + 1}",
+            _ => v.ToString(),
+        };
+    }
+
+    static string Mt32PartName(int part) => part < 8 ? $"part {part + 1}" : "rhythm part";
+
+    public string DescribeMt32Part(int part, int p, int v) => $"MT-32 {Mt32PartName(part)} {Mt32PartParams.Names[p]}: {FormatMt32Part(p, v)}";
+
+    // MT-32 Part page: part buttons (the one shown pressed, blue when it has fixed values; channel in the tooltip) and the
+    // values of that part (the rhythm part has only its partial reserve; the total of the 32 partials in its tooltip).
+    void RefreshMt32Part()
+    {
+        foreach (var button in mt32PartButtons)
+        {
+            int part = button.Part, channel = Mt32Effects.PartChannel[part];
+            bool on = part == mt32Part, isFixed = Mt32PartParams.IsPartFixed(part);
+            var key = $"{on}/{isFixed}/{channel}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsChecked = on;
+                button.IsFixed = isFixed;
+                button.ToolTip = $"{char.ToUpper(Mt32PartName(part)[0])}{Mt32PartName(part)[1..]} ({(channel <= 15 ? $"channel {channel + 1}" : "no channel")})" +
+                                 (isFixed ? ", changed" : "");
+            }
+            finally { button.Updating = false; }
+        }
+        int total = Mt32PartParams.ReserveTotal;
+        for (int p = 0; p < Mt32PartParams.Count; p++)
+        {
+            var vm = mt32PartParams[p];
+            int v = Mt32PartParams.Value(mt32Part, p), fileValue = Mt32PartParams.FileValue(mt32Part, p);
+            bool isFixed = Mt32PartParams.IsFixed(mt32Part, p), visible = mt32Part < 8 || !Mt32PartParams.IsPatchParam(p);
+            var key = $"{mt32Part}/{v}/{isFixed}/{fileValue}/{total}";
+            if (key == vm.Key) continue;
+            vm.Key = key;
+            vm.Updating = true;
+            try
+            {
+                vm.IsVisible = visible;
+                vm.IsFixed = isFixed;
+                vm.ToolTip = (isFixed ? $"Fixed (file: {FormatMt32Part(p, fileValue)})" : v < 0 ? "Patch value" : "File value") +
+                             (p == Mt32PartParams.PartialReserve ? $". Partials reserved by all parts: {total} / 32" : "");
+                switch (vm)
+                {
+                    case EffectListViewModel list:
+                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
+                        list.ValueText = v < 0 ? "auto" : "";
+                        break;
+                    case EffectSliderViewModel slider:
+                        slider.Value = v >= 0 ? v : p == Mt32PartParams.KeyShift ? 24 : p == Mt32PartParams.FineTune ? 50 : 0;
+                        slider.ValueText = FormatMt32Part(p, v);
+                        slider.ValueState = isFixed ? ValueState.Fixed : v < 0 ? ValueState.Auto : ValueState.File;
+                        break;
+                }
+            }
+            finally { vm.Updating = false; }
         }
     }
 
@@ -1682,6 +1960,8 @@ public sealed class EffectsViewModel : ObservableObject
         RefreshGsPart();
         RefreshGm2Drums();
         RefreshGm2Part();
+        RefreshMt32Part();
+        RefreshMt32Drums();
         for (int fx = 0; fx < EffectCount; fx++)
         {
             var p = parameters[fx];

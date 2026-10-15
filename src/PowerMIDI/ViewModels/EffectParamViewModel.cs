@@ -124,6 +124,13 @@ public sealed class EffectChannelViewModel : EffectParamViewModel
         this.offValue = offValue;
     }
 
+    // Same, with its own label (MT-32 parts: "1".."8", "R").
+    public EffectChannelViewModel(EffectsViewModel effects, int index, int channel, int offValue, string number) : this(effects, index, number)
+    {
+        Part = channel;
+        this.offValue = offValue;
+    }
+
     public string Number { get; }
     public int Part { get; } = -1;   // -1: a switch of its own (0 / 1)
     readonly int offValue;

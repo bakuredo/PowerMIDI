@@ -13,7 +13,7 @@ namespace PowerMIDI.Core;
 // then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
 // - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
 // - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
-//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams, WriteGsDrumMap, WriteGsPartParams, WriteGm2DrumParams, WriteGm2PartParams).
+//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams, WriteGsDrumMap, WriteGsPartParams, WriteGm2DrumParams, WriteGm2PartParams, WriteMt32PartParams, WriteMt32DrumParams).
 public static class MidiFileEditor
 {
     // GS Reset, XG System On, GM / GM2 On or MT-32 Reset.
@@ -411,6 +411,32 @@ public static class MidiFileEditor
             (d, positions) => Mt32Effects.ApplyBytes(d, values, channels, positions) != Mt32Effects.Changes.None,
             Mt32Effects.WithFixedValues, Mt32Effects.FixedEvents);
         return string.Format("MT-32 reverb: {0} SysEx written after the reset, {1} SysEx of the file corrected", written, corrected);
+    }
+
+    // MT-32 mode: writes the rhythm setup values fixed in the interface (Mt32DrumParams, Effects tab, Drums page) as
+    // MT-32 SysEx right after the reset; the file's own MT-32 SysEx that write a fixed value are corrected.
+    public static string WriteMt32DrumParams(MidiFile file)
+    {
+        var (written, corrected) = WriteFixed(file, e =>
+            (e is SysExEvent sysEx && Mt32DrumParams.WithFixedValues(sysEx.Data) is { } data ? new NormalSysExEvent(data) : null,
+             Enumerable.Empty<MidiEvent>()), Mt32DrumParams.FixedEvents);
+        return string.Format("MT-32 rhythm setup: {0} SysEx written after the reset, {1} SysEx of the file corrected", written, corrected);
+    }
+
+    // MT-32 mode: writes the part values fixed in the interface (Mt32PartParams, Effects tab, Part page) as MT-32 SysEx:
+    // right after the reset, and the patch values of a part again after each Program Change on its channel (the part
+    // loads its patch); the file's own MT-32 SysEx that write a fixed value are corrected. The channel of each part is
+    // the one of the track being played (Mt32Effects.PartChannel).
+    public static string WriteMt32PartParams(MidiFile file)
+    {
+        var none = Enumerable.Empty<MidiEvent>();
+        var (written, corrected) = WriteFixed(file, e => e switch
+        {
+            SysExEvent sysEx when Mt32PartParams.WithFixedValues(sysEx.Data) is { } data => (new NormalSysExEvent(data), none),
+            ProgramChangeEvent pc when Mt32PartParams.PartOf(pc.Channel) is int part and >= 0 => (null, Mt32PartParams.FixedPatchEvents(part)),
+            _ => (null, none),
+        }, Mt32PartParams.FixedEvents);
+        return string.Format("MT-32 part settings: {0} SysEx written, {1} SysEx of the file corrected", written, corrected);
     }
 
     // GM2 mode: same for the GM2 reverb / chorus values fixed in the interface (Gm2Effects), as GM2 SysEx.

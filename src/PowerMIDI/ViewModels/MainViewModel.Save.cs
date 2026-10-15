@@ -43,7 +43,9 @@ public sealed partial class MainViewModel
         bool gsPart = Mixer.Standard == "GS" && GsPartParams.HasFixed;     // GS part settings
         bool gm2Drums = Mixer.Standard == "GM2" && Gm2DrumParams.HasFixed; // GM2 drum settings
         bool gm2Part = Mixer.Standard == "GM2" && Gm2PartParams.HasFixed;  // GM2 part settings (RPN)
-        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && !gsDrums && !gsPart && !gm2Drums && !gm2Part && insertions.Count == 0)
+        bool mt32Part = Mixer.Standard == "MT-32" && Mt32PartParams.HasFixed; // MT-32 part settings
+        bool mt32Drums = Mixer.Standard == "MT-32" && Mt32DrumParams.HasFixed; // MT-32 rhythm setup
+        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && !gsDrums && !gsPart && !gm2Drums && !gm2Part && !mt32Part && !mt32Drums && insertions.Count == 0)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
@@ -96,6 +98,8 @@ public sealed partial class MainViewModel
         if (gsPart) report.Add(MidiFileEditor.WriteGsPartParams(midi));
         if (gm2Drums) report.Add(MidiFileEditor.WriteGm2DrumParams(midi));
         if (gm2Part) report.Add(MidiFileEditor.WriteGm2PartParams(midi));
+        if (mt32Part) report.Add(MidiFileEditor.WriteMt32PartParams(midi));
+        if (mt32Drums) report.Add(MidiFileEditor.WriteMt32DrumParams(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
         if (forceMode != null)
         {
@@ -152,6 +156,8 @@ public sealed partial class MainViewModel
         foreach (var (c, p, v) in GsPartParams.Fixed()) parts.Add($"gp{c}/{p}={v}");
         foreach (var (c, n, p, v) in Gm2DrumParams.Fixed()) parts.Add($"kd{c}/{n}/{p}={v}");
         foreach (var (c, p, v) in Gm2PartParams.Fixed()) parts.Add($"rp{c}/{p}={v}");
+        foreach (var (part, p, v) in Mt32PartParams.Fixed()) parts.Add($"mp{part}/{p}={v}");
+        foreach (var (n, p, v) in Mt32DrumParams.Fixed()) parts.Add($"md{n}/{p}={v}");
         if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");
         if (withInsertions) foreach (var insertion in insertions) parts.Add($"ins{insertion.Tick}={insertion.Description}");
         return string.Join(";", parts);

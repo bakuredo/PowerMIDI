@@ -759,6 +759,7 @@
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
           <RowDefinition Height="Auto"/>
+          <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0">
           <!-- Badge of the standard, in its color. -->
@@ -782,7 +783,7 @@
         </DockPanel>
         <!-- Position: the jump happens when the mouse button is released. Above it, the markers of the
              insertions (Insert button): tooltip = what was inserted, right click = remove it. -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
           <!-- Mouse down / up handlers: added in MainWindow.xaml.cs (they must also get the clicks the slider handles). -->
           <Slider x:Name="PositionBar" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
                   IsMoveToPointEnabled="True" IsEnabled="{Binding HasTrack}"/>
@@ -840,7 +841,7 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </Grid>
-        <DockPanel Grid.Row="2">
+        <DockPanel Grid.Row="3">
           <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
             <Button Style="{StaticResource Transport}" Content="&#xE892;" Command="{Binding PreviousCommand}" ToolTip="Previous"/>
             <Button Style="{StaticResource Transport}" Content="{Binding PlayGlyph}" Command="{Binding PlayPauseCommand}" ToolTip="Play / pause (Space)"/>
@@ -851,6 +852,10 @@
             <ToggleButton Style="{StaticResource TransportToggle}" Content="{Binding RepeatGlyph}"
                           IsChecked="{Binding IsRepeatOn, Mode=OneWay}" Command="{Binding RepeatCommand}"
                           ToolTip="{Binding RepeatToolTip}"/>
+            <!-- Shows / hides the screen of the module (text and dot picture sent by the file, see above); released while the
+                 file has sent nothing. -->
+            <ToggleButton Style="{StaticResource TransportToggle}" Content="&#xE7F4;" Margin="6,0,0,0" IsChecked="{Binding DisplayButton}"
+                          ToolTip="Module display: text and picture sent by the file"/>
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,8,0"/>
@@ -860,6 +865,19 @@
           </StackPanel>
           <Grid/>
         </DockPanel>
+        <!-- Screen of the module, as on the front of a Sound Canvas, centered between the title and the position bar, at a
+             fixed size: the 16 × 16 dot picture (Sound Canvas, MU; all dots off for an MT-32) and the text (32 characters
+             at most) the file writes on it; shown when the file sends some (display button). -->
+        <Border Grid.Row="1" HorizontalAlignment="Center" Width="320" Height="58" Margin="0,10,0,0" Background="#1F2A14"
+                BorderBrush="#3D5226" BorderThickness="1" CornerRadius="3" Padding="4"
+                ToolTip="Display of the module (text and picture sent by the file)"
+                Visibility="{Binding DisplayShown, Converter={StaticResource BoolToVisibility}}">
+          <DockPanel>
+            <Image DockPanel.Dock="Left" Source="{Binding DisplayDots}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+            <TextBlock Text="{Binding DisplayText}" FontFamily="Consolas" FontSize="13" Foreground="#A8E05F" xml:space="preserve"
+                       VerticalAlignment="Center" Margin="8,0,6,0" TextTrimming="CharacterEllipsis"/>
+          </DockPanel>
+        </Border>
       </Grid>
     </Border>
 

@@ -198,6 +198,9 @@ public static class ChannelMixer
         fileGsDefaultMap = InstrumentDefinitions.DefaultGsMap;
         Mt32Effects.ResetFile();
         Mt32Patches.ResetFile();
+        Mt32PartParams.ResetFile();
+        Mt32DrumParams.ResetFile();
+        ModuleDisplay.Clear();
         Gm2Effects.ResetFile();
         GsXgEffects.ResetFile();
         XgDrumSetup.ResetFile();
@@ -268,7 +271,7 @@ public static class ChannelMixer
     public static void ApplyEffects(IOutputDevice device)
     {
         GsXgEffects.Apply(device);
-        if (Mt32Mode) Mt32Effects.Apply(device);
+        if (Mt32Mode) { Mt32Effects.Apply(device); Mt32PartParams.Apply(device); Mt32DrumParams.Apply(device); }
         if (Gm2Mode) { Gm2Effects.Apply(device); Gm2DrumParams.Apply(device); Gm2PartParams.Apply(device); }
         if (XgMode) { XgDrumSetup.Apply(device); XgPartParams.Apply(device); }
         if (GsMode) { GsDrumMap.Apply(device); GsPartParams.Apply(device); }
@@ -522,6 +525,7 @@ public static class ChannelMixer
             int channel = pc.Channel;
             Program[channel] = pc.ProgramNumber;
             if (Mt32Mode) Mt32Patches.ProgramChanged(channel);
+            if (Mt32Mode && Mt32PartParams.ProgramChanged(channel) is int mt32Part and >= 0) SendLater(Mt32PartParams.FixedPatchEvents(mt32Part).ToArray());
             Used[channel] = true;
             if (XgMode) SendDrumSetupLater(XgDrumSetup.ProgramChanged(channel));
             if (GsMode) SendGsDrumMapLater(GsDrumMap.ProgramChanged(channel));
@@ -539,6 +543,7 @@ public static class ChannelMixer
         if (sysEx != null)
         {
             var d = sysEx.Data;
+            ModuleDisplay.Read(d);   // text for the screen of the module, shown in the player
             // file's master volume: scaled by interface slider.
             if (d.Length >= 6 && d[0] == 0x7F && d[2] == 0x04 && d[3] == 0x01)
             {
@@ -586,6 +591,9 @@ public static class ChannelMixer
             if (Mt32Mode)
             {
                 Mt32Patches.Read(d);
+                // Part and rhythm setup values (Effects tab, Part and Drums pages): corrected first (the reverb is read below).
+                if (Mt32PartParams.Read(d) is { } part) { d = part; e = new NormalSysExEvent(part); }
+                if (Mt32DrumParams.Read(d) is { } setup) { d = setup; e = new NormalSysExEvent(setup); }
                 var mt32 = Mt32Effects.Read(d);
                 if (mt32 != null) return mt32;
             }
@@ -667,6 +675,7 @@ public static class ChannelMixer
         if (XgMode && XgDrumSetup.ProgramChanged(channel) is int setup and >= 0) XgDrumSetup.Apply(device, setup);
         if (GsMode && GsDrumMap.ProgramChanged(channel) is int map and >= 0) foreach (var e in GsDrumMap.FixedEvents(map)) device.SendEvent(e);
         if (Gm2Mode && Gm2DrumParams.IsChannelFixed(channel)) foreach (var e in Gm2DrumParams.FixedEvents(channel)) device.SendEvent(e);
+        if (Mt32Mode && Mt32PartParams.ProgramChanged(channel) is int part and >= 0) foreach (var e in Mt32PartParams.FixedPatchEvents(part)) device.SendEvent(e);
     }
 
     // Forces an instrument on a channel and sends it to module immediately.

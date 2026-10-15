@@ -90,6 +90,13 @@ public static class Mt32Patches
         if (changed) Version++;
     }
 
+    // Name of a memory timbre (0-63) loaded by the file, or null.
+    public static string MemoryTimbreName(int number)
+    {
+        var name = memoryNames[number] != null ? new string(memoryNames[number]).Trim() : "";
+        return name != "" ? name : null;
+    }
+
     // Name of a timbre: presetNames = the 128 preset timbres (A1-A64, B1-B64), by number.
     static string TimbreName(int group, int number, IReadOnlyDictionary<int, string> presetNames)
     {

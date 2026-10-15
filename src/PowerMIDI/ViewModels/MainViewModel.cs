@@ -57,7 +57,7 @@ public sealed partial class MainViewModel : ObservableObject
         Mixer.KeyboardToggle = c => Run(() => ToggleKeyboardChannel(c));
 
         timer.Tick += (_, _) => Run(OnTimer);
-        ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); } catch { } };
+        ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); } catch { } };
     }
 
     RelayCommand Command(Action action) => new(() => Run(action));
@@ -419,6 +419,47 @@ public sealed partial class MainViewModel : ObservableObject
     string currentStandard = "—";
     public string CurrentStandard { get => currentStandard; private set => Set(ref currentStandard, value); }
 
+    // Screen of the module, in the player: the text the file writes on it (MT-32, Sound Canvas, MU; null until the file
+    // sends one) and its dot picture (below). Shown when the file sends some, unless hidden with the display button.
+    string displayText;
+    public string DisplayText { get => displayText; private set { if (Set(ref displayText, value)) NotifyDisplay(); } }
+    bool showDisplay = true;
+    public bool ShowDisplay { get => showDisplay; set { if (Set(ref showDisplay, value)) NotifyDisplay(); } }
+    public bool HasDisplayDots => ModuleDisplay.HasDots;
+    // The file has sent a text or a picture: the screen is shown, unless hidden with the display button.
+    public bool HasDisplay => displayText != null || HasDisplayDots;
+    public bool DisplayShown => showDisplay && HasDisplay;
+    // Display button: pressed while the screen is shown (released while the file has sent nothing, and then inactive).
+    public bool DisplayButton { get => DisplayShown; set { if (HasDisplay) ShowDisplay = value; OnPropertyChanged(); } }
+
+    void NotifyDisplay()
+    {
+        OnPropertyChanged(nameof(HasDisplayDots));
+        OnPropertyChanged(nameof(HasDisplay));
+        OnPropertyChanged(nameof(DisplayShown));
+        OnPropertyChanged(nameof(DisplayButton));
+    }
+
+    // Dot picture the file draws on the screen of the module (Sound Canvas, MU: 16 × 16), lit dots in the color of the
+    // LCD text (all unlit until the file sends one). Updated with the LEDs (30 ms), fast enough for an animation.
+    System.Windows.Media.Imaging.WriteableBitmap displayDots;
+    int shownDotsVersion = -1;
+    public System.Windows.Media.ImageSource DisplayDots => displayDots;
+
+    void UpdateDisplayDots()
+    {
+        int version = ModuleDisplay.DotsVersion;
+        if (version == shownDotsVersion) return;
+        shownDotsVersion = version;
+        displayDots ??= new System.Windows.Media.Imaging.WriteableBitmap(16, 16, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null);
+        var dots = ModuleDisplay.Dots();
+        var pixels = new int[256];
+        for (int i = 0; i < 256; i++) pixels[i] = dots[i] ? 0xA8E05F : 0x2C3A1D;
+        displayDots.WritePixels(new System.Windows.Int32Rect(0, 0, 16, 16), pixels, 16 * 4, 0);
+        OnPropertyChanged(nameof(DisplayDots));
+        NotifyDisplay();
+    }
+
     string timeText = "00:00 / 00:00";
     public string TimeText { get => timeText; private set => Set(ref timeText, value); }
 
@@ -718,6 +759,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (prompting) return;   // confirmation prompt open: do not move on
         Mixer.Refresh();
         Effects.Refresh();
+        DisplayText = ModuleDisplay.Text;
         UpdateInsertEnabled();
         if (playback == null || state != "playing") return;
         UpdateLoop();

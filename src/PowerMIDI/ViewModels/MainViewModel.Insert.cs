@@ -330,6 +330,20 @@ public sealed partial class MainViewModel
                 events.Add((-1, Gm2Effects.ParamEvent(p, v)));
                 texts.Add(Effects.DescribeGm2(p, v));
             }
+        foreach (var (n, p, v) in Mt32DrumParams.Fixed())
+        {
+            if (s.Mt32DrumFixed.TryGetValue((n, p), out int before) && before == v) continue;
+            int channel = Mt32Effects.PartChannel[Mt32PartParams.RhythmPart] is int rc and <= 15 ? rc : -1;
+            events.Add((channel, Mt32DrumParams.ParamEvent(n, p, v)));
+            texts.Add(Effects.DescribeMt32Drum(n, p, v));
+        }
+        foreach (var (part, p, v) in Mt32PartParams.Fixed())
+        {
+            if (s.Mt32PartFixed.TryGetValue((part, p), out int before) && before == v) continue;
+            int channel = part < 8 && Mt32Effects.PartChannel[part] <= 15 ? Mt32Effects.PartChannel[part] : -1;
+            events.Add((channel, Mt32PartParams.ParamEvent(part, p, v)));
+            texts.Add(Effects.DescribeMt32Part(part, p, v));
+        }
         foreach (var (c, p, v) in Gm2PartParams.Fixed())
         {
             if (s.Gm2PartFixed.TryGetValue((c, p), out int before) && before == v) continue;
@@ -400,6 +414,8 @@ public sealed partial class MainViewModel
         public readonly Dictionary<(int Channel, int Param), int> GsPartFixed = new();
         public readonly Dictionary<(int Channel, int Note, int Param), int> Gm2DrumFixed = new();
         public readonly Dictionary<(int Channel, int Param), int> Gm2PartFixed = new();
+        public readonly Dictionary<(int Part, int Param), int> Mt32PartFixed = new();
+        public readonly Dictionary<(int Note, int Param), int> Mt32DrumFixed = new();
 
         public static SettingsSnapshot Take()
         {
@@ -423,6 +439,8 @@ public sealed partial class MainViewModel
             foreach (var (c, p, v) in GsPartParams.Fixed()) s.GsPartFixed[(c, p)] = v;
             foreach (var (c, n, p, v) in Gm2DrumParams.Fixed()) s.Gm2DrumFixed[(c, n, p)] = v;
             foreach (var (c, p, v) in Gm2PartParams.Fixed()) s.Gm2PartFixed[(c, p)] = v;
+            foreach (var (part, p, v) in Mt32PartParams.Fixed()) s.Mt32PartFixed[(part, p)] = v;
+            foreach (var (n, p, v) in Mt32DrumParams.Fixed()) s.Mt32DrumFixed[(n, p)] = v;
             return s;
         }
 
@@ -473,6 +491,15 @@ public sealed partial class MainViewModel
                     if (Gm2Fixed[p]) Gm2Effects.Set(target, p, Gm2Value[p]);
                     else Gm2Effects.Clear(target, p);
                 }
+            var mt32Target = ChannelMixer.Mt32Mode ? device : null;
+            foreach (var (n, p, _) in Mt32DrumParams.Fixed().ToList())
+                if (!Mt32DrumFixed.ContainsKey((n, p))) Mt32DrumParams.Clear(mt32Target, n, p);
+            foreach (var ((n, p), v) in Mt32DrumFixed)
+                if (!Mt32DrumParams.IsFixed(n, p) || Mt32DrumParams.FixedValue(n, p) != v) Mt32DrumParams.Set(mt32Target, n, p, v);
+            foreach (var (part, p, _) in Mt32PartParams.Fixed().ToList())
+                if (!Mt32PartFixed.ContainsKey((part, p))) Mt32PartParams.Clear(mt32Target, part, p);
+            foreach (var ((part, p), v) in Mt32PartFixed)
+                if (!Mt32PartParams.IsFixed(part, p) || Mt32PartParams.FixedValue(part, p) != v) Mt32PartParams.Set(mt32Target, part, p, v);
             var gm2Target = ChannelMixer.Gm2Mode ? device : null;
             foreach (var (c, p, _) in Gm2PartParams.Fixed().ToList())
                 if (!Gm2PartFixed.ContainsKey((c, p))) Gm2PartParams.Clear(gm2Target, c, p);
