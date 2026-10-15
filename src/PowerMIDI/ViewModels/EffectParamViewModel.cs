@@ -57,7 +57,9 @@ public sealed class EffectListViewModel : EffectParamViewModel
         WheelCommand = new RelayCommand(p => effects.Run(() => Step(((WheelStep)p).Direction)));
     }
 
-    public IReadOnlyList<EffectChoice> Choices { get; }
+    // The drum setup notes change with the kit (names) and the fixed values (marks).
+    IReadOnlyList<EffectChoice> choices;
+    public IReadOnlyList<EffectChoice> Choices { get => choices; internal set => Set(ref choices, value); }
     public ICommand WheelCommand { get; }
 
     EffectChoice selectedChoice;
@@ -158,6 +160,14 @@ public sealed class EffectBlockViewModel : ObservableObject
     public string ChannelsLabel { get; init; } = "Channels";
     public List<EffectParamViewModel> Params { get; } = new();
     public List<EffectChannelViewModel> Channels { get; } = new();
+    // Second row of buttons, under the first (XG Drums: the channels that use the drum setup shown).
+    public string PartsLabel { get; init; }
+    public List<EffectChannelViewModel> Parts { get; } = new();
+    public bool HasParts => Parts.Count > 0;
+    // XG Drums: Follow button, at the right of the first row of buttons (the note shown follows the notes played).
+    public bool HasFollow { get; init; }
+    bool follow;
+    public bool Follow { get => follow; set => Set(ref follow, value); }
     public bool HasChannels => Channels.Count > 0 && channelsShown;
     // False: the buttons do not apply now (XG Variation connected as a system effect).
     bool channelsShown = true;

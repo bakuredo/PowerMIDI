@@ -330,6 +330,21 @@ public sealed partial class MainViewModel
                 events.Add((-1, Gm2Effects.ParamEvent(p, v)));
                 texts.Add(Effects.DescribeGm2(p, v));
             }
+        for (int c = 0; c < 16; c++)
+        {
+            int mode = XgDrumSetup.PartModeOverride[c];
+            if (mode < 0 || mode == s.PartMode[c]) continue;
+            events.Add((c, XgDrumSetup.PartModeEvent(c, mode)));
+            texts.Add(Effects.DescribePartMode(c, mode));
+        }
+        foreach (var (ds, n, p, v) in XgDrumSetup.Fixed())
+        {
+            if (s.DrumFixed.TryGetValue((ds, n, p), out int before) && before == v) continue;
+            // In the track of the first channel of the setup when it has one.
+            int channel = Enumerable.Range(0, 16).FirstOrDefault(c => XgDrumSetup.SetupOf(c) == ds, -1);
+            events.Add((channel, XgDrumSetup.ParamEvent(ds, n, p, v)));
+            texts.Add(Effects.DescribeDrum(ds, n, p, v));
+        }
         return (events, string.Join(" · ", texts));
     }
 
@@ -346,6 +361,8 @@ public sealed partial class MainViewModel
         public readonly int[] Mt32Value = new int[Mt32Effects.Count];
         public readonly bool[] Gm2Fixed = new bool[Gm2Effects.Count];
         public readonly int[] Gm2Value = new int[Gm2Effects.Count];
+        public readonly Dictionary<(int Setup, int Note, int Param), int> DrumFixed = new();
+        public readonly int[] PartMode = new int[16];
 
         public static SettingsSnapshot Take()
         {
@@ -362,6 +379,8 @@ public sealed partial class MainViewModel
                 (s.FxFixed[fx], s.FxValue[fx]) = (GsXgEffects.IsFixed(fx), GsXgEffects.FixedValue(fx));
             for (int p = 0; p < Mt32Effects.Count; p++) (s.Mt32Fixed[p], s.Mt32Value[p]) = (Mt32Effects.IsFixed(p), Mt32Effects.FixedValue(p));
             for (int p = 0; p < Gm2Effects.Count; p++) (s.Gm2Fixed[p], s.Gm2Value[p]) = (Gm2Effects.IsFixed(p), Gm2Effects.FixedValue(p));
+            foreach (var (ds, n, p, v) in XgDrumSetup.Fixed()) s.DrumFixed[(ds, n, p)] = v;
+            Array.Copy(XgDrumSetup.PartModeOverride, s.PartMode, 16);
             return s;
         }
 
@@ -412,6 +431,17 @@ public sealed partial class MainViewModel
                     if (Gm2Fixed[p]) Gm2Effects.Set(target, p, Gm2Value[p]);
                     else Gm2Effects.Clear(target, p);
                 }
+            var drumTarget = ChannelMixer.XgMode ? device : null;
+            for (int c = 0; c < 16; c++)
+            {
+                if (XgDrumSetup.PartModeOverride[c] == PartMode[c]) continue;
+                if (PartMode[c] >= 0) XgDrumSetup.SetPartMode(drumTarget, c, PartMode[c]);
+                else XgDrumSetup.ClearPartMode(drumTarget, c);
+            }
+            foreach (var (s, n, p, _) in XgDrumSetup.Fixed().ToList())
+                if (!DrumFixed.ContainsKey((s, n, p))) XgDrumSetup.Clear(drumTarget, s, n, p);
+            foreach (var ((s, n, p), v) in DrumFixed)
+                if (!XgDrumSetup.IsFixed(s, n, p) || XgDrumSetup.FixedValue(s, n, p) != v) XgDrumSetup.Set(drumTarget, s, n, p, v);
         }
     }
 }

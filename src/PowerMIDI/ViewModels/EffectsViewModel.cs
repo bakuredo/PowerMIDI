@@ -149,6 +149,18 @@ public sealed class EffectsViewModel : ObservableObject
     static readonly List<EffectChoice> Gm2ChorusTypes = IndexedChoices("Chorus 1", "Chorus 2", "Chorus 3", "Chorus 4", "FB Chorus", "Flanger");
     static readonly string[] Gm2Labels = { "Type", "Time", "Type", "Rate", "Depth", "Feedback", "To reverb" };
 
+    // XG Drums page: drum setup buttons (index DrumSetupIndex, value = setup), the note (DrumNoteIndex, value = note)
+    // and the parameters of that note in that setup (DrumParamBase + p, see XgDrumSetup).
+    const int DrumSetupIndex = 3000, DrumNoteIndex = 3001, DrumParamBase = 3010, DrumPartBase = 3100;   // + channel: part mode buttons
+    EffectBlockViewModel drumBlock;
+    readonly List<EffectChannelViewModel> drumSetupButtons = new();
+    readonly List<EffectChannelViewModel> drumPartButtons = new();
+    EffectListViewModel drumNote;
+    readonly EffectSliderViewModel[] drumParams = new EffectSliderViewModel[XgDrumSetup.Count];
+    int drumSetup, drumNoteNumber = 38;   // shown at start: setup 1, snare
+    string drumNotesKey = "";
+    long followedNoteOn;   // Follow: last note on already shown
+
     // Value of a GM2 parameter in its unit (formulas of the GM2 specification).
     static string FormatGm2(int p, int v) => v < 0 ? "auto" : p switch
     {
@@ -269,6 +281,31 @@ public sealed class EffectsViewModel : ObservableObject
         gm2Blocks.Add(gm2Reverb);
         gm2Blocks.Add(gm2Chorus);
 
+        // XG Drums page: a drum setup (buttons), a note of its kit, then the settings of that note: pitch, filter,
+        // envelope, output.
+        drumBlock = new EffectBlockViewModel { Title = "Drum setup", TabTitle = "Drums", ShowTitle = false, IsFirst = true, ChannelsLabel = "Drum setup",
+                                             PartsLabel = "Channels", HasFollow = true };
+        for (int s = 0; s < XgDrumSetup.Setups; s++)
+        {
+            var button = new EffectChannelViewModel(this, DrumSetupIndex, s, -1);
+            drumSetupButtons.Add(button);
+            drumBlock.Channels.Add(button);
+        }
+        for (int c = 0; c < 16; c++)
+        {
+            var button = new EffectChannelViewModel(this, DrumPartBase + c, c);
+            drumPartButtons.Add(button);
+            drumBlock.Parts.Add(button);
+        }
+        drumNote = new EffectListViewModel(this, DrumNoteIndex, Array.Empty<EffectChoice>()) { Label = "Note" };
+        drumBlock.Params.Add(drumNote);
+        for (int p = 0; p < XgDrumSetup.Count; p++)
+        {
+            drumParams[p] = new EffectSliderViewModel(this, DrumParamBase + p) { Label = XgDrumSetup.Names[p], Minimum = 0, Maximum = 127 };
+            drumBlock.Params.Add(drumParams[p]);
+        }
+        xgBlocks.Add(drumBlock);
+
         // Side by side, Reverb and Chorus both start at the top (same title margin).
         foreach (var group in new[] { gsBlocks, xgBlocks, gm2Blocks })
             if (group.Count >= 2) group[1].IsFirst = true;
@@ -324,11 +361,12 @@ public sealed class EffectsViewModel : ObservableObject
     public IEnumerable<EffectBlockViewModel> OtherBlocks => HasTabs ? new[] { selectedTabs[Blocks] } : Blocks.Skip(SideBlockCount);
 
     // GS and XG: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX;
-    // XG: Reverb, Chorus, Variation, Ins 1 to 4, EQ).
+    // XG: Reverb, Chorus, Variation, Ins 1 to 4, EQ, Drums).
     public bool HasTabs => Mode is "GS" or "XG";
     public IReadOnlyList<EffectBlockViewModel> Tabs =>
-        !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgBlocks.Take(XgBlocksWithoutInsertion).ToList() : Blocks;
-    // The XG insertion effects and Multi EQ are not offered with the MU Basic voice map: an XG Level 1 module has none.
+        !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgBlocks.Take(XgBlocksWithoutInsertion).Append(drumBlock).ToList() : Blocks;
+    // The XG insertion effects and Multi EQ are not offered with the MU Basic voice map: an XG Level 1 module has none
+    // (and only 2 drum setups).
     const int XgBlocksWithoutInsertion = 3;
     bool showInsertion = true;
     void RefreshTabs()
@@ -336,7 +374,8 @@ public sealed class EffectsViewModel : ObservableObject
         bool show = ChannelMixer.VoiceMap != ChannelMixer.VoiceMapBasic;
         if (show == showInsertion) return;
         showInsertion = show;
-        if (!show && xgBlocks.IndexOf(selectedTabs[xgBlocks]) >= XgBlocksWithoutInsertion) xgBlocks[0].IsSelected = true;
+        var selected = selectedTabs[xgBlocks];
+        if (!show && selected != drumBlock && xgBlocks.IndexOf(selected) >= XgBlocksWithoutInsertion) xgBlocks[0].IsSelected = true;
         OnPropertyChanged(nameof(Tabs));
     }
     readonly Dictionary<IReadOnlyList<EffectBlockViewModel>, EffectBlockViewModel> selectedTabs = new();
@@ -358,7 +397,8 @@ public sealed class EffectsViewModel : ObservableObject
 
     internal void SetEffect(int fx, int value)
     {
-        if (fx >= Gm2Base) Gm2Effects.Set(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base, value);
+        if (fx >= DrumSetupIndex) SetDrum(fx, value);
+        else if (fx >= Gm2Base) Gm2Effects.Set(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base, value);
         else if (fx >= Mt32Base) Mt32Effects.Set(ChannelMixer.Mt32Mode ? output() : null, fx - Mt32Base, value);
         else GsXgEffects.Set(output(), fx, value);
         Refresh();
@@ -366,13 +406,14 @@ public sealed class EffectsViewModel : ObservableObject
 
     internal void ClearEffect(int fx)
     {
-        if (fx >= Gm2Base) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base);
+        if (fx >= DrumSetupIndex) ClearDrum(fx);
+        else if (fx >= Gm2Base) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base);
         else if (fx >= Mt32Base) Mt32Effects.Clear(ChannelMixer.Mt32Mode ? output() : null, fx - Mt32Base);
         else GsXgEffects.Clear(output(), fx);
         Refresh();
     }
 
-    // Reset button: all effects return to the file values (types first), MT-32 and GM2 effects included.
+    // Reset button: all effects return to the file values (types first), MT-32 and GM2 effects and XG drum setups included.
     public void Reset()
     {
         var device = output();
@@ -384,6 +425,8 @@ public sealed class EffectsViewModel : ObservableObject
         foreach (bool typeFirst in new[] { true, false })
             for (int p = 0; p < Gm2Effects.Count; p++)
                 if (Gm2Effects.IsFixed(p) && Gm2Effects.IsType(p) == typeFirst) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? device : null, p);
+        XgDrumSetup.ClearPartMode(ChannelMixer.XgMode ? device : null);
+        XgDrumSetup.Clear(ChannelMixer.XgMode ? device : null);
         Refresh();
     }
 
@@ -398,6 +441,8 @@ public sealed class EffectsViewModel : ObservableObject
             if (Mt32Effects.IsFixed(p)) { Mt32Effects.Clear(null, p); had = true; }
         for (int p = 0; p < Gm2Effects.Count; p++)
             if (Gm2Effects.IsFixed(p)) { Gm2Effects.Clear(null, p); had = true; }
+        if (XgDrumSetup.HasFixed) { XgDrumSetup.Clear(null); had = true; }
+        if (XgDrumSetup.HasPartModes) { XgDrumSetup.ClearPartMode(null); had = true; }
         return had;
     }
 
@@ -612,6 +657,189 @@ public sealed class EffectsViewModel : ObservableObject
         }
     }
 
+    // ---------- XG Drums page ----------
+
+    void SetDrum(int fx, int value)
+    {
+        if (fx >= DrumPartBase) { SetDrumPart(fx - DrumPartBase, value == 1); return; }
+        if (fx == DrumSetupIndex)
+        {
+            if (value >= 0) drumSetup = value;
+            foreach (var button in drumSetupButtons) button.Key = "";   // pressed again: stays pressed
+        }
+        else if (fx == DrumNoteIndex) drumNoteNumber = value;
+        else XgDrumSetup.Set(ChannelMixer.XgMode ? output() : null, drumSetup, drumNoteNumber, fx - DrumParamBase, value);
+    }
+
+    // Right click: back to the file for a parameter, for the note (on the list) or for the whole setup (on its button).
+    void ClearDrum(int fx)
+    {
+        var device = ChannelMixer.XgMode ? output() : null;
+        if (fx >= DrumPartBase) XgDrumSetup.ClearPartMode(device, fx - DrumPartBase);
+        else         if (fx == DrumSetupIndex) XgDrumSetup.Clear(device, drumSetup);
+        else if (fx == DrumNoteIndex) XgDrumSetup.Clear(device, drumSetup, drumNoteNumber);
+        else XgDrumSetup.Clear(device, drumSetup, drumNoteNumber, fx - DrumParamBase);
+    }
+
+    // Channel button pressed: its part uses the drum setup shown (PART MODE DRUMS1..4). Released: back to the file's
+    // part mode if it is another one, otherwise DRUM for a part that plays a drum kit (bank MSB 126 / 127), NORMAL
+    // for the others.
+    void SetDrumPart(int channel, bool on)
+    {
+        var device = ChannelMixer.XgMode ? output() : null;
+        if (on) XgDrumSetup.SetPartMode(device, channel, 2 + drumSetup);
+        else if (XgDrumSetup.FilePartMode(channel) != 2 + drumSetup) XgDrumSetup.ClearPartMode(device, channel);
+        else XgDrumSetup.SetPartMode(device, channel, PlaysKit(channel) ? XgDrumSetup.Drum : XgDrumSetup.Normal);
+    }
+
+    static bool PlaysKit(int c) => (ChannelMixer.Override[c] ? ChannelMixer.OverrideMsb[c] : ChannelMixer.BankMsb[c]) is 126 or 127;
+
+    static string PartModeName(int mode) => mode switch { 0 => "normal", 1 => "drum", _ => $"drum setup {mode - 1}" };
+
+    public string DescribePartMode(int channel, int mode) => $"Part mode ch {channel + 1}: {PartModeName(mode)}";
+
+    // Note name in the Yamaha notation (C3 = 60).
+    static readonly string[] NoteNames = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+    static string NoteName(int n) => $"{NoteNames[n % 12]}{n / 12 - 2}";
+
+    // Channels of the parts assigned to a setup, and the kit they play (that of the first one playing a kit; Standard
+    // Kit if none).
+    static List<int> SetupChannels(int s) => Enumerable.Range(0, 16).Where(c => XgDrumSetup.SetupOf(c) == s).ToList();
+
+    (int Msb, int Program) SetupKit(int s)
+    {
+        var channels = SetupChannels(s);
+        if (channels.Count == 0) return (127, 0);
+        int c = channels.FirstOrDefault(PlaysKit, channels[0]);
+        return ChannelMixer.Override[c] ? (ChannelMixer.OverrideMsb[c], ChannelMixer.OverrideProgram[c]) : (ChannelMixer.BankMsb[c], ChannelMixer.Program[c]);
+    }
+
+    Dictionary<int, string> KitTones((int Msb, int Program) kit) =>
+        defs.XgDrumTones.TryGetValue(kit, out var tones) ? tones
+        : defs.XgDrumTones.TryGetValue((kit.Msb, 0), out tones) ? tones
+        : defs.XgDrumTones.GetValueOrDefault((127, 0), new Dictionary<int, string>());
+
+    // Value of a drum setup parameter: offsets -64..+63 (pitch in semitones / cents), pan L/C/R (0 = random),
+    // levels 0..127; -1 = depends on the note ("auto").
+    static string FormatDrum(int p, int v)
+    {
+        if (v < 0) return "auto";
+        if (XgDrumSetup.IsOffset(p))
+        {
+            int d = v - 64;
+            var text = d > 0 ? $"+{d}" : d.ToString();
+            return p == 0 ? $"{text} st" : p == 1 ? $"{text} ct" : text;
+        }
+        if (p == XgDrumSetup.Pan) return v == 0 ? "Rnd" : MixerViewModel.FormatControllerValue(1, v);
+        return v.ToString();
+    }
+
+    public string DescribeDrum(int s, int n, int p, int v) =>
+        $"Drum setup {s + 1} note {n} ({NoteName(n)}) {XgDrumSetup.Names[p]}: {FormatDrum(p, v)}";
+
+    // Drums page: setup buttons (the one shown pressed, blue when it has fixed values; setups 3-4 hidden with the MU
+    // Basic voice map), notes of the kit (fixed ones marked •) and the values of the note shown.
+    void RefreshDrums()
+    {
+        int setups = ChannelMixer.VoiceMap == ChannelMixer.VoiceMapBasic ? XgDrumSetup.Level1Setups : XgDrumSetup.Setups;
+        if (drumSetup >= setups) drumSetup = 0;
+        foreach (var button in drumSetupButtons)
+        {
+            int s = button.Part;
+            var channels = SetupChannels(s);
+            bool on = s == drumSetup, isFixed = XgDrumSetup.IsSetupFixed(s), visible = s < setups;
+            var key = $"{on}/{isFixed}/{visible}/{string.Join(",", channels)}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsChecked = on;
+                button.IsFixed = isFixed;
+                button.IsVisible = visible;
+                button.ToolTip = $"Drum setup {s + 1}: " + (channels.Count == 0 ? "no part" : "channel " + string.Join(", ", channels.Select(c => c + 1)));
+            }
+            finally { button.Updating = false; }
+        }
+
+        // Channels: pressed if their part uses the setup shown; blue when the part mode is chosen here.
+        for (int c = 0; c < 16; c++)
+        {
+            var button = drumPartButtons[c];
+            int mode = XgDrumSetup.PartMode(c);
+            bool on = mode == 2 + drumSetup, isFixed = XgDrumSetup.PartModeOverride[c] >= 0;
+            var key = $"{on}/{isFixed}/{mode}/{XgDrumSetup.FilePartMode(c)}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsChecked = on;
+                button.IsFixed = isFixed;
+                button.ToolTip = $"Channel {c + 1}: {PartModeName(mode)}" +
+                                 (isFixed ? $" (file: {PartModeName(XgDrumSetup.FilePartMode(c))})" : "");
+            }
+            finally { button.Updating = false; }
+        }
+
+        // Follow: the note shown is the last one played on a channel of the setup (a note of the kit).
+        if (drumBlock.Follow)
+        {
+            int last = -1;
+            long time = followedNoteOn;
+            for (int c = 0; c < 16; c++)
+                if (XgDrumSetup.SetupOf(c) == drumSetup && ChannelMixer.LastNoteOn[c] > time) { time = ChannelMixer.LastNoteOn[c]; last = c; }
+            if (last >= 0)
+            {
+                followedNoteOn = time;
+                int note = ChannelMixer.LastNoteNumber[last];
+                if (note is >= XgDrumSetup.FirstNote and <= XgDrumSetup.LastNote) drumNoteNumber = note;
+            }
+        }
+
+        var kit = SetupKit(drumSetup);
+        var fixedNotes = Enumerable.Range(XgDrumSetup.FirstNote, XgDrumSetup.LastNote - XgDrumSetup.FirstNote + 1)
+                                   .Where(n => XgDrumSetup.IsNoteFixed(drumSetup, n)).ToList();
+        var notesKey = $"{drumSetup}/{kit}/{string.Join(",", fixedNotes)}/{drumNoteNumber}";
+        if (notesKey != drumNotesKey)
+        {
+            drumNotesKey = notesKey;
+            var tones = KitTones(kit);
+            drumNote.Updating = true;
+            try
+            {
+                drumNote.Choices = Enumerable.Range(XgDrumSetup.FirstNote, XgDrumSetup.LastNote - XgDrumSetup.FirstNote + 1)
+                    .Select(n => new EffectChoice($"{n} {NoteName(n)}" + (tones.TryGetValue(n, out var name) ? $" · {name}" : "") +
+                                                  (fixedNotes.Contains(n) ? " •" : ""), n)).ToList();
+                drumNote.SelectedChoice = drumNote.Choices.FirstOrDefault(c => c.Value == drumNoteNumber);
+                drumNote.IsFixed = fixedNotes.Contains(drumNoteNumber);
+                drumNote.ToolTip = $"Kit: {defs.XgDrums.GetValueOrDefault(kit, "?")}. Right click: note back to file";
+            }
+            finally { drumNote.Updating = false; }
+        }
+
+        for (int p = 0; p < XgDrumSetup.Count; p++)
+        {
+            var slider = drumParams[p];
+            int v = XgDrumSetup.Value(drumSetup, drumNoteNumber, p), fileValue = XgDrumSetup.FileValue(drumSetup, drumNoteNumber, p);
+            bool isFixed = XgDrumSetup.IsFixed(drumSetup, drumNoteNumber, p);
+            var key = $"{v}/{isFixed}/{fileValue}";
+            if (key == slider.Key) continue;
+            slider.Key = key;
+            slider.Updating = true;
+            try
+            {
+                slider.IsFixed = isFixed;
+                slider.Value = v >= 0 ? v : XgDrumSetup.IsOffset(p) || p == XgDrumSetup.Pan ? 64 : 0;
+                slider.ValueText = FormatDrum(p, v);
+                slider.ValueState = isFixed ? ValueState.Fixed : v < 0 ? ValueState.Auto : ValueState.File;
+                slider.ToolTip = isFixed ? $"Fixed (file: {(fileValue < 0 ? "kit default" : FormatDrum(p, fileValue))})"
+                               : v < 0 ? "Kit default" : "File value";
+            }
+            finally { slider.Updating = false; }
+        }
+    }
+
     // XG Variation part (41) or part of an insertion effect (its second parameter).
     static bool IsXgPart(int fx) => fx == 41 || (GsXgEffects.IsInsertion(fx) && fx == GsXgEffects.InsertionType(fx) + 1);
 
@@ -646,6 +874,7 @@ public sealed class EffectsViewModel : ObservableObject
         RefreshGm2();
         RefreshTabs();
         RefreshPartButtons();
+        RefreshDrums();
         for (int fx = 0; fx < EffectCount; fx++)
         {
             var p = parameters[fx];

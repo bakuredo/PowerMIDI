@@ -513,6 +513,7 @@
       <!-- EFX on a channel: pressed = the part goes through the EFX; blue when fixed (dark if pressed, on a light background). -->
       <DataTemplate DataType="{x:Type vm:EffectChannelViewModel}">
         <ToggleButton Content="{Binding Number}" IsChecked="{Binding IsChecked}" ToolTip="{Binding ToolTip}"
+                      Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}"
                       Width="24" Height="22" Margin="0,0,4,4" FontSize="11" Padding="0">
           <ToggleButton.InputBindings>
             <MouseBinding MouseAction="RightClick" Command="{Binding ClearCommand}"/>
@@ -552,7 +553,18 @@
           <!-- Channel buttons: their label on its own line, so that they also fit in a half-width block. -->
           <DockPanel Margin="0,0,0,4" Visibility="{Binding HasChannels, Converter={StaticResource BoolToVisibility}}">
             <TextBlock DockPanel.Dock="Top" Text="{Binding ChannelsLabel}" Margin="8,3,0,5"/>
+            <ToggleButton DockPanel.Dock="Right" Content="Follow" IsChecked="{Binding Follow}" VerticalAlignment="Top"
+                          Padding="9,2" Height="22" Margin="0,0,0,4" FontSize="12" ToolTip="Note list follows notes played"
+                          Visibility="{Binding HasFollow, Converter={StaticResource BoolToVisibility}}"/>
             <ItemsControl ItemsSource="{Binding Channels}" Margin="8,0,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+            </ItemsControl>
+          </DockPanel>
+          <DockPanel Margin="0,0,0,4" Visibility="{Binding HasParts, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock DockPanel.Dock="Top" Text="{Binding PartsLabel}" Margin="8,3,0,5"/>
+            <ItemsControl ItemsSource="{Binding Parts}" Margin="8,0,0,0">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>

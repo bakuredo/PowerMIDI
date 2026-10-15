@@ -13,7 +13,7 @@ namespace PowerMIDI.Core;
 // then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
 // - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
 // - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
-//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects).
+//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup).
 public static class MidiFileEditor
 {
     // GS Reset, XG System On, GM / GM2 On or MT-32 Reset.
@@ -428,13 +428,70 @@ public static class MidiFileEditor
         return string.Format("GM2 effects: {0} SysEx written after the reset, {1} SysEx of the file corrected", written, corrected);
     }
 
+    // XG mode: writes the drum setup values fixed in the interface (XgDrumSetup):
+    // - right after the reset, and again after each event that resets a setup with fixed values (Program Change
+    //   on a part assigned to it, Drum Setup Reset);
+    // - the file's drum setup SysEx and NRPN that write a fixed value are corrected;
+    // - the part modes chosen in the interface: written after the reset, and the file's ones corrected.
+    // The setup of each part is its last PART MODE in the file (part 10: Drum Setup 1 by default), or the one chosen.
+    public static string WriteXgDrumSetup(MidiFile file)
+    {
+        var modes = new int[16];
+        modes[9] = 2;
+        foreach (var e in file.GetTrackChunks().SelectMany(c => c.Events).OfType<SysExEvent>())
+        {
+            var d = e.Data;
+            int channel = ChannelMixer.MultiPartChannel(d);
+            if (channel < 0) continue;
+            for (int pos = 6; pos < d.Length - 1; pos++)
+                if (d[5] + pos - 6 == 0x07) modes[channel] = d[pos];
+        }
+        for (int c = 0; c < 16; c++) if (XgDrumSetup.PartModeOverride[c] >= 0) modes[c] = XgDrumSetup.PartModeOverride[c];
+        int SetupOf(int channel) => modes[channel] is >= 2 and <= 5 ? modes[channel] - 2 : -1;
+        IEnumerable<MidiEvent> Again(int s) => s >= 0 && XgDrumSetup.IsSetupFixed(s) ? XgDrumSetup.FixedEvents(s) : Enumerable.Empty<MidiEvent>();
+
+        var nrpn = new XgDrumSetup.NrpnState();
+        var (written, corrected) = WriteFixed(file, e =>
+        {
+            switch (e)
+            {
+                case SysExEvent sysEx:
+                    int part = ChannelMixer.MultiPartChannel(sysEx.Data);
+                    var data = part >= 0 ? ChannelMixer.ReplaceMultiPart(sysEx.Data, null, _ => -1, XgDrumSetup.PartModeOverride[part])
+                                         : XgDrumSetup.WithFixedValues(sysEx.Data);
+                    return (data != null ? new NormalSysExEvent(data) : null, Again(XgDrumSetup.ResetSetupOf(sysEx.Data)));
+                case ProgramChangeEvent pc:
+                    return (null, Again(SetupOf(pc.Channel)));
+                case ControlChangeEvent cc when nrpn.Read(cc, SetupOf) is var (s, n, ps):
+                    var fixedCc = XgDrumSetup.FixNrpn(s, n, ps, cc, out var again);
+                    return (fixedCc, again != null ? new[] { again } : Enumerable.Empty<MidiEvent>());
+            }
+            return (null, Enumerable.Empty<MidiEvent>());
+        }, () => XgDrumSetup.PartModeEvents().Concat(XgDrumSetup.FixedEvents()));
+        return string.Format("XG drum setup: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
+    }
+
     // Writes SysEx effect values fixed in the interface: the messages of fixedEvents right after the last reset,
     // and the file's own SysEx recognized by read (which lists the positions of their values) corrected by
     // withFixedValues (null = unchanged), followed by the messages of after (optional) if it returns any.
     // Returns the number of messages written and corrected.
     static (int Written, int Corrected) WriteFixedSysEx(MidiFile file, Func<byte[], List<(int Position, int Param)>, bool> read,
         Func<byte[], List<(int Position, int Param)>, byte[]> withFixedValues, Func<IEnumerable<MidiEvent>> fixedEvents,
-        Func<List<(int Position, int Param)>, IEnumerable<MidiEvent>> after = null)
+        Func<List<(int Position, int Param)>, IEnumerable<MidiEvent>> after = null) =>
+        WriteFixed(file, e =>
+        {
+            var positions = new List<(int Position, int Param)>();
+            if (e is not SysExEvent sysEx || !read(sysEx.Data, positions)) return (null, Enumerable.Empty<MidiEvent>());
+            var data = withFixedValues(sysEx.Data, positions);
+            return (data != null ? new NormalSysExEvent(data) : null,
+                    after != null && positions.Count > 0 ? after(positions) : Enumerable.Empty<MidiEvent>());
+        }, fixedEvents);
+
+    // Writes values fixed in the interface: the messages of fixedEvents right after the last reset; each event of the
+    // file goes through process, which returns the message to write instead (null = unchanged) and the messages to
+    // write right after it. Returns the number of messages written and corrected.
+    static (int Written, int Corrected) WriteFixed(MidiFile file, Func<MidiEvent, (MidiEvent Replacement, IEnumerable<MidiEvent> After)> process,
+        Func<IEnumerable<MidiEvent>> fixedEvents)
     {
         int tpqn = 480;
         var division = file.TimeDivision as TicksPerQuarterNoteTimeDivision;
@@ -463,20 +520,14 @@ public static class MidiFileEditor
             foreach (var original in timedByChunk[k])
             {
                 var t = original;
-                var sysEx = t.Event as SysExEvent;
-                var positions = new List<(int Position, int Param)>();
-                if (sysEx != null && read(sysEx.Data, positions))
-                {
-                    var data = withFixedValues(sysEx.Data, positions);
-                    if (data != null) { t = new TimedEvent(new NormalSysExEvent(data), t.Time); corrected++; }
-                }
+                var (replacement, after) = process(t.Event);
+                if (replacement != null) { t = new TimedEvent(replacement, t.Time); corrected++; }
                 items.Add(new Item { Event = t, Priority = IsReset(t.Event) ? 0 : 2, Index = items.Count });
-                if (after != null && positions.Count > 0)
-                    foreach (var e in after(positions))
-                    {
-                        items.Add(new Item { Event = new TimedEvent(e, t.Time), Priority = 2, Index = items.Count });
-                        written++;
-                    }
+                foreach (var e in after)
+                {
+                    items.Add(new Item { Event = new TimedEvent(e, t.Time), Priority = 2, Index = items.Count });
+                    written++;
+                }
             }
             if (k == resetChunk)
             {

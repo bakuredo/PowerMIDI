@@ -81,8 +81,27 @@ public static class ChannelMixer
             catch { }   // port closed in meantime
         });
     }
+
+    // Messages to send right after the one being played (the callback returns only one), e.g. the fixed values of a
+    // drum setup that the event played has just reset.
+    static void SendLater(params MidiEvent[] events)
+    {
+        var device = Device;
+        if (device == null || events.Length == 0) return;
+        System.Threading.Tasks.Task.Delay(20).ContinueWith(_ =>
+        {
+            try { foreach (var e in events) device.SendEvent(e); }
+            catch { }   // port closed in meantime
+        });
+    }
+
+    static void SendDrumSetupLater(int setup)
+    {
+        if (setup >= 0) SendLater(XgDrumSetup.FixedEvents(setup).ToArray());
+    }
     public static readonly bool[] Muted = new bool[16];
     public static readonly long[] LastNoteOn = new long[16]; // DateTime.UtcNow.Ticks, for LEDs
+    public static readonly int[] LastNoteNumber = new int[16];  // its note (XG Drums page: Follow)
     public static readonly int[] Program = new int[16];      // last Program Change (0..127)
     public static readonly int[] BankMsb = new int[16];      // CC0
     public static readonly int[] BankLsb = new int[16];      // CC32
@@ -151,6 +170,7 @@ public static class ChannelMixer
         Mt32Patches.ResetFile();
         Gm2Effects.ResetFile();
         GsXgEffects.ResetFile();
+        XgDrumSetup.ResetFile();
     }
 
     // GS DT1 SysEx "Use for Rhythm Part": F0 41 dev 42 12 40 1x 15 vv sum F7.
@@ -214,6 +234,7 @@ public static class ChannelMixer
         GsXgEffects.Apply(device);
         if (Mt32Mode) Mt32Effects.Apply(device);
         if (Gm2Mode) Gm2Effects.Apply(device);
+        if (XgMode) XgDrumSetup.Apply(device);
     }
 
     public static int FileValue(int k, int channel) { return FileCc[k, channel]; }
@@ -289,8 +310,9 @@ public static class ChannelMixer
     };
 
     // Multi Part SysEx with its values replaced: instrument (bank MSB, LSB, program; null = the file's) and
-    // controllers (controller(k) = value to write, -1 = the file's). Returns null if nothing changes.
-    public static byte[] ReplaceMultiPart(byte[] d, (int Msb, int Lsb, int Program)? instrument, Func<int, int> controller)
+    // controllers (controller(k) = value to write, -1 = the file's) and part mode (-1 = the file's). Returns null if
+    // nothing changes.
+    public static byte[] ReplaceMultiPart(byte[] d, (int Msb, int Lsb, int Program)? instrument, Func<int, int> controller, int partMode = -1)
     {
         byte[] data = null;
         for (int pos = 6; pos < d.Length - 1; pos++)
@@ -299,6 +321,7 @@ public static class ChannelMixer
             int value = address == 0x01 && instrument != null ? instrument.Value.Msb
                       : address == 0x02 && instrument != null ? instrument.Value.Lsb
                       : address == 0x03 && instrument != null ? instrument.Value.Program
+                      : address == 0x07 ? partMode
                       : k >= 0 ? controller(k) : -1;
             if (value < 0 || value == d[pos]) continue;
             data ??= (byte[])d.Clone();
@@ -319,11 +342,12 @@ public static class ChannelMixer
             else if (address == 0x01) BankMsb[channel] = d[pos];
             else if (address == 0x02) BankLsb[channel] = d[pos];
             else if (address == 0x03) Program[channel] = d[pos];
+            else if (address == 0x07) XgDrumSetup.ReadPartMode(channel, d[pos]);
             if (address is >= 0x01 and <= 0x03) Used[channel] = SysExPatch[channel] = true;
         }
         var data = ReplaceMultiPart(d,
             Override[channel] ? (OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel]) : null,
-            k => Sent(k, channel));
+            k => Sent(k, channel), XgDrumSetup.PartModeOverride[channel]);
         return data != null ? new NormalSysExEvent(data) : null;
     }
 
@@ -425,6 +449,16 @@ public static class ChannelMixer
                 case PortamentoSwitch:
                     filePortamento[channel] = cc.ControlValue;
                     return Cc(channel, PortamentoSwitch, PortamentoSwitchValue(channel));
+                case 99:
+                case 98:
+                case 101:
+                case 100:
+                case 6:
+                    // XG drum setup NRPN: stored, and replaced by the values fixed in the Effects tab.
+                    if (!XgMode) break;
+                    var drum = XgDrumSetup.ReadController(cc, out var again);
+                    if (again != null) SendLater(again);
+                    return drum ?? e;
             }
             return e;
         }
@@ -435,6 +469,7 @@ public static class ChannelMixer
             Program[channel] = pc.ProgramNumber;
             if (Mt32Mode) Mt32Patches.ProgramChanged(channel);
             Used[channel] = true;
+            if (XgMode) SendDrumSetupLater(XgDrumSetup.ProgramChanged(channel));
             if (Override[channel])
             {
                 NoteSentProgram(channel, OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel]);
@@ -502,6 +537,12 @@ public static class ChannelMixer
                 var gm2 = Gm2Effects.Read(d);
                 if (gm2 != null) return gm2;
             }
+            if (XgMode)
+            {
+                var drum = XgDrumSetup.Read(d, out int drumReset);
+                SendDrumSetupLater(drumReset);
+                if (drum != null) return drum;
+            }
             var multiPart = ReadMultiPart(d);
             if (multiPart != null) return multiPart;
             var effect = GsXgEffects.Read(d);
@@ -515,6 +556,7 @@ public static class ChannelMixer
     // Notes do not go through EventCallback: DryWetMIDI plays them via NoteCallback.
     public static NotePlaybackData NoteCallback(NotePlaybackData note, long rawTime, long rawLength, TimeSpan playbackTime)
     {
+        LastNoteNumber[note.Channel] = note.NoteNumber;
         LastNoteOn[note.Channel] = DateTime.UtcNow.Ticks;
         Used[note.Channel] = true;
         return note;
@@ -554,6 +596,8 @@ public static class ChannelMixer
         device.SendEvent(Cc(channel, 0, msb));
         device.SendEvent(Cc(channel, 32, lsb));
         device.SendEvent(Pc(channel, program));
+        // XG: the Program Change has reset the drum setup of the part; its fixed values are written again.
+        if (XgMode && XgDrumSetup.ProgramChanged(channel) is int setup and >= 0) XgDrumSetup.Apply(device, setup);
     }
 
     // Forces an instrument on a channel and sends it to module immediately.

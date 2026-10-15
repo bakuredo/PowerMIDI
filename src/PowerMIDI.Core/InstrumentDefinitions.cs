@@ -91,6 +91,7 @@ public sealed class InstrumentDefinitions
     public readonly Dictionary<(int Msb, int Program), string> XgDrums = new();
     public readonly HashSet<(int Msb, int Lsb, int Program)> XgMu50Voices = new();   // voices the MU50 also has
     public readonly HashSet<(int Msb, int Program)> XgMu50Drums = new();             // and its drum kits
+    public readonly Dictionary<(int Msb, int Program), Dictionary<int, string>> XgDrumTones = new();   // names of the notes of each kit
     public Dictionary<int, EffectTypeDef> EfxTypes = new();
     public Dictionary<int, EffectTypeDef> XgReverbTypes = new();
     public Dictionary<int, EffectTypeDef> XgChorusTypes = new();
@@ -190,6 +191,8 @@ public sealed class InstrumentDefinitions
                             var key = (int.Parse(Attr(bank, "MSB")), int.Parse(Attr(pc, "PC")) - 1);
                             defs.XgDrums[key] = Attr(pc, "Name");
                             if (Attr(bank, "MU50") == "1") defs.XgMu50Drums.Add(key);
+                            var tones = defs.XgDrumTones[key] = new();
+                            foreach (var tone in Children(bank, "Tone")) tones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
                         }
             defs.XgReverbTypes = ReadXgEffectDefinitions(x, "00", "Reverb Parameter");
             defs.XgChorusTypes = ReadXgEffectDefinitions(x, "20", "Chorus Parameter");
