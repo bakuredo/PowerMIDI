@@ -204,6 +204,8 @@ public static class ChannelMixer
         XgPartParams.ResetFile();
         GsDrumMap.ResetFile();
         GsPartParams.ResetFile();
+        Gm2DrumParams.ResetFile();
+        Gm2PartParams.ResetFile();
         nrpn.Reset();
     }
 
@@ -267,7 +269,7 @@ public static class ChannelMixer
     {
         GsXgEffects.Apply(device);
         if (Mt32Mode) Mt32Effects.Apply(device);
-        if (Gm2Mode) Gm2Effects.Apply(device);
+        if (Gm2Mode) { Gm2Effects.Apply(device); Gm2DrumParams.Apply(device); Gm2PartParams.Apply(device); }
         if (XgMode) { XgDrumSetup.Apply(device); XgPartParams.Apply(device); }
         if (GsMode) { GsDrumMap.Apply(device); GsPartParams.Apply(device); }
     }
@@ -489,11 +491,19 @@ public static class ChannelMixer
                 case 101:
                 case 100:
                 case 6:
-                    // XG drum setup and part NRPN, pitch bend range RPN, GS drum map NRPN: stored, and replaced by the
-                    // values fixed in the Effects tab.
-                    if (!(XgMode || GsMode) || nrpn.Read(cc) is not { } entry) break;
+                case 38:
+                    // XG drum setup and part NRPN, GS drum map NRPN, RPN (pitch bend range, tuning, GM2 modulation
+                    // depth range): stored, and replaced by the values fixed in the Effects tab.
+                    if (!(XgMode || GsMode || Gm2Mode) || nrpn.Read(cc) is not { } entry) break;
                     if (GsMode) return GsDrumMap.ReadNrpn(cc, entry) ?? GsPartParams.ReadDataEntry(cc, entry) ?? e;
-                    var entered = XgDrumSetup.ReadNrpn(cc, entry, out var again);
+                    MidiEvent again;
+                    if (Gm2Mode)
+                    {
+                        var rpn = Gm2PartParams.ReadDataEntry(cc, entry, out again);
+                        if (again != null) SendLater(again);
+                        return rpn ?? e;
+                    }
+                    var entered = XgDrumSetup.ReadNrpn(cc, entry, out again);
                     if (entered == null && again == null) entered = XgPartParams.ReadDataEntry(cc, entry, out again);
                     if (again != null) SendLater(again);
                     return entered ?? e;
@@ -515,6 +525,8 @@ public static class ChannelMixer
             Used[channel] = true;
             if (XgMode) SendDrumSetupLater(XgDrumSetup.ProgramChanged(channel));
             if (GsMode) SendGsDrumMapLater(GsDrumMap.ProgramChanged(channel));
+            // GM2: the Key-Based Instrument Control values of a new kit are written again.
+            if (Gm2Mode && Gm2DrumParams.IsChannelFixed(channel)) SendLater(Gm2DrumParams.FixedEvents(channel).ToArray());
             if (Override[channel])
             {
                 NoteSentProgram(channel, OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel]);
@@ -579,6 +591,7 @@ public static class ChannelMixer
             }
             if (Gm2Mode)
             {
+                if (Gm2DrumParams.Read(d) is { } drum) return drum;
                 var gm2 = Gm2Effects.Read(d);
                 if (gm2 != null) return gm2;
             }
@@ -653,6 +666,7 @@ public static class ChannelMixer
         // XG: the Program Change has reset the drum setup of the part; its fixed values are written again.
         if (XgMode && XgDrumSetup.ProgramChanged(channel) is int setup and >= 0) XgDrumSetup.Apply(device, setup);
         if (GsMode && GsDrumMap.ProgramChanged(channel) is int map and >= 0) foreach (var e in GsDrumMap.FixedEvents(map)) device.SendEvent(e);
+        if (Gm2Mode && Gm2DrumParams.IsChannelFixed(channel)) foreach (var e in Gm2DrumParams.FixedEvents(channel)) device.SendEvent(e);
     }
 
     // Forces an instrument on a channel and sends it to module immediately.

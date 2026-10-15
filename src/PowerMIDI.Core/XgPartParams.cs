@@ -147,7 +147,7 @@ public static class XgPartParams
 
     // Parameter written by a data entry: an NRPN 01 xx, or the RPN 00 00 (bend range); -1 if none.
     public static int ParamOf(DataEntry entry) =>
-        entry.Rpn ? (entry.Msb == 0 && entry.Lsb == 0 ? BendRange : -1)
+        entry.Fine ? -1 : entry.Rpn ? (entry.Msb == 0 && entry.Lsb == 0 ? BendRange : -1)
         : entry.Msb == 0x01 ? Array.FindIndex(Params, x => x.Nrpn == entry.Lsb) : -1;
 
     // Value of the parameter written by a data entry: the bend range in semitones (0..24) becomes 40h + range.

@@ -41,7 +41,9 @@ public sealed partial class MainViewModel
         bool partEq = Mixer.Standard == "XG" && XgPartParams.HasFixed;      // XG part settings
         bool gsDrums = Mixer.Standard == "GS" && GsDrumMap.HasFixed;       // GS drum maps
         bool gsPart = Mixer.Standard == "GS" && GsPartParams.HasFixed;     // GS part settings
-        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && !gsDrums && !gsPart && insertions.Count == 0)
+        bool gm2Drums = Mixer.Standard == "GM2" && Gm2DrumParams.HasFixed; // GM2 drum settings
+        bool gm2Part = Mixer.Standard == "GM2" && Gm2PartParams.HasFixed;  // GM2 part settings (RPN)
+        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && !gsDrums && !gsPart && !gm2Drums && !gm2Part && insertions.Count == 0)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
@@ -92,6 +94,8 @@ public sealed partial class MainViewModel
         if (partEq) report.Add(MidiFileEditor.WriteXgPartParams(midi));
         if (gsDrums) report.Add(MidiFileEditor.WriteGsDrumMap(midi));
         if (gsPart) report.Add(MidiFileEditor.WriteGsPartParams(midi));
+        if (gm2Drums) report.Add(MidiFileEditor.WriteGm2DrumParams(midi));
+        if (gm2Part) report.Add(MidiFileEditor.WriteGm2PartParams(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
         if (forceMode != null)
         {
@@ -146,6 +150,8 @@ public sealed partial class MainViewModel
         foreach (var (c, p, v) in XgPartParams.Fixed()) parts.Add($"pe{c}/{p}={v}");
         foreach (var (m, n, p, v) in GsDrumMap.Fixed()) parts.Add($"gd{m}/{n}/{p}={v}");
         foreach (var (c, p, v) in GsPartParams.Fixed()) parts.Add($"gp{c}/{p}={v}");
+        foreach (var (c, n, p, v) in Gm2DrumParams.Fixed()) parts.Add($"kd{c}/{n}/{p}={v}");
+        foreach (var (c, p, v) in Gm2PartParams.Fixed()) parts.Add($"rp{c}/{p}={v}");
         if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");
         if (withInsertions) foreach (var insertion in insertions) parts.Add($"ins{insertion.Tick}={insertion.Description}");
         return string.Join(";", parts);

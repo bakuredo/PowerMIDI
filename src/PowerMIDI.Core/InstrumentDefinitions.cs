@@ -82,6 +82,7 @@ public sealed class InstrumentDefinitions
     public readonly Dictionary<int, string> GmDrums = new();
     public readonly Dictionary<(int Lsb, int Program), string> Gm2Voices = new();   // bank MSB 121
     public readonly Dictionary<int, string> Gm2Drums = new();                         // bank MSB 120
+    public readonly Dictionary<int, Dictionary<int, string>> Gm2DrumTones = new();   // names of the notes of each kit
     public const int Gm2MelodicMsb = 121, Gm2DrumMsb = 120;
     public readonly Dictionary<int, string> Mt32Voices = new();   // 128 preset patches (no banks on an MT-32)
     public readonly Dictionary<int, string> Mt32Drums = new();    // the rhythm part
@@ -136,7 +137,12 @@ public sealed class InstrumentDefinitions
                 foreach (var bank in Children(pc, "Bank"))
                     defs.Gm2Voices[(int.Parse(Attr(bank, "LSB")), int.Parse(Attr(pc, "PC")) - 1)] = Attr(bank, "Name");
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/DrumSetList/Map/PC"))
-                defs.Gm2Drums[int.Parse(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
+            {
+                int program = int.Parse(Attr(pc, "PC")) - 1;
+                defs.Gm2Drums[program] = Attr(pc, "Name");
+                var tones = defs.Gm2DrumTones[program] = new();
+                foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) tones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
+            }
         }
 
         var mt32File = Path.Combine(dir, "MT-32.xml");

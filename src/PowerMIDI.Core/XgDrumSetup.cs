@@ -243,7 +243,7 @@ public static class XgDrumSetup
     public static (int Setup, int Note, List<int> Params)? NrpnParams(int channel, DataEntry nrpn, Func<int, int> setupOf)
     {
         int s = setupOf(channel);
-        if (s < 0 || nrpn.Rpn) return null;
+        if (s < 0 || nrpn.Rpn || nrpn.Fine) return null;
         var ps = Enumerable.Range(0, Count).Where(p => NrpnMsb[p] == nrpn.Msb).ToList();
         return ps.Count > 0 ? (s, nrpn.Lsb, ps) : null;
     }

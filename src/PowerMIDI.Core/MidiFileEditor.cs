@@ -13,7 +13,7 @@ namespace PowerMIDI.Core;
 // then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
 // - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
 // - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
-//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams, WriteGsDrumMap, WriteGsPartParams).
+//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams, WriteGsDrumMap, WriteGsPartParams, WriteGm2DrumParams, WriteGm2PartParams).
 public static class MidiFileEditor
 {
     // GS Reset, XG System On, GM / GM2 On or MT-32 Reset.
@@ -517,6 +517,40 @@ public static class MidiFileEditor
             _ => (null, none),
         }, GsPartParams.FixedEvents);
         return string.Format("GS part settings: {0} SysEx written after the reset, {1} message(s) of the file corrected", written, corrected);
+    }
+
+    // GM2 mode: writes the Key-Based Instrument Control values fixed in the interface (Gm2DrumParams): right after the
+    // reset, and again after each Program Change on a channel with fixed values (a new kit); the file's own messages
+    // that write a fixed value are corrected.
+    public static string WriteGm2DrumParams(MidiFile file)
+    {
+        var none = Enumerable.Empty<MidiEvent>();
+        var (written, corrected) = WriteFixed(file, e => e switch
+        {
+            SysExEvent sysEx when Gm2DrumParams.WithFixedValues(sysEx.Data) is { } data => (new NormalSysExEvent(data), none),
+            ProgramChangeEvent pc when Gm2DrumParams.IsChannelFixed(pc.Channel) => (null, Gm2DrumParams.FixedEvents(pc.Channel)),
+            _ => (null, none),
+        }, Gm2DrumParams.FixedEvents);
+        return string.Format("GM2 drum settings: {0} SysEx written, {1} SysEx of the file corrected", written, corrected);
+    }
+
+    // GM2 mode: writes the RPN values fixed in the interface (Gm2PartParams, Effects tab, Part page) right after the
+    // reset; the file's data entries that write a fixed value are corrected (with the fixed LSB after a modulation depth
+    // range MSB).
+    public static string WriteGm2PartParams(MidiFile file)
+    {
+        var nrpn = new NrpnState();
+        var none = Enumerable.Empty<MidiEvent>();
+        var (written, corrected) = WriteFixed(file, e =>
+        {
+            if (e is not ControlChangeEvent cc || nrpn.Read(cc) is not { } entry) return (null, none);
+            var fixedCc = Gm2PartParams.FixDataEntry(cc, entry);
+            int p = Gm2PartParams.ParamOf(entry);
+            bool lsbAfter = fixedCc != null && p == Gm2PartParams.ModDepthRange && !entry.Fine;
+            return (fixedCc, lsbAfter ? new MidiEvent[] { new ControlChangeEvent((SevenBitNumber)38,
+                (SevenBitNumber)(Gm2PartParams.FixedValue(cc.Channel, p) & 0x7F)) { Channel = cc.Channel } } : none);
+        }, Gm2PartParams.FixedEvents);
+        return string.Format("GM2 part settings: {0} message(s) written, {1} message(s) of the file corrected", written, corrected);
     }
 
     // XG mode: writes the part values fixed in the interface (XgPartParams, Effects tab, Part page) as SysEx right after

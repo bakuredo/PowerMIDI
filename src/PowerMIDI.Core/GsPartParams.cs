@@ -153,7 +153,7 @@ public static class GsPartParams
 
     // Parameter written by a data entry: RPN 00 00 (bend range) or 00 01 (fine tuning); -1 if none.
     public static int ParamOf(DataEntry entry) =>
-        !entry.Rpn || entry.Msb != 0 ? -1 : entry.Lsb == 0 ? BendRange : entry.Lsb == 1 ? FineTune : -1;
+        !entry.Rpn || entry.Fine || entry.Msb != 0 ? -1 : entry.Lsb == 0 ? BendRange : entry.Lsb == 1 ? FineTune : -1;
 
     static int FromDataEntry(int p, int value) => p == BendRange ? 0x40 + Math.Min(value, 24) : value;
 

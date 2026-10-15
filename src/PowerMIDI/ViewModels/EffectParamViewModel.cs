@@ -136,9 +136,6 @@ public sealed class EffectChannelViewModel : EffectParamViewModel
     }
 }
 
-// Two blocks of the Effects tab shown side by side.
-public sealed record EffectBlockPair(EffectBlockViewModel Left, EffectBlockViewModel Right);
-
 // Block of the Effects tab (Reverb, Chorus, Delay, EFX, Variation): its title, its parameters and,
 // for the EFX (and the MT-32 reverb), the channel (part) buttons.
 public sealed class EffectBlockViewModel : ObservableObject

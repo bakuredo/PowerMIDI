@@ -186,7 +186,7 @@ public static class GsDrumMap
     public static (int Map, int Note, int Param)? NrpnParam(int channel, DataEntry entry, Func<int, int> mapOf)
     {
         int m = mapOf(channel), p = Array.IndexOf(NrpnMsb, entry.Msb);
-        return m < 0 || entry.Rpn || p < 0 ? null : (m, entry.Lsb, p);
+        return m < 0 || entry.Rpn || entry.Fine || p < 0 ? null : (m, entry.Lsb, p);
     }
 
     // Data entry with the fixed value (null = unchanged).

@@ -429,8 +429,7 @@
     </TabItem>
     <TabItem Header="Effects" DataContext="{Binding Effects}" d:DataContext="{d:DesignInstance vm:EffectsViewModel}">
     <TabItem.Resources>
-      <!-- Widths of the label and value columns of a parameter row: full width blocks. The Reverb / Chorus blocks,
-           side by side, override them with narrower ones (see below). -->
+      <!-- Widths of the label and value columns of a parameter row (blocks at full width). -->
       <GridLength x:Key="FxLabelWidth">180</GridLength>
       <GridLength x:Key="FxValueWidth">66</GridLength>
 
@@ -638,28 +637,7 @@
       </ItemsControl>
       <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel IsEnabled="{Binding IsAvailable}" Margin="0,0,6,0">
-          <!-- Blocks side by side, two per row (GM2: Reverb | Chorus), with
-               narrower label and value columns. -->
-          <ItemsControl ItemsSource="{Binding SideRows}" Focusable="False">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate DataType="{x:Type vm:EffectBlockPair}">
-                <Grid>
-                  <Grid.Resources>
-                    <GridLength x:Key="FxLabelWidth">84</GridLength>
-                    <GridLength x:Key="FxValueWidth">56</GridLength>
-                  </Grid.Resources>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                  </Grid.ColumnDefinitions>
-                  <ContentControl Content="{Binding Left}" Focusable="False"/>
-                  <ContentControl Grid.Column="2" Content="{Binding Right}" Focusable="False"/>
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <!-- The other blocks (the GS or XG block of the tab strip; the MT-32 reverb alone) at full width. -->
+          <!-- The block of the tab strip (GS, XG, GM2) or the MT-32 reverb alone, at full width. -->
           <ItemsControl ItemsSource="{Binding OtherBlocks}"/>
         </StackPanel>
       </ScrollViewer>
