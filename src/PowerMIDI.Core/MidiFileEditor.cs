@@ -13,7 +13,7 @@ namespace PowerMIDI.Core;
 // then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
 // - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
 // - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
-//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams).
+//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams, WriteGsDrumMap, WriteGsPartParams).
 public static class MidiFileEditor
 {
     // GS Reset, XG System On, GM / GM2 On or MT-32 Reset.
@@ -469,6 +469,54 @@ public static class MidiFileEditor
             return (null, Enumerable.Empty<MidiEvent>());
         }, () => XgDrumSetup.PartModeEvents().Concat(XgDrumSetup.FixedEvents()));
         return string.Format("XG drum setup: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
+    }
+
+    // GS mode: writes the drum map values fixed in the interface (GsDrumMap): right after the reset, and again after
+    // each Program Change on a channel of a drum part with fixed values (the module initializes its map); the file's
+    // drum map SysEx and NRPN that write a fixed value are corrected. The drum part of each channel is its last Use for
+    // Rhythm Part in the file (channel 10: drum part 1 by default), or the one chosen in the Mixer.
+    public static string WriteGsDrumMap(MidiFile file)
+    {
+        var rhythm = new int[16];
+        rhythm[9] = 1;
+        foreach (var e in file.GetTrackChunks().SelectMany(c => c.Events).OfType<SysExEvent>())
+            if (ChannelMixer.RhythmPartChannel(e.Data) is int channel and >= 0) rhythm[channel] = e.Data[7];
+        for (int c = 0; c < 16; c++) if (ChannelMixer.RhythmOverride[c] >= 0) rhythm[c] = ChannelMixer.RhythmOverride[c];
+        int MapOf(int channel) => rhythm[channel] is 1 or 2 ? rhythm[channel] - 1 : -1;
+
+        var nrpn = new NrpnState();
+        var none = Enumerable.Empty<MidiEvent>();
+        var (written, corrected) = WriteFixed(file, e =>
+        {
+            switch (e)
+            {
+                case SysExEvent sysEx when GsDrumMap.WithFixedValues(sysEx.Data) is { } data:
+                    return (new NormalSysExEvent(data), none);
+                case ProgramChangeEvent pc when MapOf(pc.Channel) is int m and >= 0 && GsDrumMap.IsMapFixed(m):
+                    return (null, GsDrumMap.FixedEvents(m));
+                case ControlChangeEvent cc when nrpn.Read(cc) is { } entry && GsDrumMap.NrpnParam(cc.Channel, entry, MapOf) is var (m, n, p):
+                    return (GsDrumMap.FixNrpn(m, n, p, cc), none);
+            }
+            return (null, none);
+        }, GsDrumMap.FixedEvents);
+        return string.Format("GS drum map: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
+    }
+
+    // GS mode: writes the part values fixed in the interface (GsPartParams, Effects tab, Part page) as DT1 right after
+    // the reset; the file's part DT1, pitch bend range / fine tuning RPN and mono / poly messages that write a fixed
+    // value are corrected.
+    public static string WriteGsPartParams(MidiFile file)
+    {
+        var nrpn = new NrpnState();
+        var none = Enumerable.Empty<MidiEvent>();
+        var (written, corrected) = WriteFixed(file, e => e switch
+        {
+            SysExEvent sysEx when GsPartParams.WithFixedValues(sysEx.Data) is { } data => (new NormalSysExEvent(data), none),
+            ControlChangeEvent cc when (int)cc.ControlNumber is 126 or 127 => (GsPartParams.FixMonoPoly(cc), none),
+            ControlChangeEvent cc when nrpn.Read(cc) is { } entry => (GsPartParams.FixDataEntry(cc, entry), none),
+            _ => (null, none),
+        }, GsPartParams.FixedEvents);
+        return string.Format("GS part settings: {0} SysEx written after the reset, {1} message(s) of the file corrected", written, corrected);
     }
 
     // XG mode: writes the part values fixed in the interface (XgPartParams, Effects tab, Part page) as SysEx right after

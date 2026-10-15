@@ -330,6 +330,20 @@ public sealed partial class MainViewModel
                 events.Add((-1, Gm2Effects.ParamEvent(p, v)));
                 texts.Add(Effects.DescribeGm2(p, v));
             }
+        foreach (var (c, p, v) in GsPartParams.Fixed())
+        {
+            if (s.GsPartFixed.TryGetValue((c, p), out int before) && before == v) continue;
+            events.Add((c, GsPartParams.ParamEvent(c, p, v)));
+            texts.Add(Effects.DescribeGsPart(c, p, v));
+        }
+        foreach (var (m, n, p, v) in GsDrumMap.Fixed())
+        {
+            if (s.GsDrumFixed.TryGetValue((m, n, p), out int before) && before == v) continue;
+            // In the track of the first channel of the drum part when it has one.
+            int channel = Enumerable.Range(0, 16).FirstOrDefault(c => GsDrumMap.MapOf(c) == m, -1);
+            events.Add((channel, GsDrumMap.ParamEvent(m, n, p, v)));
+            texts.Add(Effects.DescribeGsDrum(m, n, p, v));
+        }
         foreach (var (c, p, v) in XgPartParams.Fixed())
         {
             if (s.PartFixed.TryGetValue((c, p), out int before) && before == v) continue;
@@ -370,6 +384,8 @@ public sealed partial class MainViewModel
         public readonly Dictionary<(int Setup, int Note, int Param), int> DrumFixed = new();
         public readonly int[] PartMode = new int[16];
         public readonly Dictionary<(int Channel, int Param), int> PartFixed = new();
+        public readonly Dictionary<(int Map, int Note, int Param), int> GsDrumFixed = new();
+        public readonly Dictionary<(int Channel, int Param), int> GsPartFixed = new();
 
         public static SettingsSnapshot Take()
         {
@@ -389,6 +405,8 @@ public sealed partial class MainViewModel
             foreach (var (ds, n, p, v) in XgDrumSetup.Fixed()) s.DrumFixed[(ds, n, p)] = v;
             Array.Copy(XgDrumSetup.PartModeOverride, s.PartMode, 16);
             foreach (var (c, p, v) in XgPartParams.Fixed()) s.PartFixed[(c, p)] = v;
+            foreach (var (m, n, p, v) in GsDrumMap.Fixed()) s.GsDrumFixed[(m, n, p)] = v;
+            foreach (var (c, p, v) in GsPartParams.Fixed()) s.GsPartFixed[(c, p)] = v;
             return s;
         }
 
@@ -439,6 +457,16 @@ public sealed partial class MainViewModel
                     if (Gm2Fixed[p]) Gm2Effects.Set(target, p, Gm2Value[p]);
                     else Gm2Effects.Clear(target, p);
                 }
+            var gsTarget = ChannelMixer.GsMode ? device : null;
+            foreach (var (c, p, _) in GsPartParams.Fixed().ToList())
+                if (!GsPartFixed.ContainsKey((c, p))) GsPartParams.Clear(gsTarget, c, p);
+            foreach (var ((c, p), v) in GsPartFixed)
+                if (!GsPartParams.IsFixed(c, p) || GsPartParams.FixedValue(c, p) != v) GsPartParams.Set(gsTarget, c, p, v);
+            foreach (var (m, n, p, _) in GsDrumMap.Fixed().ToList())
+                if (!GsDrumFixed.ContainsKey((m, n, p)))
+                    foreach (int reset in GsDrumMap.Clear(gsTarget, m, n, p)) ChannelMixer.ResetGsDrumMap(gsTarget, reset);
+            foreach (var ((m, n, p), v) in GsDrumFixed)
+                if (!GsDrumMap.IsFixed(m, n, p) || GsDrumMap.FixedValue(m, n, p) != v) GsDrumMap.Set(gsTarget, m, n, p, v);
             var drumTarget = ChannelMixer.XgMode ? device : null;
             foreach (var (c, p, _) in XgPartParams.Fixed().ToList())
                 if (!PartFixed.ContainsKey((c, p))) XgPartParams.Clear(drumTarget, c, p);

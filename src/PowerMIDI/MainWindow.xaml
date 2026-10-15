@@ -531,6 +531,18 @@
         </Border>
       </DataTemplate>
 
+      <!-- Row of buttons among the parameters (XG Variation: the parts, under Connection), like the channel buttons of a block. -->
+      <DataTemplate DataType="{x:Type vm:EffectButtonRowViewModel}">
+        <DockPanel Margin="0,4,0,4" Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+          <TextBlock DockPanel.Dock="Top" Text="{Binding Label}" Margin="8,3,0,5"/>
+          <ItemsControl ItemsSource="{Binding Buttons}" Margin="8,0,0,0">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+        </DockPanel>
+      </DataTemplate>
+
       <!-- EFX on a channel: pressed = the part goes through the EFX; blue when fixed (dark if pressed, on a light background). -->
       <DataTemplate DataType="{x:Type vm:EffectChannelViewModel}">
         <ToggleButton Content="{Binding Number}" IsChecked="{Binding IsChecked}" ToolTip="{Binding ToolTip}"

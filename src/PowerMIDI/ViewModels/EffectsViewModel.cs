@@ -133,6 +133,7 @@ public sealed class EffectsViewModel : ObservableObject
     readonly Action<Exception> showError;
     readonly EffectParamViewModel[] parameters = new EffectParamViewModel[EffectCount];
     EffectBlockViewModel variationBlock;
+    EffectButtonRowViewModel variationParts;   // its part buttons, under Connection
     readonly List<EffectChannelViewModel> partButtons = new();   // XG Variation / Insertion part buttons (16 per effect)
     readonly List<EffectBlockViewModel> gsBlocks = new(), xgBlocks = new(), mt32Blocks = new();
     // XG tab strip: the blocks, the 4 insertion effects being one tab (insertionTab), which shows insertionSelector
@@ -168,7 +169,25 @@ public sealed class EffectsViewModel : ObservableObject
     readonly EffectSliderViewModel[] drumParams = new EffectSliderViewModel[XgDrumSetup.Count];
     int drumSetup, drumNoteNumber = 38;   // shown at start: setup 1, snare
     string drumNotesKey = "";
-    long followedNoteOn;   // Follow: last note on already shown
+
+    // GS Drums page: drum map buttons (index GsDrumMapIndex, value = map), the note (GsDrumNoteIndex) and the parameters
+    // of that note in that map (GsDrumParamBase + p, see GsDrumMap).
+    const int GsDrumMapIndex = 6000, GsDrumNoteIndex = 6001, GsDrumParamBase = 6010;
+    EffectBlockViewModel gsDrumBlock;
+    readonly List<EffectChannelViewModel> gsDrumMapButtons = new();
+    EffectListViewModel gsDrumNote;
+    readonly EffectParamViewModel[] gsDrumParams = new EffectParamViewModel[GsDrumMap.Count];
+    int gsDrumMap, gsDrumNoteNumber = 38;
+    string gsDrumNotesKey = "";
+
+    // GS Part page: channel buttons (index GsPartChannelIndex, value = channel), the EQ switch of that channel
+    // (GsPartEqIndex, GsXgEffects 130 + channel) and its parameters (GsPartParamBase + p, see GsPartParams).
+    const int GsPartChannelIndex = 7000, GsPartParamBase = 7010, GsPartEqIndex = 7100;
+    EffectBlockViewModel gsPartBlock;
+    readonly List<EffectChannelViewModel> gsPartChannelButtons = new();
+    EffectListViewModel gsPartEq;
+    readonly EffectParamViewModel[] gsPartParams = new EffectParamViewModel[GsPartParams.Count];
+    int gsPartChannel;
 
     // XG Part page: channel buttons (index PartChannelIndex, value = channel) and the parameters of that channel
     // (PartParamBase + p, see XgPartParams), in sections (EQ, Tuning, Play, Filter, Pitch EG).
@@ -234,7 +253,7 @@ public sealed class EffectsViewModel : ObservableObject
             if (!blocks.TryGetValue(b, out var block))
             {
                 block = new EffectBlockViewModel { Title = BlockNames[b], IsFirst = group.Count == 0, ChannelsLabel = b == 7 ? "EQ on channels" : GsXgEffects.IsXg(fx) ? "Part" : "Channels", ShowTitle = false,
-                                                   TabTitle = b == GsXgEffects.XgEqBlock ? "EQ" : b >= GsXgEffects.InsBlockFirst ? $"Ins {b - GsXgEffects.InsBlockFirst + 1}" : BlockNames[b].Split(" (")[0] };
+                                                   TabTitle = b == GsXgEffects.XgEqBlock ? "Multi EQ" : b >= GsXgEffects.InsBlockFirst ? $"Ins {b - GsXgEffects.InsBlockFirst + 1}" : BlockNames[b].Split(" (")[0] };
                 blocks[b] = block;
                 if (b == 5) variationBlock = block;
                 group.Add(block);
@@ -271,6 +290,15 @@ public sealed class EffectsViewModel : ObservableObject
             list.Remove(p);
             list.Insert(list.IndexOf(parameters[Fx(first)]), p);
         }
+
+        // XG Variation: Connection right under Type, then its part buttons (they only apply with the Insertion
+        // connection).
+        variationParts = new EffectButtonRowViewModel(this, "Part", variationBlock.Channels);
+        variationBlock.Channels.Clear();
+        var variation = variationBlock.Params;
+        variation.Remove(parameters[40]);
+        variation.Insert(variation.IndexOf(parameters[VarTypeParam]) + 1, parameters[40]);
+        variation.Insert(variation.IndexOf(parameters[40]) + 1, variationParts);
 
         // MT-32 page: the reverb (mode, time, level) and the reverb switch of parts 1-8 and of the rhythm part.
         var reverb = new EffectBlockViewModel { Title = "Reverb", IsFirst = true, ChannelsLabel = "Reverb per part" };
@@ -344,6 +372,53 @@ public sealed class EffectsViewModel : ObservableObject
             drumBlock.Params.Add(drumParams[p]);
         }
         xgBlocks.Add(drumBlock);
+
+        // GS Drums page: a drum map (buttons: drum part 1 / 2), a note of its drum set, then the settings of that note.
+        gsDrumBlock = new EffectBlockViewModel { Title = "Drum map", TabTitle = "Drums", ShowTitle = false, IsFirst = true, ChannelsLabel = "Drum map", HasFollow = true };
+        for (int m = 0; m < GsDrumMap.Maps; m++)
+        {
+            var button = new EffectChannelViewModel(this, GsDrumMapIndex, m, -1);
+            gsDrumMapButtons.Add(button);
+            gsDrumBlock.Channels.Add(button);
+        }
+        gsDrumNote = new EffectListViewModel(this, GsDrumNoteIndex, Array.Empty<EffectChoice>()) { Label = "Note" };
+        gsDrumBlock.Params.Add(gsDrumNote);
+        for (int p = 0; p < GsDrumMap.Count; p++)
+        {
+            gsDrumParams[p] = GsDrumMap.IsSwitch(p)
+                ? new EffectListViewModel(this, GsDrumParamBase + p, IndexedChoices("Off", "On")) { Label = GsDrumMap.Names[p] }
+                : new EffectSliderViewModel(this, GsDrumParamBase + p) { Label = GsDrumMap.Names[p], Minimum = 0, Maximum = 127 };
+            gsDrumBlock.Params.Add(gsDrumParams[p]);
+        }
+        gsBlocks.Add(gsDrumBlock);
+
+        // GS Part page: the settings of a channel (buttons), in sections: its EQ switch (40 4x 20, the GS EQ's, which the
+        // EQ page showed as channel buttons), tuning, play.
+        blocks[7].Channels.Clear();
+        gsPartBlock = new EffectBlockViewModel { Title = "Part settings", TabTitle = "Part", ShowTitle = false, IsFirst = true, ChannelsLabel = "Channel" };
+        for (int c = 0; c < 16; c++)
+        {
+            var button = new EffectChannelViewModel(this, GsPartChannelIndex, c, -1);
+            gsPartChannelButtons.Add(button);
+            gsPartBlock.Channels.Add(button);
+        }
+        gsPartBlock.Params.Add(new EffectHeadingViewModel(this, "EQ") { HasLine = false });
+        gsPartEq = new EffectListViewModel(this, GsPartEqIndex, IndexedChoices("Off", "On")) { Label = "Part EQ" };
+        gsPartBlock.Params.Add(gsPartEq);
+        string section = "";
+        for (int p = 0; p < GsPartParams.Count; p++)
+        {
+            var param = GsPartParams.Params[p];
+            if (param.Group != section) gsPartBlock.Params.Add(new EffectHeadingViewModel(this, section = param.Group));
+            gsPartParams[p] = p switch
+            {
+                GsPartParams.MonoPoly => new EffectListViewModel(this, GsPartParamBase + p, IndexedChoices("Mono", "Poly")) { Label = param.Name },
+                GsPartParams.AssignMode => new EffectListViewModel(this, GsPartParamBase + p, IndexedChoices("Single", "Limited Multi", "Full Multi")) { Label = param.Name },
+                _ => new EffectSliderViewModel(this, GsPartParamBase + p) { Label = param.Name, Minimum = param.Min, Maximum = param.Max },
+            };
+            gsPartBlock.Params.Add(gsPartParams[p]);
+        }
+        gsBlocks.Add(gsPartBlock);
         xgBlocks.Add(partBlock);
 
         // Side by side, Reverb and Chorus both start at the top (same title margin).
@@ -418,7 +493,7 @@ public sealed class EffectsViewModel : ObservableObject
     IReadOnlyList<EffectBlockViewModel> TabGroup => Mode == "XG" ? xgTabs : gsBlocks;
 
     // GS and XG: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX;
-    // XG: Reverb, Chorus, Variation, Insertion (1 to 4), EQ, Drums, Part).
+    // XG: Reverb, Chorus, Variation, Insertion (1 to 4), Multi EQ, Drums, Part).
     public bool HasTabs => Mode is "GS" or "XG";
     public IReadOnlyList<EffectBlockViewModel> Tabs =>
         !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgTabs.Take(XgBlocksWithoutInsertion).Append(drumBlock).Append(partBlock).ToList() : TabGroup;
@@ -454,7 +529,9 @@ public sealed class EffectsViewModel : ObservableObject
 
     internal void SetEffect(int fx, int value)
     {
-        if (fx >= InsertionSelectIndex) SelectInsertion(value);
+        if (fx >= GsPartChannelIndex) SetGsPart(fx, value);
+        else if (fx >= GsDrumMapIndex) SetGsDrum(fx, value);
+        else if (fx >= InsertionSelectIndex) SelectInsertion(value);
         else if (fx >= PartChannelIndex) SetPart(fx, value);
         else if (fx >= DrumSetupIndex) SetDrum(fx, value);
         else if (fx >= Gm2Base) Gm2Effects.Set(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base, value);
@@ -465,7 +542,9 @@ public sealed class EffectsViewModel : ObservableObject
 
     internal void ClearEffect(int fx)
     {
-        if (fx >= InsertionSelectIndex) ClearInsertion();
+        if (fx >= GsPartChannelIndex) ClearGsPart(fx);
+        else if (fx >= GsDrumMapIndex) ClearGsDrum(fx);
+        else if (fx >= InsertionSelectIndex) ClearInsertion();
         else if (fx >= PartChannelIndex) ClearPart(fx);
         else if (fx >= DrumSetupIndex) ClearDrum(fx);
         else if (fx >= Gm2Base) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base);
@@ -487,6 +566,8 @@ public sealed class EffectsViewModel : ObservableObject
             for (int p = 0; p < Gm2Effects.Count; p++)
                 if (Gm2Effects.IsFixed(p) && Gm2Effects.IsType(p) == typeFirst) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? device : null, p);
         XgDrumSetup.ClearPartMode(ChannelMixer.XgMode ? device : null);
+        foreach (int m in GsDrumMap.Clear(ChannelMixer.GsMode ? device : null)) ChannelMixer.ResetGsDrumMap(device, m);
+        GsPartParams.Clear(ChannelMixer.GsMode ? device : null);
         XgPartParams.Clear(ChannelMixer.XgMode ? device : null);
         XgDrumSetup.Clear(ChannelMixer.XgMode ? device : null);
         Refresh();
@@ -505,6 +586,8 @@ public sealed class EffectsViewModel : ObservableObject
             if (Gm2Effects.IsFixed(p)) { Gm2Effects.Clear(null, p); had = true; }
         if (XgDrumSetup.HasFixed) { XgDrumSetup.Clear(null); had = true; }
         if (XgDrumSetup.HasPartModes) { XgDrumSetup.ClearPartMode(null); had = true; }
+        if (GsDrumMap.HasFixed) { GsDrumMap.Clear(null); had = true; }
+        if (GsPartParams.HasFixed) { GsPartParams.Clear(null); had = true; }
         if (XgPartParams.HasFixed) { XgPartParams.Clear(null); had = true; }
         return had;
     }
@@ -712,6 +795,272 @@ public sealed class EffectsViewModel : ObservableObject
                     case EffectSliderViewModel slider:
                         if (v >= 0) slider.Value = v;
                         slider.ValueText = FormatGm2(p, v);
+                        slider.ValueState = isFixed ? ValueState.Fixed : v < 0 ? ValueState.Auto : ValueState.File;
+                        break;
+                }
+            }
+            finally { vm.Updating = false; }
+        }
+    }
+
+    // ---------- Follow (XG and GS Drums pages) ----------
+
+    // Notes played since the last refresh (ChannelMixer.PlayedNotes), and when each note was last shown (a counter).
+    readonly List<(int Channel, int Note)> playedNotes = new();
+    readonly Dictionary<int, long> followShown = new();
+    long followCount;
+
+    void CollectPlayedNotes()
+    {
+        playedNotes.Clear();
+        while (ChannelMixer.PlayedNotes.TryDequeue(out var note)) playedNotes.Add(note);
+        ChannelMixer.CollectNotes = drumBlock.Follow || gsDrumBlock.Follow;
+    }
+
+    // Follow: among the notes played since the last refresh on the channels of the page (inChannel), between first and
+    // last, the one shown the longest time ago; notes played together (a kick with a hi-hat) are thus shown in turn.
+    // null if none was played.
+    int? FollowNote(Func<int, bool> inChannel, int first, int last)
+    {
+        int? best = null;
+        long bestShown = long.MaxValue;
+        foreach (var (c, n) in playedNotes)
+        {
+            if (!inChannel(c) || n < first || n > last) continue;
+            long shown = followShown.GetValueOrDefault(n, -1);
+            if (shown < bestShown) { best = n; bestShown = shown; }
+        }
+        if (best is int note) followShown[note] = ++followCount;
+        return best;
+    }
+
+    // ---------- GS Part page ----------
+
+    void SetGsPart(int fx, int value)
+    {
+        if (fx == GsPartChannelIndex)
+        {
+            if (value >= 0) gsPartChannel = value;
+            foreach (var button in gsPartChannelButtons) button.Key = "";   // pressed again: stays pressed
+            gsPartEq.Key = "";
+        }
+        else if (fx == GsPartEqIndex) GsXgEffects.Set(output(), EqChannelFirst + gsPartChannel, value);
+        else GsPartParams.Set(ChannelMixer.GsMode ? output() : null, gsPartChannel, fx - GsPartParamBase, value);
+    }
+
+    // Right click: back to the file for a parameter, or for the whole channel (on its button).
+    void ClearGsPart(int fx)
+    {
+        var device = ChannelMixer.GsMode ? output() : null;
+        if (fx == GsPartEqIndex) GsXgEffects.Clear(output(), EqChannelFirst + gsPartChannel);
+        else if (fx == GsPartChannelIndex)
+        {
+            GsPartParams.Clear(device, gsPartChannel);
+            if (GsXgEffects.IsFixed(EqChannelFirst + gsPartChannel)) GsXgEffects.Clear(output(), EqChannelFirst + gsPartChannel);
+        }
+        else GsPartParams.Clear(device, gsPartChannel, fx - GsPartParamBase);
+    }
+
+    // Value of a GS part parameter: key shift and bend range in semitones, offset fine in Hz, fine tune in cents, key
+    // range as notes; -1 = depends on the part ("auto").
+    static string FormatGsPart(int p, int v)
+    {
+        static string Signed(int d) => d > 0 ? $"+{d}" : d.ToString();
+        if (v < 0) return "auto";
+        return p switch
+        {
+            GsPartParams.KeyShift or GsPartParams.BendRange => Signed(v - 64) + " st",
+            GsPartParams.OffsetFine => (v > 128 ? "+" : "") + string.Format(CultureInfo.InvariantCulture, "{0:0.0} Hz", (v - 128) / 10.0),
+            GsPartParams.FineTune => Signed((int)Math.Round((v - 64) * 100 / 64.0)) + " ct",
+            GsPartParams.MonoPoly => v == 0 ? "Mono" : "Poly",
+            GsPartParams.AssignMode => v switch { 0 => "Single", 1 => "Limited Multi", _ => "Full Multi" },
+            GsPartParams.KeyRangeLow or GsPartParams.KeyRangeHigh => $"{NoteName(v + 12)}",
+            _ => v.ToString(),
+        };
+    }
+
+    public string DescribeGsPart(int c, int p, int v) => $"Part ch {c + 1} {GsPartParams.Params[p].Name}: {FormatGsPart(p, v)}";
+
+    // GS Part page: channel buttons (the one shown pressed, blue when it has fixed values), its EQ switch and its values.
+    void RefreshGsPart()
+    {
+        foreach (var button in gsPartChannelButtons)
+        {
+            int c = button.Part;
+            bool on = c == gsPartChannel, isFixed = GsPartParams.IsChannelFixed(c) || GsXgEffects.IsFixed(EqChannelFirst + c);
+            var key = $"{on}/{isFixed}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsChecked = on;
+                button.IsFixed = isFixed;
+                button.ToolTip = $"Part settings of channel {c + 1}" + (isFixed ? " (changed)" : "");
+            }
+            finally { button.Updating = false; }
+        }
+
+        int eq = EqChannelFirst + gsPartChannel, eqValue = GsXgEffects.Value(eq);
+        bool eqFixed = GsXgEffects.IsFixed(eq);
+        var eqKey = $"{gsPartChannel}/{eqValue}/{eqFixed}";
+        if (eqKey != gsPartEq.Key)
+        {
+            gsPartEq.Key = eqKey;
+            gsPartEq.Updating = true;
+            try
+            {
+                gsPartEq.IsFixed = eqFixed;
+                gsPartEq.SelectedChoice = gsPartEq.Choices.FirstOrDefault(x => x.Value == eqValue);
+                gsPartEq.ToolTip = (eqFixed ? $"Fixed (file: {(GsXgEffects.FileValue(eq) == 1 ? "on" : "off")})" : "File value") +
+                                   ". Part goes through EQ settings of EQ tab";
+            }
+            finally { gsPartEq.Updating = false; }
+        }
+
+        for (int p = 0; p < GsPartParams.Count; p++)
+        {
+            var vm = gsPartParams[p];
+            int v = GsPartParams.Value(gsPartChannel, p), fileValue = GsPartParams.FileValue(gsPartChannel, p);
+            bool isFixed = GsPartParams.IsFixed(gsPartChannel, p);
+            var key = $"{gsPartChannel}/{v}/{isFixed}/{fileValue}";
+            if (key == vm.Key) continue;
+            vm.Key = key;
+            vm.Updating = true;
+            try
+            {
+                vm.IsFixed = isFixed;
+                vm.ToolTip = isFixed ? $"Fixed (file: {FormatGsPart(p, fileValue)})" : v < 0 ? "Set by module according to part" : "File value";
+                switch (vm)
+                {
+                    case EffectListViewModel list:
+                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
+                        list.ValueText = v < 0 ? "auto" : "";
+                        break;
+                    case EffectSliderViewModel slider:
+                        slider.Value = v;
+                        slider.ValueText = FormatGsPart(p, v);
+                        slider.ValueState = isFixed ? ValueState.Fixed : ValueState.File;
+                        break;
+                }
+            }
+            finally { vm.Updating = false; }
+        }
+    }
+
+    // ---------- GS Drums page ----------
+
+    void SetGsDrum(int fx, int value)
+    {
+        if (fx == GsDrumMapIndex)
+        {
+            if (value >= 0) gsDrumMap = value;
+            foreach (var button in gsDrumMapButtons) button.Key = "";   // pressed again: stays pressed
+        }
+        else if (fx == GsDrumNoteIndex) gsDrumNoteNumber = value;
+        else GsDrumMap.Set(ChannelMixer.GsMode ? output() : null, gsDrumMap, gsDrumNoteNumber, fx - GsDrumParamBase, value);
+    }
+
+    // Right click: back to the file for a parameter, for the note (on the list) or for the whole map (on its button).
+    void ClearGsDrum(int fx)
+    {
+        var device = ChannelMixer.GsMode ? output() : null;
+        var reset = fx == GsDrumMapIndex ? GsDrumMap.Clear(device, gsDrumMap)
+                  : fx == GsDrumNoteIndex ? GsDrumMap.Clear(device, gsDrumMap, gsDrumNoteNumber)
+                  : GsDrumMap.Clear(device, gsDrumMap, gsDrumNoteNumber, fx - GsDrumParamBase);
+        foreach (int m in reset) ChannelMixer.ResetGsDrumMap(device, m);
+    }
+
+    // Drum set of a map: the last one selected on its drum part (STANDARD if none), in the map of its bank LSB.
+    (int Map, int Program) GsDrumKit(int m)
+    {
+        int part = m + 1, lsb = ChannelMixer.DrumKitLsb[part];
+        return (lsb is >= 1 and <= 4 ? lsb : ChannelMixer.GsDefaultMap, Math.Max(0, ChannelMixer.DrumKitProgram[part]));
+    }
+
+    // Value of a drum map parameter: pitch in semitones, pan L/C/R (0 = random), assign group (0 = off), levels 0..127;
+    // -1 = depends on the note ("auto").
+    static string FormatGsDrum(int p, int v) => v < 0 ? "auto" : p switch
+    {
+        GsDrumMap.PitchCoarse => (v > 64 ? "+" : "") + (v - 64) + " st",
+        GsDrumMap.Pan => v == 0 ? "Rnd" : MixerViewModel.FormatControllerValue(1, v),
+        GsDrumMap.AssignGroup => v == 0 ? "Off" : v.ToString(),
+        GsDrumMap.RxNoteOff or GsDrumMap.RxNoteOn => v == 0 ? "Off" : "On",
+        _ => v.ToString(),
+    };
+
+    public string DescribeGsDrum(int m, int n, int p, int v) =>
+        $"Drum map {m + 1} note {n} ({NoteName(n)}) {GsDrumMap.Names[p]}: {FormatGsDrum(p, v)}";
+
+    // Drums page (GS): map buttons (the one shown pressed, blue when it has fixed values), notes of the drum set (fixed
+    // ones marked •; Follow: the last one played on a channel of the drum part) and the values of the note shown.
+    void RefreshGsDrums()
+    {
+        foreach (var button in gsDrumMapButtons)
+        {
+            int m = button.Part;
+            var channels = Enumerable.Range(0, 16).Where(c => GsDrumMap.MapOf(c) == m).ToList();
+            bool on = m == gsDrumMap, isFixed = GsDrumMap.IsMapFixed(m);
+            var key = $"{on}/{isFixed}/{string.Join(",", channels)}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsChecked = on;
+                button.IsFixed = isFixed;
+                button.ToolTip = $"Drum map {m + 1} (drum part {m + 1}): " + (channels.Count == 0 ? "no channel" : "channel " + string.Join(", ", channels.Select(c => c + 1)));
+            }
+            finally { button.Updating = false; }
+        }
+
+        if (gsDrumBlock.Follow && FollowNote(c => GsDrumMap.MapOf(c) == gsDrumMap, 0, 127) is int played)
+            gsDrumNoteNumber = played;
+
+        // Notes: those of the drum set, plus the note shown and the fixed ones (27-87 if the set is unknown).
+        var kit = GsDrumKit(gsDrumMap);
+        var tones = defs.GsDrumTones.GetValueOrDefault(kit) ?? defs.GsDrumTones.GetValueOrDefault((kit.Map, 0)) ?? new Dictionary<int, string>();
+        var fixedNotes = Enumerable.Range(0, 128).Where(n => GsDrumMap.IsNoteFixed(gsDrumMap, n)).ToList();
+        var notes = (tones.Count > 0 ? tones.Keys : Enumerable.Range(27, 61)).Concat(fixedNotes).Append(gsDrumNoteNumber).Distinct().OrderBy(n => n).ToList();
+        var notesKey = $"{gsDrumMap}/{kit}/{string.Join(",", fixedNotes)}/{gsDrumNoteNumber}";
+        if (notesKey != gsDrumNotesKey)
+        {
+            gsDrumNotesKey = notesKey;
+            gsDrumNote.Updating = true;
+            try
+            {
+                gsDrumNote.Choices = notes.Select(n => new EffectChoice($"{n} {NoteName(n)}" + (tones.TryGetValue(n, out var name) ? $" · {name}" : "") +
+                                                                       (fixedNotes.Contains(n) ? " •" : ""), n)).ToList();
+                gsDrumNote.SelectedChoice = gsDrumNote.Choices.FirstOrDefault(c => c.Value == gsDrumNoteNumber);
+                gsDrumNote.IsFixed = fixedNotes.Contains(gsDrumNoteNumber);
+                gsDrumNote.ToolTip = $"Drum set: {defs.GsDrums.GetValueOrDefault(kit, "?")}. Right click: note back to file";
+            }
+            finally { gsDrumNote.Updating = false; }
+        }
+
+        for (int p = 0; p < GsDrumMap.Count; p++)
+        {
+            var vm = gsDrumParams[p];
+            int v = GsDrumMap.Value(gsDrumMap, gsDrumNoteNumber, p), fileValue = GsDrumMap.FileValue(gsDrumMap, gsDrumNoteNumber, p);
+            bool isFixed = GsDrumMap.IsFixed(gsDrumMap, gsDrumNoteNumber, p);
+            var key = $"{v}/{isFixed}/{fileValue}";
+            if (key == vm.Key) continue;
+            vm.Key = key;
+            vm.Updating = true;
+            try
+            {
+                vm.IsFixed = isFixed;
+                vm.ToolTip = isFixed ? $"Fixed (file: {(fileValue < 0 ? "drum set default" : FormatGsDrum(p, fileValue))})"
+                           : v < 0 ? "Drum set default" : "File value";
+                switch (vm)
+                {
+                    case EffectListViewModel list:
+                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
+                        list.ValueText = v < 0 ? "auto" : "";
+                        break;
+                    case EffectSliderViewModel slider:
+                        slider.Value = v >= 0 ? v : p is GsDrumMap.PitchCoarse or GsDrumMap.Pan ? 64 : 0;
+                        slider.ValueText = FormatGsDrum(p, v);
                         slider.ValueState = isFixed ? ValueState.Fixed : v < 0 ? ValueState.Auto : ValueState.File;
                         break;
                 }
@@ -990,21 +1339,9 @@ public sealed class EffectsViewModel : ObservableObject
             finally { button.Updating = false; }
         }
 
-        // Follow: the note shown is the last one played on a channel of the setup (a note of the kit).
-        if (drumBlock.Follow)
-        {
-            int last = -1;
-            long time = followedNoteOn;
-            for (int c = 0; c < 16; c++)
-                if (XgDrumSetup.SetupOf(c) == drumSetup && ChannelMixer.LastNoteOn[c] > time) { time = ChannelMixer.LastNoteOn[c]; last = c; }
-            if (last >= 0)
-            {
-                followedNoteOn = time;
-                int note = ChannelMixer.LastNoteNumber[last];
-                if (note is >= XgDrumSetup.FirstNote and <= XgDrumSetup.LastNote) drumNoteNumber = note;
-            }
-        }
-
+        // Follow: a note of the kit played on a channel of the setup (see FollowNote).
+        if (drumBlock.Follow && FollowNote(c => XgDrumSetup.SetupOf(c) == drumSetup, XgDrumSetup.FirstNote, XgDrumSetup.LastNote) is int played)
+            drumNoteNumber = played;
         var kit = SetupKit(drumSetup);
         var fixedNotes = Enumerable.Range(XgDrumSetup.FirstNote, XgDrumSetup.LastNote - XgDrumSetup.FirstNote + 1)
                                    .Where(n => XgDrumSetup.IsNoteFixed(drumSetup, n)).ToList();
@@ -1055,7 +1392,7 @@ public sealed class EffectsViewModel : ObservableObject
     void RefreshPartButtons()
     {
         // Variation: the part only applies when it is connected as an insertion effect (connection 0).
-        variationBlock.ChannelsShown = GsXgEffects.Value(40) != 1;
+        variationParts.IsVisible = GsXgEffects.Value(40) != 1;
         foreach (var button in partButtons)
         {
             int v = GsXgEffects.Value(button.Index);
@@ -1082,9 +1419,12 @@ public sealed class EffectsViewModel : ObservableObject
         RefreshGm2();
         RefreshTabs();
         RefreshPartButtons();
+        CollectPlayedNotes();
         RefreshDrums();
         RefreshPart();
         RefreshInsertionButtons();
+        RefreshGsDrums();
+        RefreshGsPart();
         for (int fx = 0; fx < EffectCount; fx++)
         {
             var p = parameters[fx];

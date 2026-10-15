@@ -87,6 +87,7 @@ public sealed class InstrumentDefinitions
     public readonly Dictionary<int, string> Mt32Drums = new();    // the rhythm part
     public readonly Dictionary<(int Map, int Msb, int Program), string> GsVoices = new();
     public readonly Dictionary<(int Map, int Program), string> GsDrums = new();
+    public readonly Dictionary<(int Map, int Program), Dictionary<int, string>> GsDrumTones = new();   // names of the notes of each kit
     public readonly Dictionary<(int Msb, int Lsb, int Program), string> XgVoices = new();
     public readonly Dictionary<(int Msb, int Program), string> XgDrums = new();
     public readonly HashSet<(int Msb, int Lsb, int Program)> XgMu50Voices = new();   // voices the MU50 also has
@@ -163,7 +164,13 @@ public sealed class InstrumentDefinitions
             foreach (XmlElement map in x.SelectNodes("/ModuleData/DrumSetList/Map"))
             {
                 if (!mapIndex.TryGetValue(Attr(map, "Name") ?? "", out int m)) continue;
-                foreach (var pc in Children(map, "PC")) defs.GsDrums[(m, int.Parse(Attr(pc, "PC")) - 1)] = Attr(pc, "Name");
+                foreach (var pc in Children(map, "PC"))
+                {
+                    var key = (m, int.Parse(Attr(pc, "PC")) - 1);
+                    defs.GsDrums[key] = Attr(pc, "Name");
+                    var tones = defs.GsDrumTones[key] = new();
+                    foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) tones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
+                }
             }
             defs.EfxTypes = ReadEfxDefinitions(x);
         }

@@ -104,9 +104,34 @@ public static class ChannelMixer
     {
         if (setup >= 0) SendLater(XgDrumSetup.FixedEvents(setup).ToArray());
     }
+
+    static void SendGsDrumMapLater(int map)
+    {
+        if (map >= 0) SendLater(GsDrumMap.FixedEvents(map).ToArray());
+    }
+
+    // Selects again the drum set of a GS drum map (the module then initializes the map), then writes the values set by
+    // the file and the fixed ones: a value that depends on the note goes back to the drum set's.
+    public static void ResetGsDrumMap(IOutputDevice device, int map)
+    {
+        if (device == null) return;
+        int channel = Enumerable.Range(0, 16).FirstOrDefault(c => GsDrumMap.MapOf(c) == map, -1);
+        if (channel >= 0)
+        {
+            var (msb, lsb, program) = Override[channel] ? (OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel])
+                                                        : (BankMsb[channel], BankLsb[channel], Program[channel]);
+            device.SendEvent(Cc(channel, 0, msb));
+            device.SendEvent(Cc(channel, 32, lsb));
+            device.SendEvent(Pc(channel, program));
+        }
+        foreach (var e in GsDrumMap.KnownEvents(map)) device.SendEvent(e);
+    }
     public static readonly bool[] Muted = new bool[16];
     public static readonly long[] LastNoteOn = new long[16]; // DateTime.UtcNow.Ticks, for LEDs
-    public static readonly int[] LastNoteNumber = new int[16];  // its note (XG Drums page: Follow)
+    // Notes played (channel, note), collected while the Drums page of the Effects tab follows them (Follow): every note
+    // counts, also those played at the same time on a channel.
+    public static volatile bool CollectNotes;
+    public static readonly System.Collections.Concurrent.ConcurrentQueue<(int Channel, int Note)> PlayedNotes = new();
     public static readonly int[] Program = new int[16];      // last Program Change (0..127)
     public static readonly int[] BankMsb = new int[16];      // CC0
     public static readonly int[] BankLsb = new int[16];      // CC32
@@ -177,6 +202,8 @@ public static class ChannelMixer
         GsXgEffects.ResetFile();
         XgDrumSetup.ResetFile();
         XgPartParams.ResetFile();
+        GsDrumMap.ResetFile();
+        GsPartParams.ResetFile();
         nrpn.Reset();
     }
 
@@ -242,6 +269,7 @@ public static class ChannelMixer
         if (Mt32Mode) Mt32Effects.Apply(device);
         if (Gm2Mode) Gm2Effects.Apply(device);
         if (XgMode) { XgDrumSetup.Apply(device); XgPartParams.Apply(device); }
+        if (GsMode) { GsDrumMap.Apply(device); GsPartParams.Apply(device); }
     }
 
     public static int FileValue(int k, int channel) { return FileCc[k, channel]; }
@@ -461,16 +489,18 @@ public static class ChannelMixer
                 case 101:
                 case 100:
                 case 6:
-                    // XG drum setup and part NRPN, pitch bend range RPN: stored, and replaced by the values fixed in the
-                    // Effects tab.
-                    if (!XgMode || nrpn.Read(cc) is not { } entry) break;
+                    // XG drum setup and part NRPN, pitch bend range RPN, GS drum map NRPN: stored, and replaced by the
+                    // values fixed in the Effects tab.
+                    if (!(XgMode || GsMode) || nrpn.Read(cc) is not { } entry) break;
+                    if (GsMode) return GsDrumMap.ReadNrpn(cc, entry) ?? GsPartParams.ReadDataEntry(cc, entry) ?? e;
                     var entered = XgDrumSetup.ReadNrpn(cc, entry, out var again);
                     if (entered == null && again == null) entered = XgPartParams.ReadDataEntry(cc, entry, out again);
                     if (again != null) SendLater(again);
                     return entered ?? e;
                 case 126:
                 case 127:
-                    // Mono / poly mode: stored, and replaced by the one fixed in the Effects tab (XG).
+                    // Mono / poly mode: stored, and replaced by the one fixed in the Effects tab (XG, GS).
+                    if (GsMode) return GsPartParams.ReadMonoPoly(cc) ?? e;
                     if (!XgMode) break;
                     return XgPartParams.ReadMonoPoly(cc) ?? e;
             }
@@ -484,6 +514,7 @@ public static class ChannelMixer
             if (Mt32Mode) Mt32Patches.ProgramChanged(channel);
             Used[channel] = true;
             if (XgMode) SendDrumSetupLater(XgDrumSetup.ProgramChanged(channel));
+            if (GsMode) SendGsDrumMapLater(GsDrumMap.ProgramChanged(channel));
             if (Override[channel])
             {
                 NoteSentProgram(channel, OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel]);
@@ -551,6 +582,12 @@ public static class ChannelMixer
                 var gm2 = Gm2Effects.Read(d);
                 if (gm2 != null) return gm2;
             }
+            if (GsMode)
+            {
+                if (GsDrumMap.Read(d) is { } gsDrum) return gsDrum;
+                // Part values (Effects tab, Part page): corrected first (the Mixer's and the drum part are read below).
+                if (GsPartParams.Read(d) is { } part) { d = part; e = new NormalSysExEvent(part); }
+            }
             if (XgMode)
             {
                 var drum = XgDrumSetup.Read(d, out int drumReset);
@@ -573,7 +610,7 @@ public static class ChannelMixer
     // Notes do not go through EventCallback: DryWetMIDI plays them via NoteCallback.
     public static NotePlaybackData NoteCallback(NotePlaybackData note, long rawTime, long rawLength, TimeSpan playbackTime)
     {
-        LastNoteNumber[note.Channel] = note.NoteNumber;
+        if (CollectNotes && PlayedNotes.Count < 1024) PlayedNotes.Enqueue((note.Channel, note.NoteNumber));
         LastNoteOn[note.Channel] = DateTime.UtcNow.Ticks;
         Used[note.Channel] = true;
         return note;
@@ -615,6 +652,7 @@ public static class ChannelMixer
         device.SendEvent(Pc(channel, program));
         // XG: the Program Change has reset the drum setup of the part; its fixed values are written again.
         if (XgMode && XgDrumSetup.ProgramChanged(channel) is int setup and >= 0) XgDrumSetup.Apply(device, setup);
+        if (GsMode && GsDrumMap.ProgramChanged(channel) is int map and >= 0) foreach (var e in GsDrumMap.FixedEvents(map)) device.SendEvent(e);
     }
 
     // Forces an instrument on a channel and sends it to module immediately.

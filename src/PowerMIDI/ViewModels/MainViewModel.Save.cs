@@ -38,8 +38,10 @@ public sealed partial class MainViewModel
         bool mt32 = Mixer.Standard == "MT-32" && Mt32Effects.HasFixed;   // MT-32 reverb values fixed in the Effects tab
         bool gm2 = Mixer.Standard == "GM2" && Gm2Effects.HasFixed;       // GM2 reverb / chorus values fixed there
         bool drums = Mixer.Standard == "XG" && (XgDrumSetup.HasFixed || XgDrumSetup.HasPartModes);   // XG drum setups and part modes
-        bool partEq = Mixer.Standard == "XG" && XgPartParams.HasFixed;      // XG part EQ
-        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && insertions.Count == 0)
+        bool partEq = Mixer.Standard == "XG" && XgPartParams.HasFixed;      // XG part settings
+        bool gsDrums = Mixer.Standard == "GS" && GsDrumMap.HasFixed;       // GS drum maps
+        bool gsPart = Mixer.Standard == "GS" && GsPartParams.HasFixed;     // GS part settings
+        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && !gsDrums && !gsPart && insertions.Count == 0)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
@@ -88,6 +90,8 @@ public sealed partial class MainViewModel
         if (gm2) report.Add(MidiFileEditor.WriteGm2Effects(midi));
         if (drums) report.Add(MidiFileEditor.WriteXgDrumSetup(midi));
         if (partEq) report.Add(MidiFileEditor.WriteXgPartParams(midi));
+        if (gsDrums) report.Add(MidiFileEditor.WriteGsDrumMap(midi));
+        if (gsPart) report.Add(MidiFileEditor.WriteGsPartParams(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
         if (forceMode != null)
         {
@@ -140,6 +144,8 @@ public sealed partial class MainViewModel
         for (int c = 0; c < 16; c++)
             if (XgDrumSetup.PartModeOverride[c] >= 0) parts.Add($"pm{c}={XgDrumSetup.PartModeOverride[c]}");
         foreach (var (c, p, v) in XgPartParams.Fixed()) parts.Add($"pe{c}/{p}={v}");
+        foreach (var (m, n, p, v) in GsDrumMap.Fixed()) parts.Add($"gd{m}/{n}/{p}={v}");
+        foreach (var (c, p, v) in GsPartParams.Fixed()) parts.Add($"gp{c}/{p}={v}");
         if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");
         if (withInsertions) foreach (var insertion in insertions) parts.Add($"ins{insertion.Tick}={insertion.Description}");
         return string.Join(";", parts);

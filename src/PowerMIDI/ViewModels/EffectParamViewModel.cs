@@ -168,10 +168,7 @@ public sealed class EffectBlockViewModel : ObservableObject
     public bool HasFollow { get; init; }
     bool follow;
     public bool Follow { get => follow; set => Set(ref follow, value); }
-    public bool HasChannels => Channels.Count > 0 && channelsShown;
-    // False: the buttons do not apply now (XG Variation connected as a system effect).
-    bool channelsShown = true;
-    internal bool ChannelsShown { set { if (Set(ref channelsShown, value)) OnPropertyChanged(nameof(HasChannels)); } }
+    public bool HasChannels => Channels.Count > 0;
 }
 
 // Heading inside a block, above a group of parameters (XG Part page: EQ), with a line above unless it is the first.
@@ -180,4 +177,17 @@ public sealed class EffectHeadingViewModel : EffectParamViewModel
     public EffectHeadingViewModel(EffectsViewModel effects, string text) : base(effects, -1) { Label = text; }
     bool hasLine = true;
     public bool HasLine { get => hasLine; internal set => Set(ref hasLine, value); }
+}
+
+// Row of buttons among the parameters of a block, with its label on its own line (XG Variation: the parts, under
+// Connection).
+public sealed class EffectButtonRowViewModel : EffectParamViewModel
+{
+    public EffectButtonRowViewModel(EffectsViewModel effects, string label, IEnumerable<EffectChannelViewModel> buttons) : base(effects, -1)
+    {
+        Label = label;
+        Buttons = buttons.ToList();
+    }
+
+    public List<EffectChannelViewModel> Buttons { get; }
 }
