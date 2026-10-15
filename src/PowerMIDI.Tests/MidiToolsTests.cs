@@ -93,6 +93,22 @@ public class MidiToolsTests
 
     // The state at the loop start is sent again where the loop changed it; what is unchanged or cannot be restored is left out.
     [Fact]
+    public void Loop_end_notes_are_those_ending_in_its_last_moments()
+    {
+        // Loop 480-1440: C4 ends at 880, E4 at the loop end, G4 held across it; D4 ends at 1400 and is played again
+        // across the loop end (same key held: no Note Off for it); A4 starts at the loop end (not in the loop).
+        var file = File(
+            On(60, 480), Off(60, 400),                 // 480-880
+            On(64, 80), On(62, 0), On(67, 0),          // 960
+            Off(62, 440),                              // 1400
+            On(62, 20),                                // 1420, held across the loop end
+            Off(64, 20),                               // 1440
+            On(69, 0), Off(69, 100), Off(62, 0), Off(67, 0));
+        Assert.Equal(new[] { (0, 64) }, MidiTools.GetLoopEndNotes(file, 1300, 1440));
+        Assert.Equal(new[] { (0, 60), (0, 64) }, MidiTools.GetLoopEndNotes(file, 0, 1440).OrderBy(x => x.Note));
+    }
+
+    [Fact]
     public void Loop_restore_gives_back_the_state_of_the_loop_start()
     {
         var file = File(

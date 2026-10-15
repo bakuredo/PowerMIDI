@@ -1,3 +1,4 @@
+using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
 using Melanchall.DryWetMidi.Interaction;
 using Melanchall.DryWetMidi.Multimedia;
@@ -28,10 +29,16 @@ public sealed partial class MainViewModel
     {
         loop = MidiTools.GetLoop(midi);
         pb.RepeatStarted += (_, _) => { loopsDone++; RestoreLoopStart(); };
+        // A note whose Note Off was skipped at the loop end (see loopEndNotes) stays active for the playback library,
+        // which would then not play it again: its Note On is played anyway.
+        pb.SendNoteOnEventsForActiveNotes = true;
         loopRestore = null;
+        loopEndNotes = null;
         if (loop is { } l)
         {
             loopRestore = MidiTools.GetLoopRestore(midi, l.Start, l.End);
+            var from = TimeConverter.ConvertFrom(new MetricTimeSpan(Math.Max(0, (long)(TickToTime(l.End) - LoopEndWindow).TotalMicroseconds)), tempoMap);
+            loopEndNotes = MidiTools.GetLoopEndNotes(midi, from, l.End);
             double start = TickToTime(l.Start).TotalSeconds, end = TickToTime(l.End).TotalSeconds;
             LoopStartFraction = Math.Min(1, start / Duration);
             LoopEndFraction = Math.Min(1, end / Duration);
@@ -46,8 +53,12 @@ public sealed partial class MainViewModel
 
     // The loop restarts (playback thread): the module still has the settings of the loop end (e.g. the volume after
     // a fade out). Those of the loop start are sent again, through the mixer like the events of the file (values
-    // set by hand keep priority, the display follows).
+    // set by hand keep priority, the display follows). Before them, the Note Off of the notes ending in the last
+    // moments of the loop (LoopEndWindow): the playback library may have skipped them (see MidiTools.GetLoopEndNotes);
+    // sent twice, a Note Off does nothing.
     List<MidiEvent> loopRestore;
+    List<(int Channel, int Note)> loopEndNotes;
+    static readonly TimeSpan LoopEndWindow = TimeSpan.FromMilliseconds(100);
 
     void RestoreLoopStart()
     {
@@ -56,6 +67,11 @@ public sealed partial class MainViewModel
         if (events == null || device == null || loop == null) return;
         try
         {
+            foreach (var (channel, note) in loopEndNotes ?? new())
+            {
+                int number = TransposeNote(new NotePlaybackData((SevenBitNumber)note, (SevenBitNumber)0, (SevenBitNumber)0, (FourBitNumber)channel)).NoteNumber;
+                device.SendEvent(new NoteOffEvent((SevenBitNumber)number, (SevenBitNumber)0) { Channel = (FourBitNumber)channel });
+            }
             foreach (var e in events)
             {
                 var sent = ChannelMixer.Callback(e, loop.Value.Start, TimeSpan.Zero);

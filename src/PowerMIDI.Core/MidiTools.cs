@@ -240,6 +240,19 @@ public static class MidiTools
         return events;
     }
 
+    // Notes of the loop that end between from and its end (ticks): their Note Off is sent again when the loop restarts.
+    // The playback library loops as soon as its clock passes the loop end, without playing the events of the last clock
+    // step; with a coarse clock (Windows lowers the timer resolution of a process without a visible window), the Note
+    // Off of a note ending right at the loop end can be skipped, and the note then hangs. Not the notes still held across
+    // the loop end (same channel and key).
+    public static List<(int Channel, int Note)> GetLoopEndNotes(MidiFile file, long from, long end)
+    {
+        var notes = file.GetNotes().Where(n => n.Time < end).ToList();
+        var held = notes.Where(n => n.EndTime > end).Select(n => ((int)n.Channel, (int)n.NoteNumber)).ToHashSet();
+        return notes.Where(n => n.EndTime >= from && n.EndTime <= end).Select(n => ((int)n.Channel, (int)n.NoteNumber))
+                    .Where(k => !held.Contains(k)).Distinct().ToList();
+    }
+
     // ---------- Texts of a file (title, copyright, comments) ----------
     // A MIDI file does not say how its texts are encoded. They are read and written byte for byte (Latin-1: one
     // character per byte), so that a saved file keeps them as they were, and decoded for display only (DecodeText).
