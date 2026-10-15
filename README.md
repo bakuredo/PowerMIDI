@@ -10,7 +10,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 
 ## Features
 
-- **Player**: Playback speed, transposition and playing a channel with computer keyboard ! (click on a channel number in Mixer page)
+- **Player**: Playback speed, transposition, play a channel with keyboard ! (click on a channel number in Mixer page)
 - **Playlist**: Files and folders, drag and drop, shuffle, repeat modes...
 - **Modes**: GM, GM2, GS, XG and MT-32, detected from file or forced, with matching reset and an option to
   drop messages of other modes. Custom SysEx patches detected from XG and MT-32 modes.
