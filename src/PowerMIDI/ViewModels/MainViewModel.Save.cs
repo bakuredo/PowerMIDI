@@ -28,17 +28,14 @@ public sealed partial class MainViewModel
         if (insertMode) { Status = "Insert mode: release Insert (or Stop) before saving."; return false; }
         var source = settingsFile ?? current?.Path;
         if (source == null) { Status = "No current track to save."; return false; }
-        int controllers = MixerViewModel.ControllerCount, effectCount = EffectsViewModel.EffectCount;
-        bool hasEffects = Enumerable.Range(0, effectCount).Any(GsXgEffects.IsFixed);
+        int controllers = MixerViewModel.ControllerCount;
         var channels = Enumerable.Range(0, 16)
             .Where(c => ChannelMixer.Override[c] || ChannelMixer.RhythmOverride[c] >= 0 ||
                         Enumerable.Range(0, controllers).Any(k => ChannelMixer.IsFixed(k, c))).ToList();
         var forceMode = isForced ? selectedMode : null;
-        bool mt32 = Mixer.Standard == "MT-32" && Mt32Effects.HasFixed;   // MT-32 reverb values fixed in the Effects tab
-        bool gm2 = Mixer.Standard == "GM2" && Gm2Effects.HasFixed;       // GM2 reverb / chorus values fixed there
-        // Part and Drums pages of the Effects tab: the modules of the mode of the track that have fixed values.
-        var modules = ModuleSettings.All.Where(m => m.Standard == Mixer.Standard && m.HasFixed).ToList();
-        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && modules.Count == 0 && insertions.Count == 0)
+        // Effects tab (effects, Part and Drums pages): the modules of the mode of the track that have fixed values.
+        var modules = ModuleSettings.All.Where(m => (m.Standard == null || m.Standard == Mixer.Standard) && m.HasFixed).ToList();
+        if (channels.Count == 0 && forceMode == null && modules.Count == 0 && insertions.Count == 0)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
@@ -78,14 +75,7 @@ public sealed partial class MainViewModel
         if (insertions.Count > 0)
             report.Add($"insertions: {insertions.Count} position(s), {MidiInsertions.Apply(midi, insertions)} event(s) written");
         report.Add(MidiFileEditor.ApplyChanges(midi, apply, msb, lsb, program, applyCc, ccValues, rhythm));
-        // Effects fixed in the Effects tab.
-        var applyFx = new bool[effectCount];
-        var fxValues = new int[effectCount];
-        for (int fx = 0; fx < effectCount; fx++) { applyFx[fx] = GsXgEffects.IsFixed(fx); fxValues[fx] = GsXgEffects.FixedValue(fx); }
-        if (hasEffects) report.Add(MidiFileEditor.ApplyEffects(midi, applyFx, fxValues));
-        if (mt32) report.Add(MidiFileEditor.WriteMt32Reverb(midi));
-        if (gm2) report.Add(MidiFileEditor.WriteGm2Effects(midi));
-        // Part and Drums pages (the XG part modes and drum setups share one writer).
+        // Effects tab: effects, Part and Drums pages (the XG part modes and drum setups share one writer).
         foreach (var write in modules.Select(m => m.Write).Distinct()) report.Add(write(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
         if (forceMode != null)
@@ -129,12 +119,6 @@ public sealed partial class MainViewModel
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
                 if (ChannelMixer.IsFixed(k, c)) parts.Add($"c{k}/{c}={ChannelMixer.FixedValue(k, c)}");
         }
-        for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
-            if (GsXgEffects.IsFixed(fx)) parts.Add($"e{fx}={GsXgEffects.FixedValue(fx)}");
-        for (int p = 0; p < Mt32Effects.Count; p++)
-            if (Mt32Effects.IsFixed(p)) parts.Add($"m{p}={Mt32Effects.FixedValue(p)}");
-        for (int p = 0; p < Gm2Effects.Count; p++)
-            if (Gm2Effects.IsFixed(p)) parts.Add($"g{p}={Gm2Effects.FixedValue(p)}");
         foreach (var m in ModuleSettings.All)
             foreach (var (key, v) in m.Fixed()) parts.Add($"{m.Name}{key.A}/{key.B}/{key.C}={v}");
         if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");

@@ -6,12 +6,13 @@ namespace PowerMIDI.Core;
 // Key of a value fixed in a settings module: up to three numbers (group or channel, note, parameter), unused ones 0.
 public readonly record struct SettingKey(int A, int B = 0, int C = 0);
 
-// One kind of settings fixed in the Effects tab's Part and Drums pages (XgPartParams, XgDrumSetup, GsDrumMap…), seen in
-// the same way by the player, the Insert mode and the save: its fixed values, how to set, clear, send and write them.
+// One kind of settings fixed in the Effects tab (GsXgEffects, Mt32Effects, Gm2Effects, and the Part and Drums pages:
+// XgPartParams, XgDrumSetup, GsDrumMap…), seen in the same way by the player, the Insert mode and the save: its fixed
+// values, how to set, clear, send and write them.
 public sealed class SettingsModule
 {
     public string Name { get; init; }                     // short code, in the fingerprint of the settings
-    public string Standard { get; init; }                 // mode of the track it belongs to: XG, GS, GM2, MT-32
+    public string Standard { get; init; }                 // mode of the track it belongs to: XG, GS, GM2, MT-32 (null: any)
     public Func<bool> IsActive { get; init; }             // the module plays in this mode (its values are sent)
     public Func<IEnumerable<(SettingKey Key, int Value)>> Fixed { get; init; }
     public Action<IOutputDevice, SettingKey, int> Set { get; init; }
@@ -29,13 +30,66 @@ public sealed class SettingsModule
     public Dictionary<SettingKey, int> FixedValues() => Fixed().ToDictionary(x => x.Key, x => x.Value);
 }
 
-// The settings modules, in the order they are handled: in XG, the part modes before the drum setups (a setup applies to
-// the parts assigned to it).
+// The settings modules, in the order they are handled: the effects first (as the module resets its parts after an
+// effect type), in XG the part modes before the drum setups (a setup applies to the parts assigned to it).
 public static class ModuleSettings
 {
     static IEnumerable<MidiEvent> One(MidiEvent e) { yield return e; }
     static int FirstChannel(Func<int, bool> uses) => Enumerable.Range(0, 16).FirstOrDefault(uses, -1);
     static int Mt32Channel(int part) => part < 9 && Mt32Effects.PartChannel[part] <= 15 ? Mt32Effects.PartChannel[part] : -1;
+    // Back to the file for every fixed value, in the order of Fixed (the effect types before their parameters).
+    static void ClearEach(SettingsModule m, IOutputDevice device)
+    {
+        foreach (var (key, _) in m.Fixed().ToList()) m.Clear(device, key);
+    }
+    // Fixed values of an effects module (key: parameter in C), the types first: a type resets the parameters of its
+    // block in the module.
+    static IEnumerable<(SettingKey, int)> FixedEffects(int count, Func<int, bool> isFixed, Func<int, int> value, Func<int, bool> isType) =>
+        Enumerable.Range(0, count).Where(isFixed).OrderBy(p => !isType(p)).Select(p => (new SettingKey(0, 0, p), value(p)));
+
+    // GS and XG effects (Effects tab: Reverb, Chorus, Delay, EQ, EFX; Variation, Insertion, Multi EQ). Sent in every
+    // mode, as before the modules existed; written in the saved file whatever its mode.
+    public static readonly SettingsModule GsXgFx = new()
+    {
+        Name = "e", Standard = null, IsActive = () => true,
+        Fixed = () => FixedEffects(GsXgEffects.Count, GsXgEffects.IsFixed, GsXgEffects.FixedValue, GsXgEffects.IsType),
+        Set = (d, k, v) => GsXgEffects.Set(d, k.C, v),
+        Clear = (d, k) => GsXgEffects.Clear(d, k.C),
+        ClearAll = d => ClearEach(GsXgFx, d),
+        ResetFile = GsXgEffects.ResetFile, Apply = GsXgEffects.Apply,
+        Events = (k, v) => One(GsXgEffects.ParamEvent(k.C, v)),
+        ChannelOf = k => -1,
+        Write = f => MidiFileEditor.ApplyEffects(f, Enumerable.Range(0, GsXgEffects.Count).Select(GsXgEffects.IsFixed).ToArray(),
+                                                 Enumerable.Range(0, GsXgEffects.Count).Select(GsXgEffects.FixedValue).ToArray()),
+    };
+
+    // MT-32 reverb (Effects tab, Reverb page); the reverb switch of a part goes in the track of its channel.
+    public static readonly SettingsModule Mt32Reverb = new()
+    {
+        Name = "m", Standard = "MT-32", IsActive = () => ChannelMixer.Mt32Mode,
+        Fixed = () => FixedEffects(Mt32Effects.Count, Mt32Effects.IsFixed, Mt32Effects.FixedValue, p => false),
+        Set = (d, k, v) => Mt32Effects.Set(d, k.C, v),
+        Clear = (d, k) => Mt32Effects.Clear(d, k.C),
+        ClearAll = d => ClearEach(Mt32Reverb, d),
+        ResetFile = Mt32Effects.ResetFile, Apply = Mt32Effects.Apply,
+        Events = (k, v) => Mt32Effects.ParamEvents(k.C, v),
+        ChannelOf = k => k.C >= Mt32Effects.PartFirst ? Mt32Channel(k.C - Mt32Effects.PartFirst) : -1,
+        Write = MidiFileEditor.WriteMt32Reverb,
+    };
+
+    // GM2 reverb and chorus (Effects tab, Reverb and Chorus pages).
+    public static readonly SettingsModule Gm2Fx = new()
+    {
+        Name = "g", Standard = "GM2", IsActive = () => ChannelMixer.Gm2Mode,
+        Fixed = () => FixedEffects(Gm2Effects.Count, Gm2Effects.IsFixed, Gm2Effects.FixedValue, Gm2Effects.IsType),
+        Set = (d, k, v) => Gm2Effects.Set(d, k.C, v),
+        Clear = (d, k) => Gm2Effects.Clear(d, k.C),
+        ClearAll = d => ClearEach(Gm2Fx, d),
+        ResetFile = Gm2Effects.ResetFile, Apply = Gm2Effects.Apply,
+        Events = (k, v) => One(Gm2Effects.ParamEvent(k.C, v)),
+        ChannelOf = k => -1,
+        Write = MidiFileEditor.WriteGm2Effects,
+    };
 
     public static readonly SettingsModule XgPart = new()
     {
@@ -159,7 +213,7 @@ public static class ModuleSettings
     };
 
     public static readonly SettingsModule[] All =
-        { XgPart, XgPartModes, XgDrums, GsPart, GsDrums, Gm2Part, Gm2Drums, Mt32Part, Mt32Drums };
+        { GsXgFx, Mt32Reverb, Gm2Fx, XgPart, XgPartModes, XgDrums, GsPart, GsDrums, Gm2Part, Gm2Drums, Mt32Part, Mt32Drums };
 
     // Reset of the module (start of a track, reset in the file): every module's file values back to defaults.
     public static void ResetFiles()

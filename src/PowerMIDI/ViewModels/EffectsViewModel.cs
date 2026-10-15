@@ -439,15 +439,7 @@ public sealed partial class EffectsViewModel : ObservableObject
     public void Reset()
     {
         var device = output();
-        foreach (bool macroFirst in new[] { true, false })
-            for (int fx = 0; fx < EffectCount; fx++)
-                if (GsXgEffects.IsFixed(fx) && GsXgEffects.IsType(fx) == macroFirst) GsXgEffects.Clear(device, fx);
-        for (int p = 0; p < Mt32Effects.Count; p++)
-            if (Mt32Effects.IsFixed(p)) Mt32Effects.Clear(ChannelMixer.Mt32Mode ? device : null, p);
-        foreach (bool typeFirst in new[] { true, false })
-            for (int p = 0; p < Gm2Effects.Count; p++)
-                if (Gm2Effects.IsFixed(p) && Gm2Effects.IsType(p) == typeFirst) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? device : null, p);
-        foreach (var m in ModuleSettings.All) m.ClearAll(m.IsActive() ? device : null);   // Part and Drums pages
+        foreach (var m in ModuleSettings.All) m.ClearAll(m.IsActive() ? device : null);
         Refresh();
     }
 
@@ -456,13 +448,7 @@ public sealed partial class EffectsViewModel : ObservableObject
     public bool ClearManualSettings()
     {
         bool had = false;
-        for (int fx = 0; fx < EffectCount; fx++)
-            if (GsXgEffects.IsFixed(fx)) { GsXgEffects.Clear(null, fx); had = true; }
-        for (int p = 0; p < Mt32Effects.Count; p++)
-            if (Mt32Effects.IsFixed(p)) { Mt32Effects.Clear(null, p); had = true; }
-        for (int p = 0; p < Gm2Effects.Count; p++)
-            if (Gm2Effects.IsFixed(p)) { Gm2Effects.Clear(null, p); had = true; }
-        foreach (var m in ModuleSettings.All.Where(m => m.HasFixed)) { m.ClearAll(null); had = true; }   // Part and Drums pages
+        foreach (var m in ModuleSettings.All.Where(m => m.HasFixed)) { m.ClearAll(null); had = true; }
         return had;
     }
 

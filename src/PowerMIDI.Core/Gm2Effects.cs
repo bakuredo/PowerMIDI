@@ -67,7 +67,7 @@ public static class Gm2Effects
     }
 
     // Fixed parameters of a block (not its type).
-    static MidiEvent[] FixedParamEvents(int block) =>
+    public static MidiEvent[] FixedParamEvents(int block) =>
         Enumerable.Range(0, Count).Where(p => Block(p) == block && !IsType(p) && IsFixed(p)).Select(p => (MidiEvent)ParamEvent(p, FixedValue(p))).ToArray();
 
     // A type has just changed: the other parameters of its block go back to the type's defaults.

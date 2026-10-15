@@ -196,12 +196,9 @@ public static class ChannelMixer
         DrumKitProgram[1] = DrumKitProgram[2] = -1;
         fileVoiceMap = VoiceMapNative;
         fileGsDefaultMap = InstrumentDefinitions.DefaultGsMap;
-        Mt32Effects.ResetFile();
         Mt32Patches.ResetFile();
         ModuleDisplay.Clear();
-        Gm2Effects.ResetFile();
-        GsXgEffects.ResetFile();
-        ModuleSettings.ResetFiles();   // Part and Drums pages of the Effects tab
+        ModuleSettings.ResetFiles();   // Effects tab: effects, Part and Drums pages
         nrpn.Reset();
     }
 
@@ -263,10 +260,7 @@ public static class ChannelMixer
     // All fixed effects of the current mode (start of track, seek, port change, after a reset in file).
     public static void ApplyEffects(IOutputDevice device)
     {
-        GsXgEffects.Apply(device);
-        if (Mt32Mode) Mt32Effects.Apply(device);
-        if (Gm2Mode) Gm2Effects.Apply(device);
-        ModuleSettings.Apply(device);   // Part and Drums pages of the Effects tab, in the mode of the track
+        ModuleSettings.Apply(device);   // Effects tab: effects, Part and Drums pages, in the mode of the track
     }
 
     public static int FileValue(int k, int channel) { return FileCc[k, channel]; }

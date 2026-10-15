@@ -301,36 +301,8 @@ public sealed partial class MainViewModel
             if (parts.Count > 0) texts.Add($"ch {c + 1}: {string.Join(", ", parts)}");
         }
 
-        foreach (bool macros in new[] { true, false })
-            for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
-            {
-                if (GsXgEffects.IsType(fx) != macros || !GsXgEffects.IsFixed(fx)) continue;
-                int v = GsXgEffects.FixedValue(fx);
-                if (s.FxFixed[fx] && s.FxValue[fx] == v) continue;
-                events.Add((-1, GsXgEffects.ParamEvent(fx, v)));
-                texts.Add(Effects.DescribeEffect(fx, v));
-            }
-        for (int p = 0; p < Mt32Effects.Count; p++)
-        {
-            if (!Mt32Effects.IsFixed(p)) continue;
-            int v = Mt32Effects.FixedValue(p);
-            if (s.Mt32Fixed[p] && s.Mt32Value[p] == v) continue;
-            // Reverb of a part: in the track of its channel when it has one.
-            int part = p - Mt32Effects.PartFirst;
-            int channel = part >= 0 && Mt32Effects.PartChannel[part] <= 15 ? Mt32Effects.PartChannel[part] : -1;
-            foreach (var e in Mt32Effects.ParamEvents(p, v)) events.Add((channel, e));
-            texts.Add(Effects.DescribeMt32(p, v));
-        }
-        foreach (bool types in new[] { true, false })
-            for (int p = 0; p < Gm2Effects.Count; p++)
-            {
-                if (Gm2Effects.IsType(p) != types || !Gm2Effects.IsFixed(p)) continue;
-                int v = Gm2Effects.FixedValue(p);
-                if (s.Gm2Fixed[p] && s.Gm2Value[p] == v) continue;
-                events.Add((-1, Gm2Effects.ParamEvent(p, v)));
-                texts.Add(Effects.DescribeGm2(p, v));
-            }
-        // Part and Drums pages: the values fixed since the snapshot, module by module (part modes before drum setups).
+        // Effects tab (effects, Part and Drums pages): the values fixed since the snapshot, module by module (effect
+        // types before their parameters, part modes before drum setups).
         foreach (var m in ModuleSettings.All)
             foreach (var (key, v) in m.Fixed())
             {
@@ -349,13 +321,7 @@ public sealed partial class MainViewModel
         public readonly int[] Msb = new int[16], Lsb = new int[16], Program = new int[16], Rhythm = new int[16];
         public readonly bool[,] CcFixed = new bool[MixerViewModel.ControllerCount, 16];
         public readonly int[,] CcValue = new int[MixerViewModel.ControllerCount, 16];
-        public readonly bool[] FxFixed = new bool[EffectsViewModel.EffectCount];
-        public readonly int[] FxValue = new int[EffectsViewModel.EffectCount];
-        public readonly bool[] Mt32Fixed = new bool[Mt32Effects.Count];
-        public readonly int[] Mt32Value = new int[Mt32Effects.Count];
-        public readonly bool[] Gm2Fixed = new bool[Gm2Effects.Count];
-        public readonly int[] Gm2Value = new int[Gm2Effects.Count];
-        public readonly Dictionary<SettingsModule, Dictionary<SettingKey, int>> Modules = new();   // Part and Drums pages
+        public readonly Dictionary<SettingsModule, Dictionary<SettingKey, int>> Modules = new();   // Effects tab
 
         public static SettingsSnapshot Take()
         {
@@ -368,10 +334,6 @@ public sealed partial class MainViewModel
                 for (int k = 0; k < MixerViewModel.ControllerCount; k++)
                     (s.CcFixed[k, c], s.CcValue[k, c]) = (ChannelMixer.IsFixed(k, c), ChannelMixer.FixedValue(k, c));
             }
-            for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
-                (s.FxFixed[fx], s.FxValue[fx]) = (GsXgEffects.IsFixed(fx), GsXgEffects.FixedValue(fx));
-            for (int p = 0; p < Mt32Effects.Count; p++) (s.Mt32Fixed[p], s.Mt32Value[p]) = (Mt32Effects.IsFixed(p), Mt32Effects.FixedValue(p));
-            for (int p = 0; p < Gm2Effects.Count; p++) (s.Gm2Fixed[p], s.Gm2Value[p]) = (Gm2Effects.IsFixed(p), Gm2Effects.FixedValue(p));
             foreach (var m in ModuleSettings.All) s.Modules[m] = m.FixedValues();
             return s;
         }
@@ -399,31 +361,7 @@ public sealed partial class MainViewModel
                     else ChannelMixer.ClearController(device, k, c);
                 }
             }
-            foreach (bool macros in new[] { true, false })
-                for (int fx = 0; fx < EffectsViewModel.EffectCount; fx++)
-                {
-                    if (GsXgEffects.IsType(fx) != macros) continue;
-                    if (GsXgEffects.IsFixed(fx) == FxFixed[fx] && (!FxFixed[fx] || GsXgEffects.FixedValue(fx) == FxValue[fx])) continue;
-                    if (FxFixed[fx]) GsXgEffects.Set(device, fx, FxValue[fx]);
-                    else GsXgEffects.Clear(device, fx);
-                }
-            for (int p = 0; p < Mt32Effects.Count; p++)
-            {
-                if (Mt32Effects.IsFixed(p) == Mt32Fixed[p] && (!Mt32Fixed[p] || Mt32Effects.FixedValue(p) == Mt32Value[p])) continue;
-                var target = ChannelMixer.Mt32Mode ? device : null;
-                if (Mt32Fixed[p]) Mt32Effects.Set(target, p, Mt32Value[p]);
-                else Mt32Effects.Clear(target, p);
-            }
-            foreach (bool types in new[] { true, false })
-                for (int p = 0; p < Gm2Effects.Count; p++)
-                {
-                    if (Gm2Effects.IsType(p) != types) continue;
-                    if (Gm2Effects.IsFixed(p) == Gm2Fixed[p] && (!Gm2Fixed[p] || Gm2Effects.FixedValue(p) == Gm2Value[p])) continue;
-                    var target = ChannelMixer.Gm2Mode ? device : null;
-                    if (Gm2Fixed[p]) Gm2Effects.Set(target, p, Gm2Value[p]);
-                    else Gm2Effects.Clear(target, p);
-                }
-            // Part and Drums pages, module by module: values cleared since the snapshot, then values set again.
+            // Effects tab, module by module: values cleared since the snapshot, then values set again.
             foreach (var m in ModuleSettings.All)
             {
                 var target = m.IsActive() ? device : null;

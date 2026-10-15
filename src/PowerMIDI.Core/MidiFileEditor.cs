@@ -445,9 +445,7 @@ public static class MidiFileEditor
         // A type set by the file resets its block: the fixed parameters of that block are written again after it.
         IEnumerable<MidiEvent> AfterType(List<(int Position, int Param)> positions) =>
             positions.Where(x => Gm2Effects.IsType(x.Param)).Select(x => Gm2Effects.Block(x.Param)).Distinct()
-                .SelectMany(block => Enumerable.Range(0, Gm2Effects.Count)
-                    .Where(p => Gm2Effects.Block(p) == block && !Gm2Effects.IsType(p) && Gm2Effects.IsFixed(p))
-                    .Select(p => (MidiEvent)Gm2Effects.ParamEvent(p, Gm2Effects.FixedValue(p))));
+                .SelectMany(Gm2Effects.FixedParamEvents);
         var (written, corrected) = WriteFixedSysEx(file, (d, positions) => Gm2Effects.ApplyBytes(d, values, positions),
                                                    Gm2Effects.WithFixedValues, Gm2Effects.FixedEvents, AfterType);
         return string.Format("GM2 effects: {0} SysEx written after the reset, {1} SysEx of the file corrected", written, corrected);
