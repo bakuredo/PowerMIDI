@@ -26,6 +26,12 @@ public static class Wheel
     public static ICommand GetCommand(DependencyObject d) => (ICommand)d.GetValue(CommandProperty);
     public static void SetCommand(DependencyObject d, ICommand value) => d.SetValue(CommandProperty, value);
 
+    public static readonly DependencyProperty ComboStepProperty = DependencyProperty.RegisterAttached(
+        "ComboStep", typeof(bool), typeof(Wheel), new PropertyMetadata(false, OnComboStepChanged));
+
+    public static bool GetComboStep(DependencyObject d) => (bool)d.GetValue(ComboStepProperty);
+    public static void SetComboStep(DependencyObject d, bool value) => d.SetValue(ComboStepProperty, value);
+
     static void OnSliderStepChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {
         if (d is not RangeBase slider) return;
@@ -40,6 +46,23 @@ public static class Wheel
         int step = Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ? 8 : 1;
         double value = Math.Round(slider.Value) + Math.Sign(e.Delta) * step;
         slider.Value = Math.Max(slider.Minimum, Math.Min(slider.Maximum, value));
+        e.Handled = true;
+    }
+
+    static void OnComboStepChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        if (d is not ComboBox combo) return;
+        combo.PreviewMouseWheel -= StepCombo;
+        if ((bool)e.NewValue) combo.PreviewMouseWheel += StepCombo;
+    }
+
+    // Next / previous item (stops at both ends); an open list keeps its normal scrolling.
+    static void StepCombo(object sender, MouseWheelEventArgs e)
+    {
+        var combo = (ComboBox)sender;
+        if (combo.IsDropDownOpen) return;
+        int index = Math.Max(0, Math.Min(combo.Items.Count - 1, combo.SelectedIndex - Math.Sign(e.Delta)));
+        if (index != combo.SelectedIndex) combo.SelectedIndex = index;
         e.Handled = true;
     }
 

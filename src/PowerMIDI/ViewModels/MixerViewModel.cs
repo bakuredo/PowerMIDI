@@ -629,12 +629,13 @@ public sealed class MixerViewModel : ObservableObject
         });
     }
 
-    // Next / previous map: the same sound in GS (SC-55 → SC-88 → SC-88Pro → SC-8850); in XG, see SetXgMap.
+    // Next / previous map in the order of the list: the same sound in GS (SC-8850 → SC-88Pro → SC-88 → SC-55, the
+    // list starting with the newest map); in XG, see SetXgMap.
     internal void StepMap(int c, int direction)
     {
         if (HasGsMaps)
         {
-            int target = MapFromLsb(GetCurrentSound(c).Lsb) + direction;
+            int target = MapFromLsb(GetCurrentSound(c).Lsb) - direction;
             if (target >= 1 && target <= NewestGsMap) SetChannelMap(c, target);
         }
         else if (HasXgBanks)

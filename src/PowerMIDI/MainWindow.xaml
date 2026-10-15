@@ -217,7 +217,7 @@
         <!-- Insert mode: see MainViewModel.Insert.cs. The tab's DataContext is the mixer. -->
         <ToggleButton DockPanel.Dock="Right" Style="{StaticResource InsertButton}"/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
-        <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}"
+        <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}" b:Wheel.ComboStep="True"
                   ToolTip="Controller set by the sliders">
           <!-- Order of the menu: see MixerViewModel.MenuOrder -->
           <ComboBoxItem Content="Modulation (CC1)"
@@ -251,11 +251,11 @@
         </ComboBox>
         <!-- XG voice map (XG mode only): which version of the capital voices the module plays, see MixerViewModel. -->
         <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.VoiceMapNames}"
-                  SelectedIndex="{Binding VoiceMapIndex}" Visibility="{Binding IsXg, Converter={StaticResource BoolToVisibility}}"
+                  SelectedIndex="{Binding VoiceMapIndex}" b:Wheel.ComboStep="True" Visibility="{Binding IsXg, Converter={StaticResource BoolToVisibility}}"
                   ToolTip="Voice map: version of XG base sounds (Auto: file choice)"/>
         <!-- GS default map (GS mode only): map of the sounds whose bank LSB is 0, see MixerViewModel. -->
         <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.GsDefaultMapNames}"
-                  SelectedIndex="{Binding GsDefaultMapIndex}" Visibility="{Binding IsGs, Converter={StaticResource BoolToVisibility}}"
+                  SelectedIndex="{Binding GsDefaultMapIndex}" b:Wheel.ComboStep="True" Visibility="{Binding IsGs, Converter={StaticResource BoolToVisibility}}"
                   ToolTip="Default map: map of GS sounds without bank LSB (Auto: file choice)"/>
       </DockPanel>
       <!-- Speed and pitch of the playback (listening aids, see MainViewModel.Speed.cs). The tab's DataContext is the
