@@ -16,15 +16,17 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
   drop messages of other modes. Custom SysEx patches detected from XG and MT-32 modes.
 - **Mixer**: Mute/Solo, activity and one controller slider per channel (modulation, volume, pan, reverb,
   chorus, delay / variation, filter and envelope settings), with instrument names for each mode.
-- **Effects**: Reverb, chorus, delay, EQ and EFX in GS mode - Reverb, chorus, variation, insertion, EQ in XG - Reverb
-  in MT-32 - Reverb and chorus in GM2.
+- **Effects**: Reverb, Chorus, Delay, EQ, EFX, Drums, Part in GS mode - Reverb, Chorus, Variation, Insertion, Multi-EQ, Drums, Part in XG
+  Reverb, Drums, Part in MT-32 - Reverb, Chorus, Part in GM2.
 - **Saving**: Changed settings (in blue) are written into a copy of MIDI file, for whole track or at a position
   of track (Insert mode).
 - **File loops markers**: `loopStart` / `loopEnd`, `[` / `]` markers and CC111 are followed.
+- **LCD module support**: Show text and dot pictures from file during playback.
 - **Color themes**: Built-in XAML themes; can be edited !
 
 
 ## Next-Steps
+
 - A better application icon.
 - Built-in SoundFont (SF2) files support.
 
@@ -50,13 +52,13 @@ dotnet publish -c Release
 | `src/PowerMIDI` | Windows application |
 | `src/PowerMIDI.Core` | MIDI logic: modes, mixer state, effects, file editing, module definitions |
 | `src/PowerMIDI.Console` | Console player |
-| `src/PowerMIDI.Tests` | Tests that need no MIDI port |
+| `src/PowerMIDI.Tests` | Unit tests used during development |
 | `instruments` | Module definition files |
-| `samples` | MIDI files for trying program |
+| `samples` | Sample MIDI files |
 
 ## Credits
 
 - MIDI playback and file handling: [DryWetMIDI](https://melanchall.github.io/drywetmidi/) by Maxim Dobroselsky.
-- Module definition files: based on the XML files of [Domino](http://takabosoft.com/) by Takabo Soft.
+- Module definition files: based on XML files of [Domino](http://takabosoft.com/) by Takabo Soft.
 
 See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details.
