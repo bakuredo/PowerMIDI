@@ -82,9 +82,7 @@ public class XgDrumSetupTests
     public void Decay_nrpn_writes_both_decays() => Run(() =>
     {
         XgDrumSetup.Set(null, 0, Snare, Decay2, 20);
-        Play(Cc(9, 99, 0x17));
-        Play(Cc(9, 98, Snare));
-        var played = XgDrumSetup.ReadController(Cc(9, 6, 50), out var again);
+        var played = XgDrumSetup.ReadNrpn(Cc(9, 6, 50), new DataEntry(false, 0x17, Snare), out var again);
         Assert.Equal(20, (int)((ControlChangeEvent)played).ControlValue);
         Assert.Equal(XgDrumSetup.ParamEvent(0, Snare, Decay1, 50).Data, ((SysExEvent)again).Data);   // decay 1: the file's
         Assert.Equal(50, XgDrumSetup.FileValue(0, Snare, Decay1));

@@ -13,7 +13,7 @@ namespace PowerMIDI.Core;
 // then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
 // - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
 // - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
-//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup).
+//   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams).
 public static class MidiFileEditor
 {
     // GS Reset, XG System On, GM / GM2 On or MT-32 Reset.
@@ -42,7 +42,7 @@ public static class MidiFileEditor
     {
         var cc = e as ControlChangeEvent;
         if (cc == null) return -1;
-        // The portamento switch goes with a fixed Portamento Time (on, see ChannelMixer.PortamentoSwitchValue).
+        // The portamento switch goes with a fixed Portamento Time (on, off at 0: see ChannelMixer.PortamentoSwitchValue).
         if (cc.ControlNumber == ChannelMixer.PortamentoSwitch && apply[ChannelMixer.PortamentoTime][cc.Channel]) return ChannelMixer.PortamentoTime;
         int k = ChannelMixer.ControllerIndex(cc.ControlNumber);
         return k >= 0 && apply[k][cc.Channel] ? k : -1;
@@ -165,7 +165,7 @@ public static class MidiFileEditor
                         events.Add(new ControlChangeEvent((SevenBitNumber)(byte)ChannelMixer.ControllerNumbers[c],
                                                           (SevenBitNumber)(byte)ccValues[c][ch]) { Channel = (FourBitNumber)(byte)ch });
                 if (applyCc[ChannelMixer.PortamentoTime][ch])
-                    events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoOn) { Channel = (FourBitNumber)(byte)ch });
+                    events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(ccValues[ChannelMixer.PortamentoTime][ch])) { Channel = (FourBitNumber)(byte)ch });
                 foreach (var e in events)
                     items.Add(new Item { Event = new TimedEvent(e, time), Priority = 1, Index = items.Count });
             }
@@ -450,7 +450,7 @@ public static class MidiFileEditor
         int SetupOf(int channel) => modes[channel] is >= 2 and <= 5 ? modes[channel] - 2 : -1;
         IEnumerable<MidiEvent> Again(int s) => s >= 0 && XgDrumSetup.IsSetupFixed(s) ? XgDrumSetup.FixedEvents(s) : Enumerable.Empty<MidiEvent>();
 
-        var nrpn = new XgDrumSetup.NrpnState();
+        var nrpn = new NrpnState();
         var (written, corrected) = WriteFixed(file, e =>
         {
             switch (e)
@@ -462,13 +462,37 @@ public static class MidiFileEditor
                     return (data != null ? new NormalSysExEvent(data) : null, Again(XgDrumSetup.ResetSetupOf(sysEx.Data)));
                 case ProgramChangeEvent pc:
                     return (null, Again(SetupOf(pc.Channel)));
-                case ControlChangeEvent cc when nrpn.Read(cc, SetupOf) is var (s, n, ps):
+                case ControlChangeEvent cc when nrpn.Read(cc) is { } entry && XgDrumSetup.NrpnParams(cc.Channel, entry, SetupOf) is var (s, n, ps):
                     var fixedCc = XgDrumSetup.FixNrpn(s, n, ps, cc, out var again);
                     return (fixedCc, again != null ? new[] { again } : Enumerable.Empty<MidiEvent>());
             }
             return (null, Enumerable.Empty<MidiEvent>());
         }, () => XgDrumSetup.PartModeEvents().Concat(XgDrumSetup.FixedEvents()));
         return string.Format("XG drum setup: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
+    }
+
+    // XG mode: writes the part values fixed in the interface (XgPartParams, Effects tab, Part page) as SysEx right after
+    // the reset; the file's part SysEx, NRPN, pitch bend range RPN and mono / poly messages that write a fixed value are
+    // corrected.
+    public static string WriteXgPartParams(MidiFile file)
+    {
+        var nrpn = new NrpnState();
+        var none = Enumerable.Empty<MidiEvent>();
+        var (written, corrected) = WriteFixed(file, e =>
+        {
+            switch (e)
+            {
+                case SysExEvent sysEx when XgPartParams.WithFixedValues(sysEx.Data) is { } data:
+                    return (new NormalSysExEvent(data), none);
+                case ControlChangeEvent cc when (int)cc.ControlNumber is 126 or 127:
+                    return (XgPartParams.FixMonoPoly(cc), none);
+                case ControlChangeEvent cc when nrpn.Read(cc) is { } entry:
+                    var fixedCc = XgPartParams.FixDataEntry(cc, entry, out var again);
+                    return (fixedCc, again != null ? new[] { again } : none);
+            }
+            return (null, none);
+        }, XgPartParams.FixedEvents);
+        return string.Format("XG part settings: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
     }
 
     // Writes SysEx effect values fixed in the interface: the messages of fixedEvents right after the last reset,

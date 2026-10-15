@@ -51,7 +51,6 @@ public static class XgDrumSetup
         for (int s = 0; s < Setups; s++) ResetSetup(s);
         Array.Clear(filePartMode);
         filePartMode[9] = 2;
-        ResetControllers();
     }
 
     static void ResetSetup(int s)
@@ -239,36 +238,15 @@ public static class XgDrumSetup
         return IsSetupFixed(s) ? s : -1;
     }
 
-    // NRPN state of each channel: MSB, LSB (-1 = none, or an RPN is selected).
-    public sealed class NrpnState
+    // Drum setup parameters written by an NRPN data entry (CC99 = msb, CC98 = note) on a channel whose setup is given by
+    // setupOf: its setup, note and parameters (the decay NRPN writes both decay rates), or null.
+    public static (int Setup, int Note, List<int> Params)? NrpnParams(int channel, DataEntry nrpn, Func<int, int> setupOf)
     {
-        readonly int[] msb = new int[16], lsb = new int[16];
-        public NrpnState() => Reset();
-        public void Reset() { Array.Fill(msb, -1); Array.Fill(lsb, -1); }
-
-        // CC99 / CC98 / CC101 / CC100 change the state; CC6 on a drum setup parameter (setup of the channel given by
-        // setupOf): its setup, note and parameters (the decay NRPN writes both decay rates). Otherwise null.
-        public (int Setup, int Note, List<int> Params)? Read(ControlChangeEvent cc, Func<int, int> setupOf)
-        {
-            int channel = cc.Channel, value = cc.ControlValue;
-            switch ((int)cc.ControlNumber)
-            {
-                case 99: msb[channel] = value; return null;
-                case 98: lsb[channel] = value; return null;
-                case 101: case 100: msb[channel] = lsb[channel] = -1; return null;
-                case 6: break;
-                default: return null;
-            }
-            int s = setupOf(channel), n = lsb[channel];
-            if (s < 0 || n < 0 || msb[channel] < 0) return null;
-            var ps = Enumerable.Range(0, Count).Where(p => NrpnMsb[p] == msb[channel]).ToList();
-            return ps.Count > 0 ? (s, n, ps) : null;
-        }
+        int s = setupOf(channel);
+        if (s < 0 || nrpn.Rpn) return null;
+        var ps = Enumerable.Range(0, Count).Where(p => NrpnMsb[p] == nrpn.Msb).ToList();
+        return ps.Count > 0 ? (s, nrpn.Lsb, ps) : null;
     }
-
-    static readonly NrpnState nrpn = new();
-
-    public static void ResetControllers() => nrpn.Reset();
 
     // Data entry of a drum setup NRPN with the fixed values: the message to play instead (null = unchanged). The decay
     // NRPN writes both decay rates: when only one is fixed, or both with different values, the second one is
@@ -285,12 +263,12 @@ public static class XgDrumSetup
         return new ControlChangeEvent((SevenBitNumber)6, (SevenBitNumber)fixedValue[s, n, fixedPs[0]]) { Channel = cc.Channel };
     }
 
-    // NRPN controllers played from the file: a drum setup value is stored, and replaced by the fixed one
-    // (see FixNrpn; null = unchanged).
-    public static MidiEvent ReadController(ControlChangeEvent cc, out MidiEvent again)
+    // NRPN data entry played from the file: a drum setup value is stored, and replaced by the fixed one (see FixNrpn;
+    // null = unchanged, also when it is not a drum setup NRPN).
+    public static MidiEvent ReadNrpn(ControlChangeEvent cc, DataEntry nrpn, out MidiEvent again)
     {
         again = null;
-        if (nrpn.Read(cc, SetupOf) is not var (s, n, ps)) return null;
+        if (NrpnParams(cc.Channel, nrpn, SetupOf) is not var (s, n, ps)) return null;
         foreach (int p in ps) file[s, n, p] = cc.ControlValue;
         Version++;
         return FixNrpn(s, n, ps, cc, out again);

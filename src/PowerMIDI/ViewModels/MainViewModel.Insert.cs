@@ -294,8 +294,8 @@ public sealed partial class MainViewModel
                 int v = ChannelMixer.FixedValue(k, c);
                 if (s.CcFixed[k, c] && s.CcValue[k, c] == v) continue;
                 events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.ControllerNumbers[k], (SevenBitNumber)v) { Channel = (FourBitNumber)c }));
-                if (k == ChannelMixer.PortamentoTime)   // heard only with the portamento on
-                    events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoOn) { Channel = (FourBitNumber)c }));
+                if (k == ChannelMixer.PortamentoTime)   // heard only with the portamento on (off at 0)
+                    events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(v)) { Channel = (FourBitNumber)c }));
                 parts.Add($"{MixerViewModel.ControllerNames[k]} {MixerViewModel.FormatControllerValue(k, v)}");
             }
             if (parts.Count > 0) texts.Add($"ch {c + 1}: {string.Join(", ", parts)}");
@@ -330,6 +330,12 @@ public sealed partial class MainViewModel
                 events.Add((-1, Gm2Effects.ParamEvent(p, v)));
                 texts.Add(Effects.DescribeGm2(p, v));
             }
+        foreach (var (c, p, v) in XgPartParams.Fixed())
+        {
+            if (s.PartFixed.TryGetValue((c, p), out int before) && before == v) continue;
+            events.Add((c, XgPartParams.ParamEvent(c, p, v)));
+            texts.Add(Effects.DescribePart(c, p, v));
+        }
         for (int c = 0; c < 16; c++)
         {
             int mode = XgDrumSetup.PartModeOverride[c];
@@ -363,6 +369,7 @@ public sealed partial class MainViewModel
         public readonly int[] Gm2Value = new int[Gm2Effects.Count];
         public readonly Dictionary<(int Setup, int Note, int Param), int> DrumFixed = new();
         public readonly int[] PartMode = new int[16];
+        public readonly Dictionary<(int Channel, int Param), int> PartFixed = new();
 
         public static SettingsSnapshot Take()
         {
@@ -381,6 +388,7 @@ public sealed partial class MainViewModel
             for (int p = 0; p < Gm2Effects.Count; p++) (s.Gm2Fixed[p], s.Gm2Value[p]) = (Gm2Effects.IsFixed(p), Gm2Effects.FixedValue(p));
             foreach (var (ds, n, p, v) in XgDrumSetup.Fixed()) s.DrumFixed[(ds, n, p)] = v;
             Array.Copy(XgDrumSetup.PartModeOverride, s.PartMode, 16);
+            foreach (var (c, p, v) in XgPartParams.Fixed()) s.PartFixed[(c, p)] = v;
             return s;
         }
 
@@ -432,6 +440,10 @@ public sealed partial class MainViewModel
                     else Gm2Effects.Clear(target, p);
                 }
             var drumTarget = ChannelMixer.XgMode ? device : null;
+            foreach (var (c, p, _) in XgPartParams.Fixed().ToList())
+                if (!PartFixed.ContainsKey((c, p))) XgPartParams.Clear(drumTarget, c, p);
+            foreach (var ((c, p), v) in PartFixed)
+                if (!XgPartParams.IsFixed(c, p) || XgPartParams.FixedValue(c, p) != v) XgPartParams.Set(drumTarget, c, p, v);
             for (int c = 0; c < 16; c++)
             {
                 if (XgDrumSetup.PartModeOverride[c] == PartMode[c]) continue;

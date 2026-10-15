@@ -267,6 +267,8 @@ public sealed class MixerViewModel : ObservableObject
             ch.ValueText = text;
             ch.IsFixed = isFixed;
             ch.SliderToolTip = isFixed ? $"{name} fixed at {text} (file: {FormatShownValue(k, fileValue)})" : $"{name} from the file: {text}";
+            if (k == ChannelMixer.PortamentoTime)
+                ch.SliderToolTip += isFixed ? $"\nPortamento {(value > 0 ? "on" : "off")} (CC65)" : "\nMoving slider turns portamento on (CC65), 0 turns it off";
         });
     }
 

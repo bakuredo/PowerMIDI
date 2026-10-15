@@ -247,7 +247,7 @@
           <ComboBoxItem Content="Vibrato Delay (CC78)"
                         ToolTip="Delay before the vibrato, relative to the original sound"/>
           <ComboBoxItem Content="Portamento Time (CC5)"
-                        ToolTip="Glide time between notes (with portamento on)"/>
+                        ToolTip="Glide time between notes. Moving slider turns portamento on (CC65), 0 turns it off"/>
         </ComboBox>
         <!-- XG voice map (XG mode only): which version of the capital voices the module plays, see MixerViewModel. -->
         <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.VoiceMapNames}"
@@ -508,6 +508,27 @@
             </TextBlock.Style>
           </TextBlock>
         </Grid>
+      </DataTemplate>
+
+      <!-- Heading above a group of parameters of a block (XG Part page: EQ): a line above (none for the first group),
+           then its name in semi-bold. -->
+      <DataTemplate DataType="{x:Type vm:EffectHeadingViewModel}">
+        <Border BorderBrush="{DynamicResource LineBrush}" Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+          <Border.Style>
+            <Style TargetType="Border">
+              <Setter Property="BorderThickness" Value="0,1,0,0"/>
+              <Setter Property="Margin" Value="0,10,0,0"/>
+              <Setter Property="Padding" Value="0,8,0,6"/>
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding HasLine}" Value="False">
+                  <Setter Property="BorderThickness" Value="0"/>
+                  <Setter Property="Margin" Value="0,4,0,0"/>
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
+          <TextBlock Text="{Binding Label}" FontWeight="SemiBold" Margin="8,0,0,0"/>
+        </Border>
       </DataTemplate>
 
       <!-- EFX on a channel: pressed = the part goes through the EFX; blue when fixed (dark if pressed, on a light background). -->

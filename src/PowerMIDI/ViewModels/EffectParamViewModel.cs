@@ -173,3 +173,11 @@ public sealed class EffectBlockViewModel : ObservableObject
     bool channelsShown = true;
     internal bool ChannelsShown { set { if (Set(ref channelsShown, value)) OnPropertyChanged(nameof(HasChannels)); } }
 }
+
+// Heading inside a block, above a group of parameters (XG Part page: EQ), with a line above unless it is the first.
+public sealed class EffectHeadingViewModel : EffectParamViewModel
+{
+    public EffectHeadingViewModel(EffectsViewModel effects, string text) : base(effects, -1) { Label = text; }
+    bool hasLine = true;
+    public bool HasLine { get => hasLine; internal set => Set(ref hasLine, value); }
+}

@@ -27,10 +27,13 @@ public static class ChannelMixer
     public const int Modulation = 13, Expression = 14, PortamentoTime = 15;
     const int Controllers = 16;
     // Portamento switch (CC65) of each channel: the file's. While Portamento Time is fixed in the interface, the
-    // portamento is on (127), so that the time is heard; back to the file's switch when it is no longer fixed.
+    // portamento is on (127), so that the time is heard, and off (0) when the time is fixed at 0; back to the file's
+    // switch when it is no longer fixed.
     static readonly int[] filePortamento = new int[16];
     public const int PortamentoSwitch = 65, PortamentoOn = 127;
-    public static int PortamentoSwitchValue(int channel) => CcOverride[PortamentoTime, channel] ? PortamentoOn : filePortamento[channel];
+    public static int PortamentoSwitchValue(int channel) =>
+        CcOverride[PortamentoTime, channel] ? PortamentoSwitchFor(OverrideCc[PortamentoTime, channel]) : filePortamento[channel];
+    public static int PortamentoSwitchFor(int time) => time > 0 ? PortamentoOn : 0;
     static readonly int[,] FileCc = new int[Controllers, 16];       // last value sent by file
     static readonly bool[,] CcOverride = new bool[Controllers, 16]; // value fixed in interface?
     static readonly int[,] OverrideCc = new int[Controllers, 16];   // fixed value
@@ -94,6 +97,8 @@ public static class ChannelMixer
             catch { }   // port closed in meantime
         });
     }
+
+    static readonly NrpnState nrpn = new();   // NRPN / RPN selected on each channel (XG drum setup and part)
 
     static void SendDrumSetupLater(int setup)
     {
@@ -171,6 +176,8 @@ public static class ChannelMixer
         Gm2Effects.ResetFile();
         GsXgEffects.ResetFile();
         XgDrumSetup.ResetFile();
+        XgPartParams.ResetFile();
+        nrpn.Reset();
     }
 
     // GS DT1 SysEx "Use for Rhythm Part": F0 41 dev 42 12 40 1x 15 vv sum F7.
@@ -234,7 +241,7 @@ public static class ChannelMixer
         GsXgEffects.Apply(device);
         if (Mt32Mode) Mt32Effects.Apply(device);
         if (Gm2Mode) Gm2Effects.Apply(device);
-        if (XgMode) XgDrumSetup.Apply(device);
+        if (XgMode) { XgDrumSetup.Apply(device); XgPartParams.Apply(device); }
     }
 
     public static int FileValue(int k, int channel) { return FileCc[k, channel]; }
@@ -454,11 +461,18 @@ public static class ChannelMixer
                 case 101:
                 case 100:
                 case 6:
-                    // XG drum setup NRPN: stored, and replaced by the values fixed in the Effects tab.
-                    if (!XgMode) break;
-                    var drum = XgDrumSetup.ReadController(cc, out var again);
+                    // XG drum setup and part NRPN, pitch bend range RPN: stored, and replaced by the values fixed in the
+                    // Effects tab.
+                    if (!XgMode || nrpn.Read(cc) is not { } entry) break;
+                    var entered = XgDrumSetup.ReadNrpn(cc, entry, out var again);
+                    if (entered == null && again == null) entered = XgPartParams.ReadDataEntry(cc, entry, out again);
                     if (again != null) SendLater(again);
-                    return drum ?? e;
+                    return entered ?? e;
+                case 126:
+                case 127:
+                    // Mono / poly mode: stored, and replaced by the one fixed in the Effects tab (XG).
+                    if (!XgMode) break;
+                    return XgPartParams.ReadMonoPoly(cc) ?? e;
             }
             return e;
         }
@@ -542,6 +556,9 @@ public static class ChannelMixer
                 var drum = XgDrumSetup.Read(d, out int drumReset);
                 SendDrumSetupLater(drumReset);
                 if (drum != null) return drum;
+                // Part values of a Multi Part SysEx (Effects tab, Part page): corrected first (the Mixer's are read below).
+                var eq = XgPartParams.Read(d);
+                if (eq != null) { d = eq; e = new NormalSysExEvent(eq); }
             }
             var multiPart = ReadMultiPart(d);
             if (multiPart != null) return multiPart;

@@ -135,6 +135,14 @@ public sealed class EffectsViewModel : ObservableObject
     EffectBlockViewModel variationBlock;
     readonly List<EffectChannelViewModel> partButtons = new();   // XG Variation / Insertion part buttons (16 per effect)
     readonly List<EffectBlockViewModel> gsBlocks = new(), xgBlocks = new(), mt32Blocks = new();
+    // XG tab strip: the blocks, the 4 insertion effects being one tab (insertionTab), which shows insertionSelector
+    // (buttons 1-4) above the insertion chosen.
+    readonly List<EffectBlockViewModel> xgTabs = new();
+    List<EffectBlockViewModel> insertionBlocks;
+    EffectBlockViewModel insertionTab, insertionSelector;
+    readonly List<EffectChannelViewModel> insertionButtons = new();
+    const int InsertionSelectIndex = 5000;
+    int insertion;
 
     // MT-32 page: parameter p of Mt32Effects has the index Mt32Base + p (the GS / XG ones are 0..145).
     const int Mt32Base = 1000;
@@ -153,6 +161,7 @@ public sealed class EffectsViewModel : ObservableObject
     // and the parameters of that note in that setup (DrumParamBase + p, see XgDrumSetup).
     const int DrumSetupIndex = 3000, DrumNoteIndex = 3001, DrumParamBase = 3010, DrumPartBase = 3100;   // + channel: part mode buttons
     EffectBlockViewModel drumBlock;
+    EffectBlockViewModel partBlock;
     readonly List<EffectChannelViewModel> drumSetupButtons = new();
     readonly List<EffectChannelViewModel> drumPartButtons = new();
     EffectListViewModel drumNote;
@@ -160,6 +169,14 @@ public sealed class EffectsViewModel : ObservableObject
     int drumSetup, drumNoteNumber = 38;   // shown at start: setup 1, snare
     string drumNotesKey = "";
     long followedNoteOn;   // Follow: last note on already shown
+
+    // XG Part page: channel buttons (index PartChannelIndex, value = channel) and the parameters of that channel
+    // (PartParamBase + p, see XgPartParams), in sections (EQ, Tuning, Play, Filter, Pitch EG).
+    const int PartChannelIndex = 4000, PartParamBase = 4010;
+    readonly List<EffectChannelViewModel> partChannelButtons = new();
+    readonly EffectParamViewModel[] partParams = new EffectParamViewModel[XgPartParams.Count];
+    readonly Dictionary<string, EffectHeadingViewModel> partHeadings = new();
+    int partChannel;
 
     // Value of a GM2 parameter in its unit (formulas of the GM2 specification).
     static string FormatGm2(int p, int v) => v < 0 ? "auto" : p switch
@@ -281,6 +298,28 @@ public sealed class EffectsViewModel : ObservableObject
         gm2Blocks.Add(gm2Reverb);
         gm2Blocks.Add(gm2Chorus);
 
+        // XG Part page: the settings of a channel (buttons), in sections with a heading each.
+        partBlock = new EffectBlockViewModel { Title = "Part settings", TabTitle = "Part", ShowTitle = false, IsFirst = true, ChannelsLabel = "Channel" };
+        for (int c = 0; c < 16; c++)
+        {
+            var button = new EffectChannelViewModel(this, PartChannelIndex, c, -1);
+            partChannelButtons.Add(button);
+            partBlock.Channels.Add(button);
+        }
+        for (int p = 0; p < XgPartParams.Count; p++)
+        {
+            var param = XgPartParams.Params[p];
+            if (!partHeadings.ContainsKey(param.Group))
+            {
+                partHeadings[param.Group] = new EffectHeadingViewModel(this, param.Group) { HasLine = partHeadings.Count > 0 };
+                partBlock.Params.Add(partHeadings[param.Group]);
+            }
+            partParams[p] = p == XgPartParams.MonoPoly
+                ? new EffectListViewModel(this, PartParamBase + p, IndexedChoices("Mono", "Poly")) { Label = param.Name }
+                : new EffectSliderViewModel(this, PartParamBase + p) { Label = param.Name, Minimum = param.Min, Maximum = param.Max };
+            partBlock.Params.Add(partParams[p]);
+        }
+
         // XG Drums page: a drum setup (buttons), a note of its kit, then the settings of that note: pitch, filter,
         // envelope, output.
         drumBlock = new EffectBlockViewModel { Title = "Drum setup", TabTitle = "Drums", ShowTitle = false, IsFirst = true, ChannelsLabel = "Drum setup",
@@ -305,12 +344,26 @@ public sealed class EffectsViewModel : ObservableObject
             drumBlock.Params.Add(drumParams[p]);
         }
         xgBlocks.Add(drumBlock);
+        xgBlocks.Add(partBlock);
 
         // Side by side, Reverb and Chorus both start at the top (same title margin).
         foreach (var group in new[] { gsBlocks, xgBlocks, gm2Blocks })
             if (group.Count >= 2) group[1].IsFirst = true;
+        // XG insertion effects 1-4: one tab, with the choice of the insertion above its parameters (see OtherBlocks).
+        insertionBlocks = Enumerable.Range(0, GsXgEffects.InsCount).Select(n => blocks[GsXgEffects.InsBlockFirst + n]).ToList();
+        insertionTab = new EffectBlockViewModel { Title = "Insertion effects", TabTitle = "Insertion", ShowTitle = false };
+        insertionSelector = new EffectBlockViewModel { Title = "Insertion", ShowTitle = false, IsFirst = true, ChannelsLabel = "Insertion" };
+        for (int n = 0; n < GsXgEffects.InsCount; n++)
+        {
+            var button = new EffectChannelViewModel(this, InsertionSelectIndex, n, -1);
+            insertionButtons.Add(button);
+            insertionSelector.Channels.Add(button);
+        }
+        xgTabs.AddRange(xgBlocks.Where(b => !insertionBlocks.Contains(b)));
+        xgTabs.Insert(XgBlocksWithoutInsertion, insertionTab);   // after Reverb, Chorus, Variation
+
         // GS and XG: one block at a time, chosen in the tab strip (see Tabs); the first one at start.
-        foreach (var group in new[] { gsBlocks, xgBlocks })
+        foreach (var group in new[] { gsBlocks, xgTabs })
         {
             foreach (var block in group)
                 block.Selected = () =>
@@ -358,13 +411,17 @@ public sealed class EffectsViewModel : ObservableObject
     int SideBlockCount => Mode == "GM2" ? 2 : 0;
     public IReadOnlyList<EffectBlockPair> SideRows =>
         Enumerable.Range(0, SideBlockCount / 2).Select(i => new EffectBlockPair(Blocks[2 * i], Blocks[2 * i + 1])).ToList();
-    public IEnumerable<EffectBlockViewModel> OtherBlocks => HasTabs ? new[] { selectedTabs[Blocks] } : Blocks.Skip(SideBlockCount);
+    public IEnumerable<EffectBlockViewModel> OtherBlocks =>
+        !HasTabs ? Blocks.Skip(SideBlockCount)
+        : selectedTabs[TabGroup] == insertionTab ? new[] { insertionSelector, insertionBlocks[insertion] }
+        : new[] { selectedTabs[TabGroup] };
+    IReadOnlyList<EffectBlockViewModel> TabGroup => Mode == "XG" ? xgTabs : gsBlocks;
 
     // GS and XG: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX;
-    // XG: Reverb, Chorus, Variation, Ins 1 to 4, EQ, Drums).
+    // XG: Reverb, Chorus, Variation, Insertion (1 to 4), EQ, Drums, Part).
     public bool HasTabs => Mode is "GS" or "XG";
     public IReadOnlyList<EffectBlockViewModel> Tabs =>
-        !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgBlocks.Take(XgBlocksWithoutInsertion).Append(drumBlock).ToList() : Blocks;
+        !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgTabs.Take(XgBlocksWithoutInsertion).Append(drumBlock).Append(partBlock).ToList() : TabGroup;
     // The XG insertion effects and Multi EQ are not offered with the MU Basic voice map: an XG Level 1 module has none
     // (and only 2 drum setups).
     const int XgBlocksWithoutInsertion = 3;
@@ -374,8 +431,8 @@ public sealed class EffectsViewModel : ObservableObject
         bool show = ChannelMixer.VoiceMap != ChannelMixer.VoiceMapBasic;
         if (show == showInsertion) return;
         showInsertion = show;
-        var selected = selectedTabs[xgBlocks];
-        if (!show && selected != drumBlock && xgBlocks.IndexOf(selected) >= XgBlocksWithoutInsertion) xgBlocks[0].IsSelected = true;
+        var selected = selectedTabs[xgTabs];
+        if (!show && selected != drumBlock && selected != partBlock && xgTabs.IndexOf(selected) >= XgBlocksWithoutInsertion) xgTabs[0].IsSelected = true;
         OnPropertyChanged(nameof(Tabs));
     }
     readonly Dictionary<IReadOnlyList<EffectBlockViewModel>, EffectBlockViewModel> selectedTabs = new();
@@ -397,7 +454,9 @@ public sealed class EffectsViewModel : ObservableObject
 
     internal void SetEffect(int fx, int value)
     {
-        if (fx >= DrumSetupIndex) SetDrum(fx, value);
+        if (fx >= InsertionSelectIndex) SelectInsertion(value);
+        else if (fx >= PartChannelIndex) SetPart(fx, value);
+        else if (fx >= DrumSetupIndex) SetDrum(fx, value);
         else if (fx >= Gm2Base) Gm2Effects.Set(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base, value);
         else if (fx >= Mt32Base) Mt32Effects.Set(ChannelMixer.Mt32Mode ? output() : null, fx - Mt32Base, value);
         else GsXgEffects.Set(output(), fx, value);
@@ -406,7 +465,9 @@ public sealed class EffectsViewModel : ObservableObject
 
     internal void ClearEffect(int fx)
     {
-        if (fx >= DrumSetupIndex) ClearDrum(fx);
+        if (fx >= InsertionSelectIndex) ClearInsertion();
+        else if (fx >= PartChannelIndex) ClearPart(fx);
+        else if (fx >= DrumSetupIndex) ClearDrum(fx);
         else if (fx >= Gm2Base) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? output() : null, fx - Gm2Base);
         else if (fx >= Mt32Base) Mt32Effects.Clear(ChannelMixer.Mt32Mode ? output() : null, fx - Mt32Base);
         else GsXgEffects.Clear(output(), fx);
@@ -426,6 +487,7 @@ public sealed class EffectsViewModel : ObservableObject
             for (int p = 0; p < Gm2Effects.Count; p++)
                 if (Gm2Effects.IsFixed(p) && Gm2Effects.IsType(p) == typeFirst) Gm2Effects.Clear(ChannelMixer.Gm2Mode ? device : null, p);
         XgDrumSetup.ClearPartMode(ChannelMixer.XgMode ? device : null);
+        XgPartParams.Clear(ChannelMixer.XgMode ? device : null);
         XgDrumSetup.Clear(ChannelMixer.XgMode ? device : null);
         Refresh();
     }
@@ -443,6 +505,7 @@ public sealed class EffectsViewModel : ObservableObject
             if (Gm2Effects.IsFixed(p)) { Gm2Effects.Clear(null, p); had = true; }
         if (XgDrumSetup.HasFixed) { XgDrumSetup.Clear(null); had = true; }
         if (XgDrumSetup.HasPartModes) { XgDrumSetup.ClearPartMode(null); had = true; }
+        if (XgPartParams.HasFixed) { XgPartParams.Clear(null); had = true; }
         return had;
     }
 
@@ -657,6 +720,151 @@ public sealed class EffectsViewModel : ObservableObject
         }
     }
 
+    // ---------- XG insertion effects (one tab) ----------
+
+    void SelectInsertion(int n)
+    {
+        if (n >= 0 && n != insertion)
+        {
+            insertion = n;
+            OnPropertyChanged(nameof(OtherBlocks));
+        }
+        foreach (var button in insertionButtons) button.Key = "";   // pressed again: stays pressed
+    }
+
+    // Right click on its button: the insertion effect shown goes back to the file (its type first).
+    void ClearInsertion()
+    {
+        var device = output();
+        int first = GsXgEffects.InsFirst + insertion * GsXgEffects.InsSize;
+        foreach (bool typeFirst in new[] { true, false })
+            for (int fx = first; fx < first + GsXgEffects.InsSize; fx++)
+                if (GsXgEffects.IsFixed(fx) && GsXgEffects.IsType(fx) == typeFirst) GsXgEffects.Clear(device, fx);
+    }
+
+    // Insertion buttons: the one shown pressed, blue when it has fixed values; type and part in the tooltip.
+    void RefreshInsertionButtons()
+    {
+        foreach (var button in insertionButtons)
+        {
+            int n = button.Part, first = GsXgEffects.InsFirst + n * GsXgEffects.InsSize;
+            bool on = n == insertion, isFixed = Enumerable.Range(first, GsXgEffects.InsSize).Any(GsXgEffects.IsFixed);
+            var type = FormatEffectValue(first, GsXgEffects.Value(first));
+            int part = GsXgEffects.Value(first + 1);
+            var tip = $"Insertion {n + 1}: {type}, " + (part is >= 0 and < 64 ? $"part {part + 1}" : part is 64 or 65 ? "A/D input" : "no part");
+            var key = $"{on}/{isFixed}/{tip}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsChecked = on;
+                button.IsFixed = isFixed;
+                button.ToolTip = tip;
+            }
+            finally { button.Updating = false; }
+        }
+    }
+
+    // ---------- XG part EQ (Part page) ----------
+
+    void SetPart(int fx, int value)
+    {
+        if (fx == PartChannelIndex)
+        {
+            if (value >= 0) partChannel = value;
+            foreach (var button in partChannelButtons) button.Key = "";   // pressed again: stays pressed
+        }
+        else XgPartParams.Set(ChannelMixer.XgMode ? output() : null, partChannel, fx - PartParamBase, value);
+    }
+
+    // Right click: back to the file for a parameter, or for the whole channel (on its button).
+    void ClearPart(int fx)
+    {
+        var device = ChannelMixer.XgMode ? output() : null;
+        if (fx == PartChannelIndex) XgPartParams.Clear(device, partChannel);
+        else XgPartParams.Clear(device, partChannel, fx - PartParamBase);
+    }
+
+    // Value of a part parameter: EQ gains in dB and frequencies; note shift and bend range in semitones; detune in Hz;
+    // velocity sense, dry level: 0..127; high pass filter and pitch EG: -64..+63.
+    string FormatPart(int p, int v)
+    {
+        static string Signed(int d) => d > 0 ? $"+{d}" : d.ToString();
+        var name = XgPartParams.Params[p].Name;
+        return p switch
+        {
+            XgPartParams.BassGain or XgPartParams.TrebleGain => Signed(v - 64) + " dB",
+            _ when name.EndsWith("Frequency") => xgEqFrequencies.TryGetValue(v, out var hz) ? hz : v.ToString(),
+            XgPartParams.NoteShift or XgPartParams.BendRange => Signed(v - 64) + " st",
+            XgPartParams.Detune => (v > 128 ? "+" : "") + string.Format(CultureInfo.InvariantCulture, "{0:0.0} Hz", (v - 128) / 10.0),
+            XgPartParams.MonoPoly => v == 0 ? "Mono" : "Poly",
+            _ when XgPartParams.Params[p].Group is "Filter" or "Pitch EG" => Signed(v - 64),
+            _ => v.ToString(),
+        };
+    }
+
+    public string DescribePart(int c, int p, int v) => $"Part ch {c + 1} {XgPartParams.Params[p].Name}: {FormatPart(p, v)}";
+
+    // Part page: channel buttons (the one shown pressed, blue when it has fixed values) and the values of that channel.
+    // The MU100 parameters (EQ, high pass filter) are hidden with the MU Basic voice map, and their headings with them;
+    // the first heading shown has no line above.
+    void RefreshPart()
+    {
+        bool mu100 = ChannelMixer.VoiceMap != ChannelMixer.VoiceMapBasic;
+        bool first = true;
+        foreach (var (group, heading) in partHeadings)
+        {
+            heading.IsVisible = mu100 || XgPartParams.Params.Any(x => x.Group == group && !x.Mu100);
+            heading.HasLine = !first || !heading.IsVisible;
+            if (heading.IsVisible) first = false;
+        }
+        foreach (var button in partChannelButtons)
+        {
+            int c = button.Part;
+            bool on = c == partChannel, isFixed = XgPartParams.IsChannelFixed(c);
+            var key = $"{on}/{isFixed}";
+            if (key == button.Key) continue;
+            button.Key = key;
+            button.Updating = true;
+            try
+            {
+                button.IsChecked = on;
+                button.IsFixed = isFixed;
+                button.ToolTip = $"Part settings of channel {c + 1}" + (isFixed ? " (changed)" : "");
+            }
+            finally { button.Updating = false; }
+        }
+        for (int p = 0; p < XgPartParams.Count; p++)
+        {
+            var vm = partParams[p];
+            int v = XgPartParams.Value(partChannel, p), fileValue = XgPartParams.FileValue(partChannel, p);
+            bool isFixed = XgPartParams.IsFixed(partChannel, p), visible = mu100 || !XgPartParams.Params[p].Mu100;
+            var key = $"{v}/{isFixed}/{fileValue}/{visible}";
+            if (key == vm.Key) continue;
+            vm.Key = key;
+            vm.Updating = true;
+            try
+            {
+                vm.IsVisible = visible;
+                vm.IsFixed = isFixed;
+                vm.ToolTip = isFixed ? $"Fixed (file: {FormatPart(p, fileValue)})" : "File value";
+                switch (vm)
+                {
+                    case EffectListViewModel list:
+                        list.SelectedChoice = list.Choices.FirstOrDefault(x => x.Value == v);
+                        break;
+                    case EffectSliderViewModel slider:
+                        slider.Value = v;
+                        slider.ValueText = FormatPart(p, v);
+                        slider.ValueState = isFixed ? ValueState.Fixed : ValueState.File;
+                        break;
+                }
+            }
+            finally { vm.Updating = false; }
+        }
+    }
+
     // ---------- XG Drums page ----------
 
     void SetDrum(int fx, int value)
@@ -676,7 +884,7 @@ public sealed class EffectsViewModel : ObservableObject
     {
         var device = ChannelMixer.XgMode ? output() : null;
         if (fx >= DrumPartBase) XgDrumSetup.ClearPartMode(device, fx - DrumPartBase);
-        else         if (fx == DrumSetupIndex) XgDrumSetup.Clear(device, drumSetup);
+        else if (fx == DrumSetupIndex) XgDrumSetup.Clear(device, drumSetup);
         else if (fx == DrumNoteIndex) XgDrumSetup.Clear(device, drumSetup, drumNoteNumber);
         else XgDrumSetup.Clear(device, drumSetup, drumNoteNumber, fx - DrumParamBase);
     }
@@ -875,6 +1083,8 @@ public sealed class EffectsViewModel : ObservableObject
         RefreshTabs();
         RefreshPartButtons();
         RefreshDrums();
+        RefreshPart();
+        RefreshInsertionButtons();
         for (int fx = 0; fx < EffectCount; fx++)
         {
             var p = parameters[fx];

@@ -38,7 +38,8 @@ public sealed partial class MainViewModel
         bool mt32 = Mixer.Standard == "MT-32" && Mt32Effects.HasFixed;   // MT-32 reverb values fixed in the Effects tab
         bool gm2 = Mixer.Standard == "GM2" && Gm2Effects.HasFixed;       // GM2 reverb / chorus values fixed there
         bool drums = Mixer.Standard == "XG" && (XgDrumSetup.HasFixed || XgDrumSetup.HasPartModes);   // XG drum setups and part modes
-        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && insertions.Count == 0)
+        bool partEq = Mixer.Standard == "XG" && XgPartParams.HasFixed;      // XG part EQ
+        if (channels.Count == 0 && !hasEffects && forceMode == null && !mt32 && !gm2 && !drums && !partEq && insertions.Count == 0)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
@@ -86,6 +87,7 @@ public sealed partial class MainViewModel
         if (mt32) report.Add(MidiFileEditor.WriteMt32Reverb(midi));
         if (gm2) report.Add(MidiFileEditor.WriteGm2Effects(midi));
         if (drums) report.Add(MidiFileEditor.WriteXgDrumSetup(midi));
+        if (partEq) report.Add(MidiFileEditor.WriteXgPartParams(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
         if (forceMode != null)
         {
@@ -137,6 +139,7 @@ public sealed partial class MainViewModel
         foreach (var (s, n, p, v) in XgDrumSetup.Fixed()) parts.Add($"d{s}/{n}/{p}={v}");
         for (int c = 0; c < 16; c++)
             if (XgDrumSetup.PartModeOverride[c] >= 0) parts.Add($"pm{c}={XgDrumSetup.PartModeOverride[c]}");
+        foreach (var (c, p, v) in XgPartParams.Fixed()) parts.Add($"pe{c}/{p}={v}");
         if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");
         if (withInsertions) foreach (var insertion in insertions) parts.Add($"ins{insertion.Tick}={insertion.Description}");
         return string.Join(";", parts);

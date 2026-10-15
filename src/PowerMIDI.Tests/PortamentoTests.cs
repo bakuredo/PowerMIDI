@@ -5,7 +5,8 @@ using PowerMIDI.Core;
 
 namespace PowerMIDI.Tests;
 
-// A Portamento Time fixed in the Mixer turns the portamento on (CC65), during playback and in a saved file.
+// A Portamento Time fixed in the Mixer turns the portamento on (CC65; off when fixed at 0), during playback and in a
+// saved file.
 [Collection("ChannelMixer")]   // shared static state: not in parallel with the other tests that use it
 public class PortamentoTests
 {
@@ -66,5 +67,23 @@ public class PortamentoTests
         Assert.Contains((5, 40), ccs);
         Assert.Contains((65, 127), ccs);
         Assert.DoesNotContain((65, 0), ccs);                                                  // the file's "off" is removed
+    }
+
+    [Fact]
+    public void Time_fixed_at_0_turns_the_portamento_off()
+    {
+        try
+        {
+            ChannelMixer.ResetChannelState(false);
+            var port = new Recorder();
+            ChannelMixer.SetController(port, ChannelMixer.PortamentoTime, Channel, 0);
+            Assert.Equal(new[] { (5, 0), (65, 0) }, port.Sent.Cast<ControlChangeEvent>().Select(c => ((int)c.ControlNumber, (int)c.ControlValue)));
+            Assert.Equal(0, Value(ChannelMixer.Callback(Cc(65, 127), 0, TimeSpan.Zero)));      // the file's "on" is replaced
+        }
+        finally
+        {
+            ChannelMixer.ClearController(null, ChannelMixer.PortamentoTime, Channel);
+            ChannelMixer.ResetChannelState(false);
+        }
     }
 }
