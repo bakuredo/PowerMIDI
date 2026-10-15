@@ -67,9 +67,12 @@ public static class Gm2Effects
 
     static void SendFixedParams(IOutputDevice device, int block)
     {
-        for (int p = 0; p < Count; p++)
-            if (Block(p) == block && !IsType(p) && isFixed[p]) device.SendEvent(ParamEvent(p, fixedValue[p]));
+        foreach (var e in FixedParamEvents(block)) device.SendEvent(e);
     }
+
+    // Fixed parameters of a block (not its type).
+    static MidiEvent[] FixedParamEvents(int block) =>
+        Enumerable.Range(0, Count).Where(p => Block(p) == block && !IsType(p) && isFixed[p]).Select(p => (MidiEvent)ParamEvent(p, fixedValue[p])).ToArray();
 
     // A type has just changed: the other parameters of its block go back to the type's defaults.
     static void TypeChanged(int[] values, int type)
@@ -142,8 +145,7 @@ public static class Gm2Effects
         var positions = new List<(int Position, int Param)>();
         if (!ApplyBytes(d, file, positions)) return null;
         foreach (int block in positions.Where(x => IsType(x.Param)).Select(x => Block(x.Param)).Distinct())
-            if (device != null && Enumerable.Range(0, Count).Any(p => Block(p) == block && !IsType(p) && isFixed[p]))
-                System.Threading.Tasks.Task.Delay(30).ContinueWith(_ => { try { SendFixedParams(device, block); } catch { } });
+            if (device != null) ChannelMixer.SendLater(FixedParamEvents(block));
         var data = WithFixedValues(d, positions);
         return data != null ? new NormalSysExEvent(data) : null;
     }

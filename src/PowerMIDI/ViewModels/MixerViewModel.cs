@@ -225,11 +225,7 @@ public sealed class MixerViewModel : ObservableObject
     // envelope, filter and vibrato (index 5 to 12): relative to 64, from -64 to +63 (0 = original sound).
     public static string FormatControllerValue(int k, int value)
     {
-        if (k >= 5 && k < ChannelMixer.Modulation)
-        {
-            int delta = value - 64;
-            return delta > 0 ? $"+{delta}" : delta.ToString();
-        }
+        if (k >= 5 && k < ChannelMixer.Modulation) return MidiTools.FormatSigned(value - 64);
         if (k != 1) return value.ToString();
         if (value == 64) return "C";
         return value < 64 ? $"L{64 - value}" : $"R{value - 64}";

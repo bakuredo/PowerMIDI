@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Multimedia;
+using PowerMIDI.Core;
 
 namespace PowerMIDI.ViewModels;
 
@@ -43,7 +44,7 @@ public sealed partial class MainViewModel
         }
     }
 
-    public string TransposeText => transposeSemitones > 0 ? $"+{transposeSemitones / 2}" : (transposeSemitones / 2).ToString();
+    public string TransposeText => MidiTools.FormatSigned(transposeSemitones / 2);
 
     // Right click on a slider: back to normal.
     public ICommand ResetSpeedCommand => new RelayCommand(() => Speed = 100);

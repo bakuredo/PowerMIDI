@@ -18,7 +18,6 @@ public sealed partial class EffectsViewModel
     readonly List<EffectChannelViewModel> drumPartButtons = new();
 
     static readonly IReadOnlyList<string> Channels16 = Enumerable.Range(1, 16).Select(c => c.ToString()).ToList();
-    static string Signed(int d) => d > 0 ? $"+{d}" : d.ToString();
     static string NoteName(int n) => SettingsPage.NoteName(n);
     static string ChannelList(IEnumerable<int> channels) =>
         channels.Any() ? "channel " + string.Join(", ", channels.Select(c => c + 1)) : "no channel";
@@ -169,7 +168,7 @@ public sealed partial class EffectsViewModel
     // Drum setup: offsets -64..+63 (pitch in semitones / cents), pan L/C/R (0 = random), levels 0..127.
     static string FormatDrum(int p, int v)
     {
-        if (XgDrumSetup.IsOffset(p)) return Signed(v - 64) + (p == 0 ? " st" : p == 1 ? " ct" : "");
+        if (XgDrumSetup.IsOffset(p)) return MidiTools.FormatSigned(v - 64) + (p == 0 ? " st" : p == 1 ? " ct" : "");
         if (p == XgDrumSetup.Pan) return v == 0 ? "Rnd" : MixerViewModel.FormatControllerValue(1, v);
         return v.ToString();
     }
@@ -181,12 +180,12 @@ public sealed partial class EffectsViewModel
         var name = XgPartParams.Params[p].Name;
         return p switch
         {
-            XgPartParams.BassGain or XgPartParams.TrebleGain => Signed(v - 64) + " dB",
+            XgPartParams.BassGain or XgPartParams.TrebleGain => MidiTools.FormatSigned(v - 64) + " dB",
             _ when name.EndsWith("Frequency") => xgEqFrequencies.TryGetValue(v, out var hz) ? hz : v.ToString(),
-            XgPartParams.NoteShift or XgPartParams.BendRange => Signed(v - 64) + " st",
+            XgPartParams.NoteShift or XgPartParams.BendRange => MidiTools.FormatSigned(v - 64) + " st",
             XgPartParams.Detune => (v > 128 ? "+" : "") + string.Format(CultureInfo.InvariantCulture, "{0:0.0} Hz", (v - 128) / 10.0),
             XgPartParams.MonoPoly => v == 0 ? "Mono" : "Poly",
-            _ when XgPartParams.Params[p].Group is "Filter" or "Pitch EG" => Signed(v - 64),
+            _ when XgPartParams.Params[p].Group is "Filter" or "Pitch EG" => MidiTools.FormatSigned(v - 64),
             _ => v.ToString(),
         };
     }
@@ -274,7 +273,7 @@ public sealed partial class EffectsViewModel
     // Drum map: pitch in semitones, pan L/C/R (0 = random), assign group (0 = off), levels 0..127.
     static string FormatGsDrum(int p, int v) => p switch
     {
-        GsDrumMap.PitchCoarse => Signed(v - 64) + " st",
+        GsDrumMap.PitchCoarse => MidiTools.FormatSigned(v - 64) + " st",
         GsDrumMap.Pan => v == 0 ? "Rnd" : MixerViewModel.FormatControllerValue(1, v),
         GsDrumMap.AssignGroup => v == 0 ? "Off" : v.ToString(),
         GsDrumMap.RxNoteOff or GsDrumMap.RxNoteOn => v == 0 ? "Off" : "On",
@@ -284,9 +283,9 @@ public sealed partial class EffectsViewModel
     // Part: key shift and bend range in semitones, offset fine in Hz, fine tune in cents, key range as notes.
     static string FormatGsPart(int p, int v) => p switch
     {
-        GsPartParams.KeyShift or GsPartParams.BendRange => Signed(v - 64) + " st",
+        GsPartParams.KeyShift or GsPartParams.BendRange => MidiTools.FormatSigned(v - 64) + " st",
         GsPartParams.OffsetFine => (v > 128 ? "+" : "") + string.Format(CultureInfo.InvariantCulture, "{0:0.0} Hz", (v - 128) / 10.0),
-        GsPartParams.FineTune => Signed((int)Math.Round((v - 64) * 100 / 64.0)) + " ct",
+        GsPartParams.FineTune => MidiTools.FormatSigned((int)Math.Round((v - 64) * 100 / 64.0)) + " ct",
         GsPartParams.MonoPoly => v == 0 ? "Mono" : "Poly",
         GsPartParams.AssignMode => v switch { 0 => "Single", 1 => "Limited Multi", _ => "Full Multi" },
         GsPartParams.KeyRangeLow or GsPartParams.KeyRangeHigh => NoteName(v + 12),
@@ -358,8 +357,8 @@ public sealed partial class EffectsViewModel
     static string FormatGm2Part(int p, int v) => p switch
     {
         Gm2PartParams.BendRange => $"{v} st",
-        Gm2PartParams.FineTune => Signed((int)Math.Round((v - 64) * 100 / 64.0)) + " ct",
-        Gm2PartParams.CoarseTune => Signed(v - 64) + " st",
+        Gm2PartParams.FineTune => MidiTools.FormatSigned((int)Math.Round((v - 64) * 100 / 64.0)) + " ct",
+        Gm2PartParams.CoarseTune => MidiTools.FormatSigned(v - 64) + " st",
         _ => $"{(int)Math.Round(v * 100 / 128.0)} ct",
     };
 
@@ -446,8 +445,8 @@ public sealed partial class EffectsViewModel
     // Part: key shift in semitones and fine tune in cents (both centered), bender range in semitones, partial reserve.
     static string FormatMt32Part(int p, int v) => p switch
     {
-        Mt32PartParams.KeyShift => Signed(v - 24) + " st",
-        Mt32PartParams.FineTune => Signed(v - 50) + " ct",
+        Mt32PartParams.KeyShift => MidiTools.FormatSigned(v - 24) + " st",
+        Mt32PartParams.FineTune => MidiTools.FormatSigned(v - 50) + " ct",
         Mt32PartParams.BenderRange => $"{v} st",
         Mt32PartParams.AssignMode => $"POLY {v + 1}",
         _ => v.ToString(),

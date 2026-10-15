@@ -82,13 +82,13 @@ public static class GsXgEffects
         InsEach(_ => Cat(new[] { 0x49 * 128, 127 }, Repeat(-1, 16))), XgEq(0, 64, 7, 0, 0x0C, 0x1C, 0x22, 0x2E, 0x34));
     // Parameter set by type: in GS, type sets all effect's parameters;
     // in XG, only effect's own parameters (not return, pan or sends).
-    public static readonly bool[] TypeDependent = CatBool(new[] {
+    public static readonly bool[] TypeDependent = Cat(new[] {
         true, true, true, true, true, true, true,  true, true, true, true, true, true, true, true, true,
         true, true, true, true, true, true, true, true,
         true, false, false, true,  true, false, false, false, true, true, true,  true, false, false, false, false, false, false },
-        RepeatBool(true, 24), RepeatBool(false, 16), RepeatBool(true, 16), RepeatBool(true, 28), RepeatBool(false, 20),
-        InsTypeDependent, InsTypeDependent, InsTypeDependent, InsTypeDependent, RepeatBool(true, XgEqSize));
-    static bool[] InsTypeDependent => CatBool(new[] { true, false }, RepeatBool(true, 16));
+        Repeat(true, 24), Repeat(false, 16), Repeat(true, 16), Repeat(true, 28), Repeat(false, 20),
+        InsTypeDependent, InsTypeDependent, InsTypeDependent, InsTypeDependent, Repeat(true, XgEqSize));
+    static bool[] InsTypeDependent => Cat(new[] { true, false }, Repeat(true, 16));
     public const int InsFirst = 146, InsSize = 18, InsCount = 4, InsBlockFirst = 8;
     public const int XgEqFirst = InsFirst + InsCount * InsSize, XgEqSize = 18, XgEqBlock = InsBlockFirst + InsCount;
     public const int Count = XgEqFirst + XgEqSize;
@@ -97,13 +97,11 @@ public static class GsXgEffects
     static readonly int[] TypeParams = { 0, 7, 16, 24, 28, 35, 42, InsFirst, InsFirst + InsSize, InsFirst + 2 * InsSize, InsFirst + 3 * InsSize, XgEqFirst };
     public const int Blocks = XgEqBlock + 1;
 
-    static int[] Cat(params int[][] parts) { var l = new List<int>(); foreach (var a in parts) l.AddRange(a); return l.ToArray(); }
-    static bool[] CatBool(params bool[][] parts) { var l = new List<bool>(); foreach (var a in parts) l.AddRange(a); return l.ToArray(); }
-    static int[] Repeat(int v, int n) { var a = new int[n]; for (int i = 0; i < n; i++) a[i] = v; return a; }
-    static bool[] RepeatBool(bool v, int n) { var a = new bool[n]; for (int i = 0; i < n; i++) a[i] = v; return a; }
-    static int[] Range(int start, int n) { var a = new int[n]; for (int i = 0; i < n; i++) a[i] = start + i; return a; }
-    static int[] Range2(int start, int n) { var a = new int[n]; for (int i = 0; i < n; i++) a[i] = start + 2 * i; return a; }
-    static int[] InsEach(Func<int, int[]> part) { var l = new List<int>(); for (int n = 0; n < InsCount; n++) l.AddRange(part(n)); return l.ToArray(); }
+    static T[] Cat<T>(params T[][] parts) => parts.SelectMany(a => a).ToArray();
+    static T[] Repeat<T>(T v, int n) => Enumerable.Repeat(v, n).ToArray();
+    static int[] Range(int start, int n) => Enumerable.Range(start, n).ToArray();
+    static int[] Range2(int start, int n) => Enumerable.Range(0, n).Select(i => start + 2 * i).ToArray();
+    static int[] InsEach(Func<int, int[]> part) => Enumerable.Range(0, InsCount).SelectMany(part).ToArray();
     static readonly int[] effectFile = new int[Count];      // file value (-1 = unknown: set by type)
     static readonly bool[] effectFixed = new bool[Count];   // fixed in interface?
     static readonly int[] effectFixedValue = new int[Count];
@@ -237,9 +235,12 @@ public static class GsXgEffects
     // Resends a block's fixed parameters (after its type, which may have overwritten them in module).
     static void SendFixedParams(IOutputDevice device, int block)
     {
-        for (int e = 0; e < Count; e++)
-            if (Block[e] == block && !IsType(e) && effectFixed[e]) device.SendEvent(ParamEvent(e, effectFixedValue[e]));
+        foreach (var e in FixedParamEvents(block)) device.SendEvent(e);
     }
+
+    // Fixed parameters of a block (not its type).
+    static MidiEvent[] FixedParamEvents(int block) =>
+        Enumerable.Range(0, Count).Where(e => Block[e] == block && !IsType(e) && effectFixed[e]).Select(e => (MidiEvent)ParamEvent(e, effectFixedValue[e])).ToArray();
 
     public static void Set(IOutputDevice device, int e, int value)
     {
@@ -293,16 +294,8 @@ public static class GsXgEffects
             if (effectFixed[e]) { data[pos] = ValueByte(e, part, effectFixedValue[e]); changed = true; }
         }
         // Type changed by file: fixed parameters of this block are resent right after.
-        foreach (int block in macroBlocks)
-        {
-            bool hasFixed = false;
-            for (int e = 0; e < Count; e++) if (Block[e] == block && !IsType(e) && effectFixed[e]) hasFixed = true;
-            if (hasFixed && device != null)
-            {
-                int blk = block;
-                System.Threading.Tasks.Task.Delay(30).ContinueWith(_ => { try { SendFixedParams(device, blk); } catch { } });
-            }
-        }
+        if (device != null)
+            foreach (int block in macroBlocks) ChannelMixer.SendLater(FixedParamEvents(block));
         if (!changed) return null;
         if (gs) MidiTools.FixRolandChecksum(data);
         return new NormalSysExEvent(data);

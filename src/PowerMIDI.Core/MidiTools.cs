@@ -305,4 +305,7 @@ public static class MidiTools
     }
 
     public static string FormatTime(TimeSpan t) => t.ToString(@"mm\:ss");
+
+    // Signed number: "+5", "0", "-5".
+    public static string FormatSigned(int value) => value > 0 ? $"+{value}" : value.ToString();
 }

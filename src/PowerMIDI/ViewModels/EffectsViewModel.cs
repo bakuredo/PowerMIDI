@@ -542,7 +542,7 @@ public sealed partial class EffectsViewModel : ObservableObject
             if (def.Name.Contains("Pan", StringComparison.OrdinalIgnoreCase) && def.Offset == 64) return MixerViewModel.FormatControllerValue(1, raw);   // L63..C..R63
             int shown = raw - def.Offset;
             // "+" only for parameters that have negative values (gains, transposition…).
-            text = def.Min - def.Offset < 0 && shown > 0 ? $"+{shown}" : shown.ToString();
+            text = def.Min - def.Offset < 0 ? MidiTools.FormatSigned(shown) : shown.ToString();
         }
         // Numbers from XG tables: "+08" -> "+8"; the unit is also added after "±0".
         var number = Regex.Match(text, @"^([+\-±]?)0*(\d+)$");
@@ -564,13 +564,13 @@ public sealed partial class EffectsViewModel : ObservableObject
             return value.ToString();
         }
         if (PanParams.Contains(fx)) return MixerViewModel.FormatControllerValue(1, value);
-        if (SignedParams.Contains(fx)) { int d = value - 64; return d > 0 ? $"+{d}" : d.ToString(); }
-        if (EqGainParams.Contains(fx)) { int d = value - 64; return (d > 0 ? $"+{d}" : d.ToString()) + " dB"; }
+        if (SignedParams.Contains(fx)) return MidiTools.FormatSigned(value - 64);
+        if (EqGainParams.Contains(fx)) return MidiTools.FormatSigned(value - 64) + " dB";
         if (fx >= GsXgEffects.XgEqFirst)
         {
             // XG Multi EQ: gain, frequency and Q of a band (the type and the shapes are lists).
             string label = Labels[fx];
-            if (label.EndsWith("Gain")) { int d = value - 64; return (d > 0 ? $"+{d}" : d.ToString()) + " dB"; }
+            if (label.EndsWith("Gain")) return MidiTools.FormatSigned(value - 64) + " dB";
             if (label.EndsWith("Frequency")) return xgEqFrequencies.TryGetValue(value, out var hz) ? hz : value.ToString();
             return string.Format(CultureInfo.InvariantCulture, "{0:0.0}", value / 10.0);
         }

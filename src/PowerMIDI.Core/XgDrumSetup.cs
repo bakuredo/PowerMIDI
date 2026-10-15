@@ -36,7 +36,6 @@ public static class XgDrumSetup
     public const int Normal = 0, Drum = 1;
     public static int PartMode(int channel) => PartModeOverride[channel] >= 0 ? PartModeOverride[channel] : filePartMode[channel];
     public static int FilePartMode(int channel) => filePartMode[channel];
-    public static bool HasPartModes => PartModeOverride.Any(m => m >= 0);
 
     // Incremented when the file changes a value (the interface refreshes its page).
     public static int Version;

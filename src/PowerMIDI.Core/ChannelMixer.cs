@@ -86,12 +86,12 @@ public static class ChannelMixer
     }
 
     // Messages to send right after the one being played (the callback returns only one), e.g. the fixed values of a
-    // drum setup that the event played has just reset.
-    static void SendLater(params MidiEvent[] events)
+    // drum setup or of an effect block that the event played has just reset (the module needs a moment for that).
+    internal static void SendLater(params MidiEvent[] events)
     {
         var device = Device;
         if (device == null || events.Length == 0) return;
-        System.Threading.Tasks.Task.Delay(20).ContinueWith(_ =>
+        System.Threading.Tasks.Task.Delay(30).ContinueWith(_ =>
         {
             try { foreach (var e in events) device.SendEvent(e); }
             catch { }   // port closed in meantime
