@@ -51,6 +51,12 @@ public static class MidiTools
     public static ProgramChangeEvent Pc(int channel, int program) =>
         new((SevenBitNumber)(byte)program) { Channel = (FourBitNumber)(byte)channel };
 
+    public static NoteOnEvent NoteOn(int channel, int note, int velocity) =>
+        new((SevenBitNumber)(byte)note, (SevenBitNumber)(byte)velocity) { Channel = (FourBitNumber)(byte)channel };
+
+    public static NoteOffEvent NoteOff(int channel, int note, int velocity) =>
+        new((SevenBitNumber)(byte)note, (SevenBitNumber)(byte)velocity) { Channel = (FourBitNumber)(byte)channel };
+
     // Recomputes the Roland checksum of a DT1 SysEx (GS, MT-32): address and data bytes.
     public static void FixRolandChecksum(byte[] data)
     {
@@ -278,6 +284,11 @@ public static class MidiTools
     // Text of a file (read by ReadFile) as it was meant: UTF-8 if its bytes are valid UTF-8; Shift-JIS (Japanese
     // files) if they are valid Shift-JIS with a lead byte 81-9F, which Western text hardly has; otherwise
     // Windows-1252 (accented letters).
+    // Text typed for a text event (Event Editor): written in UTF-8 when it has other characters than ASCII (DecodeText
+    // reads it back), as the bytes of the file are kept one character per byte.
+    public static string EncodeText(string text) =>
+        text.All(c => c < 0x80) ? text : ByteEncoding.GetString(Encoding.UTF8.GetBytes(text));
+
     public static string DecodeText(string raw)
     {
         if (string.IsNullOrEmpty(raw) || raw.All(c => c < 0x80) || raw.Any(c => c > 0xFF)) return raw;

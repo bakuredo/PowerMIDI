@@ -680,7 +680,6 @@ public sealed partial class MainViewModel : ObservableObject
         pb.Speed = speed / 100;   // speed and pitch sliders (MainViewModel.Speed.cs)
         playback = pb;
         tempoMap = midi.GetTempoMap();
-        eventMidi = midi;
         eventsPending = true;   // the Event Editor lists it at the next timer tick (after the start)
         TimeSpan length = pb.GetDuration<MetricTimeSpan>();
         durationText = MidiTools.FormatTime(length);
@@ -706,6 +705,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         had |= Effects.ClearManualSettings();
         had |= ClearInsertions();
+        had |= ClearEdits();   // Event Editor
         return had;
     }
 
@@ -789,52 +789,5 @@ public sealed partial class MainViewModel : ObservableObject
         SetPosition(now.TotalSeconds);
         TimeText = $"{MidiTools.FormatTime(now)} / {durationText}";
         eventEditor?.UpdatePosition(now.TotalSeconds);
-    }
-
-    // ---------- Event Editor ----------
-
-    // The window shows the events of the track being played (with its insertions); it follows the playback.
-    EventEditorViewModel eventEditor;   // null while the window is closed
-    MidiFile eventMidi;                 // file of the current playback
-    bool eventsPending;                 // not listed yet
-
-    void OpenEventEditor()
-    {
-        if (eventEditor == null)
-        {
-            eventEditor = new EventEditorViewModel(defs, Effects, SeekTo);
-            eventsPending = true;
-        }
-        LoadEvents();
-        view.ShowEventEditor(eventEditor, () => eventEditor = null);
-    }
-
-    // Lists the events of the current playback (a long file takes a moment: not before the playback starts).
-    void LoadEvents()
-    {
-        if (!eventsPending || eventEditor == null || eventMidi == null) return;
-        eventsPending = false;
-        eventEditor.Load(eventMidi, Mixer.Standard, Path.GetFileName(settingsFile));
-    }
-
-    // Values fixed in the Mixer or Effects tab (blue): the Event Editor shows the events they replace in blue too.
-    string eventsFixed = "";
-
-    void RefreshEventsFixed()
-    {
-        if (eventEditor == null) return;
-        var signature = GetSettingsSignature(false);
-        if (signature == eventsFixed) return;
-        eventsFixed = signature;
-        eventEditor.RefreshFixed();
-    }
-
-    // Playback from a time (seconds), as when the position bar is released there.
-    void SeekTo(double seconds)
-    {
-        if (playback == null) return;
-        SetPosition(seconds);
-        EndSeek();
-        TimeText = $"{MidiTools.FormatTime(TimeSpan.FromSeconds(seconds))} / {durationText}";
     }
 }

@@ -5,11 +5,15 @@ using Melanchall.DryWetMidi.Interaction;
 namespace PowerMIDI.Core;
 
 // One row of the event list (Event Editor): an event of the file, a note being one row (Note On and its Note Off).
-// Tick: position in the file; Track: track number (1-based); Channel: 0-15, -1 for an event without channel (SysEx,
-// meta); Kind: group used by the filters; Type, Data and Description: the texts of the row; Event: the event (null for a
-// note).
+// Tick: position in the file; Track: track number (1-based; 0: an event inserted with the Insert button, not in the
+// file); Channel: 0-15, -1 for an event without channel (SysEx, meta); Kind: group used by the filters; Type, Data and
+// Description: the texts of the row; Event: the event (the Note On of a note); Index: its place in its track (for the
+// changes, see MidiEventEdits; -1: inserted); OffIndex / Length: the Note Off of a note (-1 / 0 otherwise).
 public sealed record MidiEventRow(long Tick, int Track, int Channel, EventKind Kind, string Type, string Data, string Description,
-                                  MidiEvent Event = null);
+                                  MidiEvent Event = null, int Index = -1, int OffIndex = -1, long Length = 0)
+{
+    public bool IsInserted => Track == 0;
+}
 
 public enum EventKind { Note, Controller, Program, PitchBend, Aftertouch, SysEx, Meta }
 
@@ -20,19 +24,45 @@ public static class MidiEventList
 {
     // instrumentName(channel, program, bank MSB, bank LSB, GS rhythm part): name of the instrument the channel plays.
     // describeSysEx(data): description of a SysEx (null: the generic one).
+    // inserted: events written by the Insert button (position, event), listed with the file's ones.
     public static List<MidiEventRow> Build(MidiFile file, Func<int, int, int, int, int, string> instrumentName,
-                                           Func<byte[], string> describeSysEx = null)
+                                           Func<byte[], string> describeSysEx = null,
+                                           IEnumerable<(long Tick, MidiEvent Event)> inserted = null)
     {
-        // All the events of all tracks in the order they play (position, then track, then order in the track).
-        var objects = new List<(long Tick, int Track, int Order, ITimedObject Object)>();
+        // All the events of all tracks in the order they play (position, then track, then place in the track). A note:
+        // its Note On with the place and position of its Note Off (the first Note Off of the same channel and key after it).
+        var objects = new List<(long Tick, int Track, int Index, MidiEvent Event, int OffIndex, long OffTick)>();
         int track = 0;
         foreach (var chunk in file.GetTrackChunks())
         {
             track++;
-            int order = 0;
-            foreach (var o in chunk.GetObjects(ObjectType.TimedEvent | ObjectType.Note)) objects.Add((o.Time, track, order++, o));
+            var held = new Dictionary<(int, int), Queue<int>>();   // Note On waiting for their Note Off, by channel and key
+            long time = 0;
+            for (int i = 0; i < chunk.Events.Count; i++)
+            {
+                var e = chunk.Events[i];
+                time += e.DeltaTime;
+                if (e is NoteOnEvent on && on.Velocity > 0)
+                {
+                    var key = ((int)on.Channel, (int)on.NoteNumber);
+                    if (!held.TryGetValue(key, out var queue)) held[key] = queue = new();
+                    queue.Enqueue(objects.Count);
+                    objects.Add((time, track, i, e, -1, 0));
+                }
+                else if (e is NoteEvent off && held.TryGetValue(((int)off.Channel, (int)off.NoteNumber), out var waiting) && waiting.Count > 0)
+                {
+                    int o = waiting.Dequeue();
+                    objects[o] = objects[o] with { OffIndex = i, OffTick = time };
+                }
+                else objects.Add((time, track, i, e, -1, 0));
+            }
         }
-        objects.Sort((a, b) => a.Tick != b.Tick ? a.Tick.CompareTo(b.Tick) : a.Track != b.Track ? a.Track.CompareTo(b.Track) : a.Order.CompareTo(b.Order));
+        int order = 0;
+        foreach (var (tick, e) in inserted ?? Enumerable.Empty<(long, MidiEvent)>()) objects.Add((tick, 0, order++, e, -1, 0));
+        // Inserted events: after the file's ones at the same position (as MidiInsertions writes them).
+        objects.Sort((a, b) => a.Tick != b.Tick ? a.Tick.CompareTo(b.Tick)
+                             : (a.Track == 0) != (b.Track == 0) ? (a.Track == 0 ? 1 : -1)
+                             : a.Track != b.Track ? a.Track.CompareTo(b.Track) : a.Index.CompareTo(b.Index));
 
         // State of the channels while reading: bank, program, GS rhythm part, RPN / NRPN selected.
         int[] msb = new int[16], lsb = new int[16], program = new int[16], rhythm = new int[16];
@@ -42,23 +72,22 @@ public static class MidiEventList
         string Instrument(int c) => names[c] ??= instrumentName?.Invoke(c, program[c], msb[c], lsb[c], rhythm[c]) ?? "";
 
         var rows = new List<MidiEventRow>(objects.Count);
-        foreach (var (tick, t, _, o) in objects)
+        foreach (var (tick, t, index, e, offIndex, offTick) in objects)
         {
-            if (o is Note note)
-            {
-                int c = note.Channel;
-                rows.Add(new(tick, t, c, EventKind.Note, "Note",
-                             $"{NoteName(note.NoteNumber)} ({note.NoteNumber}) · vel {note.Velocity} · len {note.Length}", Instrument(c)));
-                continue;
-            }
-            var e = ((TimedEvent)o).Event;
+            int i = t == 0 ? -1 : index;
+            MidiEventRow Row(int channel, EventKind kind, string type, string data, string description) =>
+                new(tick, t, channel, kind, type, data, description, e, i);
             switch (e)
             {
+                case NoteOnEvent on when offIndex >= 0:
+                    rows.Add(Row(on.Channel, EventKind.Note, "Note", $"{NoteName(on.NoteNumber)} ({on.NoteNumber}) · vel {on.Velocity} · len {offTick - tick}",
+                                 Instrument(on.Channel)) with { OffIndex = offIndex, Length = offTick - tick });
+                    break;
                 case NoteOnEvent on:   // a Note On without its Note Off (or the reverse): not paired into a note
-                    rows.Add(new(tick, t, on.Channel, EventKind.Note, "Note On", $"{NoteName(on.NoteNumber)} ({on.NoteNumber}) · vel {on.Velocity}", Instrument(on.Channel), e));
+                    rows.Add(Row(on.Channel, EventKind.Note, "Note On", $"{NoteName(on.NoteNumber)} ({on.NoteNumber}) · vel {on.Velocity}", Instrument(on.Channel)));
                     break;
                 case NoteOffEvent off:
-                    rows.Add(new(tick, t, off.Channel, EventKind.Note, "Note Off", $"{NoteName(off.NoteNumber)} ({off.NoteNumber})", Instrument(off.Channel), e));
+                    rows.Add(Row(off.Channel, EventKind.Note, "Note Off", $"{NoteName(off.NoteNumber)} ({off.NoteNumber})", Instrument(off.Channel)));
                     break;
                 case ControlChangeEvent cc:
                 {
@@ -76,35 +105,34 @@ public static class MidiEventList
                             text += $" · {ParameterName(p.Rpn, p.Msb, p.Lsb)}";
                             break;
                     }
-                    rows.Add(new(tick, t, c, EventKind.Controller, "Control Change", $"{n} = {v}", text, e));
+                    rows.Add(Row(c, EventKind.Controller, "Control Change", $"{n} = {v}", text));
                     break;
                 }
                 case ProgramChangeEvent pc:
                     program[pc.Channel] = pc.ProgramNumber;
                     names[pc.Channel] = null;
-                    rows.Add(new(tick, t, pc.Channel, EventKind.Program, "Program Change",
-                                 $"{pc.ProgramNumber + 1} · bank {msb[pc.Channel]} / {lsb[pc.Channel]}", Instrument(pc.Channel), e));
+                    rows.Add(Row(pc.Channel, EventKind.Program, "Program Change", $"{pc.ProgramNumber + 1} · bank {msb[pc.Channel]} / {lsb[pc.Channel]}",
+                                 Instrument(pc.Channel)));
                     break;
                 case PitchBendEvent pb:
-                    rows.Add(new(tick, t, pb.Channel, EventKind.PitchBend, "Pitch Bend", MidiTools.FormatSigned(pb.PitchValue - 8192), "", e));
+                    rows.Add(Row(pb.Channel, EventKind.PitchBend, "Pitch Bend", MidiTools.FormatSigned(pb.PitchValue - 8192), ""));
                     break;
                 case ChannelAftertouchEvent at:
-                    rows.Add(new(tick, t, at.Channel, EventKind.Aftertouch, "Channel Pressure", $"{at.AftertouchValue}", "", e));
+                    rows.Add(Row(at.Channel, EventKind.Aftertouch, "Channel Pressure", $"{at.AftertouchValue}", ""));
                     break;
                 case NoteAftertouchEvent pat:
-                    rows.Add(new(tick, t, pat.Channel, EventKind.Aftertouch, "Poly Pressure",
-                                 $"{NoteName(pat.NoteNumber)} ({pat.NoteNumber}) = {pat.AftertouchValue}", "", e));
+                    rows.Add(Row(pat.Channel, EventKind.Aftertouch, "Poly Pressure", $"{NoteName(pat.NoteNumber)} ({pat.NoteNumber}) = {pat.AftertouchValue}", ""));
                     break;
                 case SysExEvent sx:
                 {
                     var d = sx.Data;
                     int c = ChannelMixer.RhythmPartChannel(d);
                     if (c >= 0) (rhythm[c], names[c]) = (d[7], null);
-                    rows.Add(new(tick, t, -1, EventKind.SysEx, "SysEx", Hex(d), describeSysEx?.Invoke(d) ?? DescribeSysEx(d), e));
+                    rows.Add(Row(-1, EventKind.SysEx, "SysEx", Hex(d), describeSysEx?.Invoke(d) ?? DescribeSysEx(d)));
                     break;
                 }
                 default:
-                    rows.Add(new(tick, t, ChannelOf(e), EventKind.Meta, MetaType(e), MetaData(e), "", e));
+                    rows.Add(Row(ChannelOf(e), EventKind.Meta, MetaType(e), MetaData(e), ""));
                     break;
             }
         }
@@ -153,12 +181,12 @@ public static class MidiEventList
     static readonly string[] NoteNames = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
     public static string NoteName(int n) => $"{NoteNames[n % 12]}{n / 12 - 2}";
 
-    // SysEx bytes in hexadecimal, without F0 / F7 (cut after 48 bytes).
-    public static string Hex(byte[] d)
+    // SysEx bytes in hexadecimal, without F0 / F7 (cut after 48 bytes, unless all).
+    public static string Hex(byte[] d, bool all = false)
     {
         var bytes = d.Length > 0 && d[^1] == 0xF7 ? d[..^1] : d;
-        var text = string.Join(" ", bytes.Take(48).Select(b => b.ToString("X2")));
-        return bytes.Length > 48 ? text + $" … ({bytes.Length} bytes)" : text;
+        var text = string.Join(" ", (all ? bytes : bytes.Take(48)).Select(b => b.ToString("X2")));
+        return !all && bytes.Length > 48 ? text + $" … ({bytes.Length} bytes)" : text;
     }
 
     static readonly Dictionary<int, string> Controllers = new()

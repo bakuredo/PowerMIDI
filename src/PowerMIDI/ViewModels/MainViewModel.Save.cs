@@ -35,7 +35,7 @@ public sealed partial class MainViewModel
         var forceMode = isForced ? selectedMode : null;
         // Effects tab (effects, Part and Drums pages): the modules of the mode of the track that have fixed values.
         var modules = ModuleSettings.All.Where(m => (m.Standard == null || m.Standard == Mixer.Standard) && m.HasFixed).ToList();
-        if (channels.Count == 0 && forceMode == null && modules.Count == 0 && insertions.Count == 0)
+        if (channels.Count == 0 && forceMode == null && modules.Count == 0 && insertions.Count == 0 && editedFile == null)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
@@ -68,9 +68,11 @@ public sealed partial class MainViewModel
             }
         }
 
-        // Re-read from disk: the original file is never modified in memory or during playback.
-        var midi = MidiTools.ReadFile(source);
+        // Re-read from disk, or the copy changed in the Event Editor: the original file is never modified in memory or
+        // during playback.
+        var midi = editedFile?.Clone() ?? MidiTools.ReadFile(source);
         var report = new List<string>();
+        if (editedFile != null) report.Add("events changed in Event Editor");
         // Insertions (Insert button) first: the settings fixed for the whole track then replace them like the file's.
         if (insertions.Count > 0)
             report.Add($"insertions: {insertions.Count} position(s), {MidiInsertions.Apply(midi, insertions)} event(s) written");
@@ -122,6 +124,7 @@ public sealed partial class MainViewModel
         foreach (var m in ModuleSettings.All)
             foreach (var (key, v) in m.Fixed()) parts.Add($"{m.Name}{key.A}/{key.B}/{key.C}={v}");
         if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");
+        if (editedFile != null) parts.Add($"edits={editVersion}");   // Event Editor
         if (withInsertions) foreach (var insertion in insertions) parts.Add($"ins{insertion.Tick}={insertion.Description}");
         return string.Join(";", parts);
     }

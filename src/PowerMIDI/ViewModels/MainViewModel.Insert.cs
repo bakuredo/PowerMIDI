@@ -46,10 +46,11 @@ public sealed partial class MainViewModel
 
     long CurrentTick() => playback != null ? ((MidiTimeSpan)playback.GetCurrentTime<MidiTimeSpan>()).TimeSpan : 0;
 
-    // The track to play: the file, with the insertions if it is the one they belong to.
+    // The track to play: the file (with the changes of the Event Editor) and the insertions, if it is the one they
+    // belong to.
     MidiFile ReadTrackFile(string path)
     {
-        var midi = MidiTools.ReadFile(path);
+        var midi = path == settingsFile && editedFile != null ? editedFile.Clone() : MidiTools.ReadFile(path);
         if (path == settingsFile && insertions.Count > 0) MidiInsertions.Apply(midi, insertions);
         return midi;
     }
