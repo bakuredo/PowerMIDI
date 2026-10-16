@@ -213,6 +213,20 @@ public static class GsXgEffects
         return result;
     }
 
+    // Effect parameters a SysEx writes and their values (Event Editor), without storing them.
+    public static List<(int Param, int Value)> ValuesOf(byte[] d)
+    {
+        var result = new List<(int, int)>();
+        foreach (var g in ValueBytes(d, out _, out _)?.GroupBy(b => b[1]) ?? Enumerable.Empty<IGrouping<int, int[]>>())
+        {
+            int e = g.Key, v = 0;
+            foreach (var b in g)
+                v = Size(e) == 1 || b[2] == 2 ? d[b[0]] : b[2] == 0 ? d[b[0]] * 128 + v % 128 : v / 128 * 128 + d[b[0]];
+            result.Add((e, v));
+        }
+        return result;
+    }
+
     // Byte to write for value v of a parameter (part 0 = single byte or MSB, 1 = LSB).
     internal static byte ValueByte(int e, int part, int v)
     {

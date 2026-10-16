@@ -20,6 +20,7 @@ public sealed partial class MainViewModel : ObservableObject
     const string GlyphPause = "";
 
     readonly IMainView view;
+    readonly InstrumentDefinitions defs;
     readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     readonly DispatcherTimer ledTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     readonly Random random = new();
@@ -37,6 +38,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(IMainView view, InstrumentDefinitions defs)
     {
         this.view = view;
+        this.defs = defs;
         Mixer = new MixerViewModel(defs, () => output, s => Status = s, view.ShowError);
         Effects = new EffectsViewModel(defs, () => output, view.ShowError);
 
@@ -53,6 +55,7 @@ public sealed partial class MainViewModel : ObservableObject
         NextCommand = Command(() => MoveTrack(1));
         PreviousCommand = Command(Previous);
         RepeatCommand = Command(() => RepeatMode = (RepeatMode + 1) % 3);
+        EventsCommand = Command(OpenEventEditor);
 
         Mixer.KeyboardToggle = c => Run(() => ToggleKeyboardChannel(c));
 
@@ -86,6 +89,7 @@ public sealed partial class MainViewModel : ObservableObject
     public ICommand NextCommand { get; }
     public ICommand PreviousCommand { get; }
     public ICommand RepeatCommand { get; }
+    public ICommand EventsCommand { get; }       // Event Editor window
 
     string status = "Drop MIDI files or a folder onto the window.";
     public string Status { get => status; set => Set(ref status, value); }
@@ -676,6 +680,8 @@ public sealed partial class MainViewModel : ObservableObject
         pb.Speed = speed / 100;   // speed and pitch sliders (MainViewModel.Speed.cs)
         playback = pb;
         tempoMap = midi.GetTempoMap();
+        eventMidi = midi;
+        eventsPending = true;   // the Event Editor lists it at the next timer tick (after the start)
         TimeSpan length = pb.GetDuration<MetricTimeSpan>();
         durationText = MidiTools.FormatTime(length);
         Duration = Math.Max(1, length.TotalSeconds);
@@ -769,6 +775,8 @@ public sealed partial class MainViewModel : ObservableObject
         Effects.Refresh();
         DisplayText = ModuleDisplay.Text;
         UpdateInsertEnabled();
+        LoadEvents();
+        RefreshEventsFixed();
         if (playback == null || state != "playing") return;
         UpdateLoop();
         if (!playback.IsRunning)   // end of track
@@ -780,5 +788,53 @@ public sealed partial class MainViewModel : ObservableObject
         TimeSpan now = playback.GetCurrentTime<MetricTimeSpan>();
         SetPosition(now.TotalSeconds);
         TimeText = $"{MidiTools.FormatTime(now)} / {durationText}";
+        eventEditor?.UpdatePosition(now.TotalSeconds);
+    }
+
+    // ---------- Event Editor ----------
+
+    // The window shows the events of the track being played (with its insertions); it follows the playback.
+    EventEditorViewModel eventEditor;   // null while the window is closed
+    MidiFile eventMidi;                 // file of the current playback
+    bool eventsPending;                 // not listed yet
+
+    void OpenEventEditor()
+    {
+        if (eventEditor == null)
+        {
+            eventEditor = new EventEditorViewModel(defs, Effects, SeekTo);
+            eventsPending = true;
+        }
+        LoadEvents();
+        view.ShowEventEditor(eventEditor, () => eventEditor = null);
+    }
+
+    // Lists the events of the current playback (a long file takes a moment: not before the playback starts).
+    void LoadEvents()
+    {
+        if (!eventsPending || eventEditor == null || eventMidi == null) return;
+        eventsPending = false;
+        eventEditor.Load(eventMidi, Mixer.Standard, Path.GetFileName(settingsFile));
+    }
+
+    // Values fixed in the Mixer or Effects tab (blue): the Event Editor shows the events they replace in blue too.
+    string eventsFixed = "";
+
+    void RefreshEventsFixed()
+    {
+        if (eventEditor == null) return;
+        var signature = GetSettingsSignature(false);
+        if (signature == eventsFixed) return;
+        eventsFixed = signature;
+        eventEditor.RefreshFixed();
+    }
+
+    // Playback from a time (seconds), as when the position bar is released there.
+    void SeekTo(double seconds)
+    {
+        if (playback == null) return;
+        SetPosition(seconds);
+        EndSeek();
+        TimeText = $"{MidiTools.FormatTime(TimeSpan.FromSeconds(seconds))} / {durationText}";
     }
 }

@@ -27,4 +27,7 @@ public interface IMainView
 
     // Wait cursor while files are being read.
     void SetBusy(bool busy);
+
+    // Shows the Event Editor window (brought to the front if open); closed is called when it closes.
+    void ShowEventEditor(EventEditorViewModel editor, Action closed) { }
 }

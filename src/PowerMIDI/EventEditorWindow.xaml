@@ -1,0 +1,73 @@
+<Window x:Class="PowerMIDI.EventEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:PowerMIDI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
+        Title="{Binding Title}" Icon="PowerMIDI.ico" Width="1100" Height="640" MinWidth="720" MinHeight="300"
+        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource WindowTextBrush}" FontFamily="Segoe UI" FontSize="13"
+        WindowStartupLocation="CenterScreen"
+        d:DataContext="{d:DesignInstance vm:EventEditorViewModel}">
+  <!-- Event Editor (see EventEditorViewModel): the events of the current track, filtered; the row being played is
+       selected while Follow is on; double click (or Enter) on a row: playback from there. A window of its own (not kept
+       above the main one), closed with it. -->
+  <Window.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Styles.xaml"/>
+      </ResourceDictionary.MergedDictionaries>
+      <!-- An event replaced by a value fixed in the Mixer or Effects tab is blue, as the value there; the tooltip says by what. -->
+      <Style TargetType="ListViewItem" BasedOn="{StaticResource ThemedListViewItem}">
+        <EventSetter Event="MouseDoubleClick" Handler="OnRowDoubleClick"/>
+        <Style.Triggers>
+          <DataTrigger Binding="{Binding IsFixed}" Value="True">
+            <Setter Property="Foreground" Value="{DynamicResource FixedBrush}"/>
+            <Setter Property="ToolTip" Value="{Binding FixedText}"/>
+          </DataTrigger>
+        </Style.Triggers>
+      </Style>
+      <!-- Hexadecimal and numbers in a fixed-width font. -->
+      <DataTemplate x:Key="DataCell">
+        <TextBlock Text="{Binding Data}" FontFamily="Consolas" TextTrimming="CharacterEllipsis"/>
+      </DataTemplate>
+      <DataTemplate x:Key="DescriptionCell">
+        <TextBlock Text="{Binding Description}" TextTrimming="CharacterEllipsis"/>
+      </DataTemplate>
+    </ResourceDictionary>
+  </Window.Resources>
+
+  <DockPanel Margin="12">
+    <!-- Filters -->
+    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8" LastChildFill="False">
+      <ComboBox Width="190" ItemsSource="{Binding Tracks}" SelectedIndex="{Binding TrackFilter}" ToolTip="Show events of one track"/>
+      <ComboBox Width="120" Margin="8,0,0,0" ItemsSource="{Binding Channels}" SelectedIndex="{Binding ChannelFilter}"
+                ToolTip="Show events of one channel (No channel: SysEx and meta events)"/>
+      <ComboBox Width="140" Margin="8,0,0,0" ItemsSource="{Binding Kinds}" SelectedIndex="{Binding KindFilter}" ToolTip="Show one kind of events"/>
+      <TextBox Width="200" Margin="8,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
+               Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search in type, data and description"/>
+      <ToggleButton DockPanel.Dock="Right" Content="Follow" Padding="10,3" IsChecked="{Binding Follow}"
+                    ToolTip="Select event being played"/>
+      <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" Foreground="{DynamicResource WindowTextMutedBrush}"
+                 VerticalAlignment="Center" Margin="0,0,12,0"/>
+    </DockPanel>
+
+    <ListView x:Name="EventList" Style="{StaticResource ThemedListView}" ItemsSource="{Binding View}"
+              SelectedItem="{Binding SelectedRow}" SelectionMode="Single"
+              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling">
+      <ListView.InputBindings>
+        <KeyBinding Key="Return" Command="{Binding SeekCommand}" CommandParameter="{Binding SelectedItem, ElementName=EventList}"/>
+      </ListView.InputBindings>
+      <ListView.View>
+        <GridView>
+          <GridViewColumn Header="Position" Width="80" DisplayMemberBinding="{Binding Position}"/>
+          <GridViewColumn Header="Time" Width="80" DisplayMemberBinding="{Binding Time}"/>
+          <GridViewColumn Header="Track" Width="50" DisplayMemberBinding="{Binding Track}"/>
+          <GridViewColumn Header="Ch" Width="36" DisplayMemberBinding="{Binding Channel}"/>
+          <GridViewColumn Header="Type" Width="120" DisplayMemberBinding="{Binding Type}"/>
+          <GridViewColumn Header="Data" Width="300" CellTemplate="{StaticResource DataCell}"/>
+          <GridViewColumn Header="Description" Width="360" CellTemplate="{StaticResource DescriptionCell}"/>
+        </GridView>
+      </ListView.View>
+    </ListView>
+  </DockPanel>
+</Window>

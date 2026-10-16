@@ -179,6 +179,7 @@ public partial class MainWindow : Window, IMainView
         try { keepOpen = !vm.ConfirmLeaveSettings(); } catch { }
         if (keepOpen) { e.Cancel = true; return; }
         try { SaveSettings(); } catch { }
+        CloseEventEditor();
         vm.Shutdown();
     }
 
@@ -230,6 +231,19 @@ public partial class MainWindow : Window, IMainView
         MessageBox.Show(this, text, "PowerMIDI", MessageBoxButton.OKCancel, MessageBoxImage.Information) == MessageBoxResult.OK;
 
     public void SetBusy(bool busy) => Cursor = busy ? Cursors.Wait : null;
+
+    // Event Editor: one window, of its own (not kept above this one), closed with this one.
+    EventEditorWindow eventWindow;
+
+    public void ShowEventEditor(EventEditorViewModel editor, Action closed)
+    {
+        if (eventWindow != null) { eventWindow.Activate(); return; }
+        eventWindow = new EventEditorWindow(editor);
+        eventWindow.Closed += (_, _) => { eventWindow = null; closed(); };
+        eventWindow.Show();
+    }
+
+    void CloseEventEditor() => eventWindow?.Close();
 
     // ---------- PowerMIDI settings (PowerMIDI.ini, next to the program) ----------
 

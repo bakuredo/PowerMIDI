@@ -12,6 +12,10 @@
         Drop="OnDrop" PreviewKeyDown="OnPreviewKeyDown" PreviewKeyUp="OnPreviewKeyUp" Deactivated="OnDeactivated"
         Closing="OnClosing">
   <Window.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Styles.xaml"/>   <!-- buttons, lists -->
+      </ResourceDictionary.MergedDictionaries>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
     <!-- Instrument list of a channel: the look of a Windows list, with a search box above the sounds (it filters
          them while typing; see ChannelViewModel.SearchText). The colors of the closed list are Windows' own. -->
@@ -60,53 +64,9 @@
         <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.6"/></Trigger>
       </ControlTemplate.Triggers>
     </ControlTemplate>
-    <Style TargetType="Button">
-      <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
-      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
-      <Setter Property="Padding" Value="10,4"/>
-      <Setter Property="Margin" Value="0,0,6,0"/>
-      <Setter Property="Cursor" Value="Hand"/>
-      <!-- Hover / click: Windows lightens background, so text turns black to stay readable. -->
-      <Style.Triggers>
-        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-        <Trigger Property="IsPressed" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-      </Style.Triggers>
-    </Style>
-    <!-- Toggle buttons (mixer M / S, EFX channels): same rules, and black text when
-         pressed (light background). State colors (red mute, green solo, blue fixed) take precedence. -->
-    <Style TargetType="ToggleButton">
-      <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
-      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
-      <Setter Property="Cursor" Value="Hand"/>
-      <Style.Triggers>
-        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-        <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-      </Style.Triggers>
-    </Style>
-    <!-- Playlist: hovered or selected row in the colors of the theme; double click plays the track. -->
-    <Style TargetType="ListViewItem">
+    <!-- Playlist rows (Styles.xaml); double click plays the track. -->
+    <Style TargetType="ListViewItem" BasedOn="{StaticResource ThemedListViewItem}">
       <EventSetter Event="MouseDoubleClick" Handler="OnPlaylistItemDoubleClick"/>
-      <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <!-- Own template: the hovered and the selected rows in the colors of the theme (the default one draws them light). -->
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="ListViewItem">
-            <Border x:Name="Bd" Background="Transparent" Padding="0,2" SnapsToDevicePixels="True">
-              <GridViewRowPresenter VerticalAlignment="Center"/>
-            </Border>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TabHoverBrush}"/>
-              </Trigger>
-              <Trigger Property="IsSelected" Value="True">
-                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TabSelectedBrush}"/>
-              </Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
     </Style>
     <Style x:Key="Transport" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
       <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
@@ -137,42 +97,6 @@
       <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
       <Setter Property="ToolTip" Value="Inserts at the current position the settings changed while it is pressed."/>
     </Style>
-    <Style TargetType="GridViewColumnHeader">
-      <Setter Property="Background" Value="{DynamicResource HeaderBrush}"/>
-      <Setter Property="Foreground" Value="{DynamicResource TextSoftBrush}"/>
-      <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
-      <Setter Property="HorizontalContentAlignment" Value="Left"/>
-      <Setter Property="Padding" Value="6,4"/>
-      <!-- Own template: the column separators (resize grips) of the default one are white. -->
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="GridViewColumnHeader">
-            <Grid>
-              <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="0,0,0,1"
-                      Padding="{TemplateBinding Padding}">
-                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"
-                                  RecognizesAccessKey="True"/>
-              </Border>
-              <Thumb x:Name="PART_HeaderGripper" HorizontalAlignment="Right" Width="9" Margin="0,0,-4,0" Cursor="SizeWE">
-                <Thumb.Template>
-                  <ControlTemplate TargetType="Thumb">
-                    <Border Background="Transparent">
-                      <Rectangle Width="1" HorizontalAlignment="Center" Fill="{DynamicResource LineBrush}"/>
-                    </Border>
-                  </ControlTemplate>
-                </Thumb.Template>
-              </Thumb>
-            </Grid>
-            <ControlTemplate.Triggers>
-              <!-- The filler after the last column has no separator. -->
-              <Trigger Property="Role" Value="Padding">
-                <Setter TargetName="PART_HeaderGripper" Property="Visibility" Value="Collapsed"/>
-              </Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
     <!-- Dark tabs: wider headers, light text; selected tab is lighter. -->
     <Style TargetType="TabItem">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -197,6 +121,7 @@
         </Setter.Value>
       </Setter>
     </Style>
+    </ResourceDictionary>
   </Window.Resources>
 
   <DockPanel Margin="12">
@@ -706,21 +631,9 @@
     </StackPanel>
 
     <!-- Playlist: double click (see the ListViewItem style) or Enter plays the track, Del removes the selected tracks. -->
-    <ListView x:Name="PlaylistView" Grid.Row="1" Background="{DynamicResource PanelBrush}" Foreground="{DynamicResource TextBrush}"
-              BorderBrush="{DynamicResource LineBrush}" SelectionMode="Extended" ItemsSource="{Binding Playlist}"
+    <ListView x:Name="PlaylistView" Grid.Row="1" Style="{StaticResource ThemedListView}"
+              SelectionMode="Extended" ItemsSource="{Binding Playlist}"
               SelectedItem="{Binding SelectedTrack}" SelectionChanged="OnPlaylistSelectionChanged">
-      <!-- Own template: the default one lights the border up under the mouse and with the focus. -->
-      <ListView.Template>
-        <ControlTemplate TargetType="ListView">
-          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
-            <ScrollViewer Style="{DynamicResource {x:Static GridView.GridViewScrollViewerStyleKey}}" Padding="{TemplateBinding Padding}"
-                          Focusable="False">
-              <ItemsPresenter/>
-            </ScrollViewer>
-          </Border>
-        </ControlTemplate>
-      </ListView.Template>
       <ListView.InputBindings>
         <KeyBinding Key="Return" Command="{Binding PlaySelectedCommand}"/>
         <KeyBinding Key="Delete" Command="{Binding RemoveCommand}"
@@ -856,6 +769,9 @@
                  file has sent nothing. -->
             <ToggleButton Style="{StaticResource TransportToggle}" Content="&#xE7F4;" Margin="6,0,0,0" IsChecked="{Binding DisplayButton}"
                           ToolTip="Module display: text and picture sent by the file"/>
+            <!-- Event Editor window: the events of the track (see EventEditorViewModel). -->
+            <Button Style="{StaticResource Transport}" Content="&#xE8FD;" Margin="6,0,0,0" Command="{Binding EventsCommand}"
+                    ToolTip="Event list of track"/>
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,8,0"/>

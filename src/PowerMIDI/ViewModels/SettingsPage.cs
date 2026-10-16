@@ -1,4 +1,5 @@
 using Melanchall.DryWetMidi.Multimedia;
+using PowerMIDI.Core;
 
 namespace PowerMIDI.ViewModels;
 
@@ -169,8 +170,7 @@ public sealed class SettingsPage
     public string Describe(int g, int n, int p, int v) => $"{DescribePrefix(g, n)} {Params[p].Label}: {Params[p].Text(v)}";
 
     // Name of a note in the Yamaha notation (C3 = 60).
-    static readonly string[] NoteNames = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    public static string NoteName(int n) => $"{NoteNames[n % 12]}{n / 12 - 2}";
+    public static string NoteName(int n) => MidiEventList.NoteName(n);
 
     bool OwnFixed(int g) => Params.Any(x => x.OwnIsFixed?.Invoke(g) == true);
 
