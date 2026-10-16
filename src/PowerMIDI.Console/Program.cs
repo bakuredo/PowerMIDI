@@ -117,6 +117,7 @@ try
 
             bool paused = false;
             playback.Start();
+            PlaybackPriority.Set(true);   // same timing without a visible window (timer, priority, no sleep)
             try
             {
                 while (playback.IsRunning || paused)
@@ -134,6 +135,7 @@ try
                             case ConsoleKey.Spacebar:
                                 if (paused) playback.Start(); else playback.Stop();
                                 paused = !paused;
+                                PlaybackPriority.Set(!paused);
                                 break;
                             case ConsoleKey.R: playback.MoveToStart(); break;
                             case ConsoleKey.RightArrow: playback.MoveForward(tenSeconds); break;
@@ -145,7 +147,7 @@ try
                     Thread.Sleep(50);
                 }
             }
-            finally { playback.Stop(); }
+            finally { playback.Stop(); PlaybackPriority.Set(false); }
         }
 
         switch (action)

@@ -523,6 +523,7 @@ public sealed partial class MainViewModel : ObservableObject
     void SetState(string newState)
     {
         state = newState;
+        PlaybackPriority.Set(newState == "playing");   // same timing in the background (timer, priority, no sleep)
         PlayGlyph = newState == "playing" ? GlyphPause : GlyphPlay;
         HasTrack = current != null;
         UpdateInsertEnabled();
