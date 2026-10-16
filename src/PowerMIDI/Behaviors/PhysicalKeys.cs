@@ -7,7 +7,9 @@ namespace PowerMIDI.Behaviors;
 // the key right of Tab is 0x10 whether it reads A, Q or anything else.
 public static class PhysicalKeys
 {
-    [DllImport("user32.dll")] static extern uint MapVirtualKey(uint code, uint mapType);
+    // Loaded from the system folder only (never a DLL of the same name next to the program).
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("user32.dll")]
+    static extern uint MapVirtualKey(uint code, uint mapType);
     const uint VkToScan = 0, ScanToVk = 1, VkToChar = 2;
 
     // Scan code of a WPF key in the current layout (0 if none).

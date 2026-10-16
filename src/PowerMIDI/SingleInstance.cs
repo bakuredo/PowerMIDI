@@ -13,7 +13,9 @@ public static class SingleInstance
     static readonly string Id = $"PowerMIDI.SingleInstance.{Environment.UserName}.{Process.GetCurrentProcess().SessionId}";
     static Mutex mutex;   // held by the running instance until it exits
 
-    [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(int processId);
+    // Loaded from the system folder only (never a DLL of the same name next to the program).
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("user32.dll")]
+    static extern bool AllowSetForegroundWindow(int processId);
     const int AnyProcess = -1;
 
     // True if this process is the first instance (it then owns the mutex).

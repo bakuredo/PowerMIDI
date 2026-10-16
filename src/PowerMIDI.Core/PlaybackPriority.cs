@@ -50,10 +50,15 @@ public static class PlaybackPriority
         public uint Version, ControlMask, StateMask;
     }
 
-    [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
-    [DllImport("kernel32.dll", SetLastError = true)]
+    // Windows DLLs are loaded from the system folder only (never a DLL of the same name next to the program).
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("kernel32.dll")]
+    static extern IntPtr GetCurrentProcess();
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("kernel32.dll", SetLastError = true)]
     static extern bool SetProcessInformation(IntPtr process, int informationClass, ref PowerThrottlingState information, uint size);
-    [DllImport("kernel32.dll")] static extern uint SetThreadExecutionState(uint flags);
-    [DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint period);
-    [DllImport("winmm.dll")] static extern uint timeEndPeriod(uint period);
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("kernel32.dll")]
+    static extern uint SetThreadExecutionState(uint flags);
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("winmm.dll")]
+    static extern uint timeBeginPeriod(uint period);
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("winmm.dll")]
+    static extern uint timeEndPeriod(uint period);
 }
