@@ -35,7 +35,7 @@ public sealed partial class MainViewModel
         {
             loopRestore = MidiTools.GetLoopRestore(midi, l.Start, l.End);
             var from = TimeConverter.ConvertFrom(new MetricTimeSpan(Math.Max(0, (long)(TickToTime(l.End) - LoopEndWindow).TotalMicroseconds)), tempoMap);
-            loopEndNotes = MidiTools.GetLoopEndNotes(midi, from, l.End);
+            loopEndNotes = MidiTools.GetLoopEndNotes(midi, l.Start, from, l.End);
             double start = TickToTime(l.Start).TotalSeconds, end = TickToTime(l.End).TotalSeconds;
             LoopStartFraction = Math.Min(1, start / Duration);
             LoopEndFraction = Math.Min(1, end / Duration);
@@ -51,8 +51,8 @@ public sealed partial class MainViewModel
     // The loop restarts (playback thread): the module still has the settings of the loop end (e.g. the volume after
     // a fade out). Those of the loop start are sent again, through the mixer like the events of the file (values
     // set by hand keep priority, the display follows). Before them, the Note Off of the notes ending in the last
-    // moments of the loop (LoopEndWindow): the playback library may have skipped them (see MidiTools.GetLoopEndNotes);
-    // sent twice, a Note Off does nothing.
+    // moments of the loop (LoopEndWindow: the playback library may have skipped them) and of those held past its end
+    // (see MidiTools.GetLoopEndNotes); sent twice, a Note Off does nothing.
     List<MidiEvent> loopRestore;
     List<(int Channel, int Note)> loopEndNotes;
     static readonly TimeSpan LoopEndWindow = TimeSpan.FromMilliseconds(100);

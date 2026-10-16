@@ -240,17 +240,21 @@ public static class MidiTools
         return events;
     }
 
-    // Notes of the loop that end between from and its end (ticks): their Note Off is sent again when the loop restarts.
-    // The playback library loops as soon as its clock passes the loop end, without playing the events of the last clock
-    // step; with a coarse clock (Windows lowers the timer resolution of a process without a visible window), the Note
-    // Off of a note ending right at the loop end can be skipped, and the note then hangs. Not the notes still held across
-    // the loop end (same channel and key).
-    public static List<(int Channel, int Note)> GetLoopEndNotes(MidiFile file, long from, long end)
+    // Notes to turn off when the loop (start-end, ticks) restarts, as the game engines these loops are written for do:
+    // - those ending between from and the loop end: the playback library loops as soon as its clock passes the loop
+    //   end, without playing the events of the last clock step; with a coarse clock (Windows lowers the timer resolution
+    //   of a process without a visible window) or a short tick, the Note Off of a note ending right at the loop end can
+    //   be skipped, and the note then hangs;
+    // - those started in the loop and held past its end (a pad on the loop point): their Note Off, after the loop end,
+    //   is never played while looping; the next pass plays them again from their start.
+    // Not the notes started before the loop and held across it (a drone from the intro): the loop never plays them
+    // again, they keep sounding (same channel and key).
+    public static List<(int Channel, int Note)> GetLoopEndNotes(MidiFile file, long start, long from, long end)
     {
         var notes = file.GetNotes().Where(n => n.Time < end).ToList();
-        var held = notes.Where(n => n.EndTime > end).Select(n => ((int)n.Channel, (int)n.NoteNumber)).ToHashSet();
-        return notes.Where(n => n.EndTime >= from && n.EndTime <= end).Select(n => ((int)n.Channel, (int)n.NoteNumber))
-                    .Where(k => !held.Contains(k)).Distinct().ToList();
+        var drones = notes.Where(n => n.Time < start && n.EndTime > end).Select(n => ((int)n.Channel, (int)n.NoteNumber)).ToHashSet();
+        return notes.Where(n => n.EndTime >= from && n.EndTime <= end || n.Time >= start && n.EndTime > end)
+                    .Select(n => ((int)n.Channel, (int)n.NoteNumber)).Where(k => !drones.Contains(k)).Distinct().ToList();
     }
 
     // ---------- Texts of a file (title, copyright, comments) ----------
