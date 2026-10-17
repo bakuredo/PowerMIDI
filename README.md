@@ -1,12 +1,12 @@
 # PowerMIDI
 
 MIDI file player and editor for Windows, made for hardware or software sound modules :
-- **Roland Sound Canvas Series**: 88emuPlayer, Roland SCVA, Roland SC-8850 and other GS modules
+- **Roland Sound Canvas Series**: 88emuPlayer, Nuked-SC55-P256, Roland SC-8850 and other GS modules
 - **Yamaha MU Series**: S-MU2000, Yamaha MU2000EX, Yamaha MU50, S-YXG50 and other XG modules
 - **Roland MT-32**: MuntVSTi or Roland MT-32 / CM-64
 - **General MIDI Level 1 and 2**: Too much devices and software !
 
-![PowerMIDI playing a file: playlist, playback controls and Mixer tab](docs/screenshot.png)
+![PowerMIDI](docs/screenshot.png)
 
 ## Features
 
@@ -18,6 +18,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
   chorus, delay / variation, filter and envelope settings), with instrument names for each mode.
 - **Effects**: Reverb, Chorus, Delay, EQ, EFX, Drums, Part in GS mode - Reverb, Chorus, Variation, Insertion, Multi-EQ, Drums, Part in XG -
   Reverb, Drums, Part in MT-32 - Reverb, Chorus, Drums, Part in GM2.
+- **Event editor**: List all events of file and editing with filters, add, append and replace functions.
 - **Saving**: Changed settings (in blue) are written into a copy of MIDI file, for whole track or at a position
   of track (Insert mode).
 - **File loops markers**: `loopStart` / `loopEnd`, `[` / `]` markers and CC111 are followed.
@@ -34,7 +35,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 
 - Windows 10 or 11, 64-bit.
 - [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) or download standalone version.
-- A MIDI output device (a hardware module, software, VST or included with Windows if you want...).
+- A MIDI output device (a hardware module, software, VST or included with Windows).
 
 ## Building
 
