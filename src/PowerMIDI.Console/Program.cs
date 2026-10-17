@@ -133,7 +133,8 @@ try
                         switch (k.Key)
                         {
                             case ConsoleKey.Spacebar:
-                                if (paused) playback.Start(); else playback.Stop();
+                                if (paused) playback.Start();
+                                else { playback.Stop(); MidiTools.ReleaseNotes(output, new int[16], new int[16]); }   // pedals not followed here
                                 paused = !paused;
                                 PlaybackPriority.Set(!paused);
                                 break;

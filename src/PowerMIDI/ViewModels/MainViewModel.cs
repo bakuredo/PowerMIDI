@@ -491,7 +491,6 @@ public sealed partial class MainViewModel : ObservableObject
         IsSeeking = false;
         Run(() =>
         {
-            CancelInsertMode();
             if (playback == null) return;
             playback.MoveToTime(new MetricTimeSpan(TimeSpan.FromSeconds(position)));
             // The seek resends the file's CC7 and programs: reapply sliders and manual choices.
@@ -530,7 +529,6 @@ public sealed partial class MainViewModel : ObservableObject
         PlaybackPriority.Set(newState == "playing");   // same timing in the background (timer, priority, no sleep)
         PlayGlyph = newState == "playing" ? GlyphPause : GlyphPlay;
         HasTrack = current != null;
-        UpdateInsertEnabled();
     }
 
     // ---------- Volume, shuffle, repeat ----------
@@ -580,7 +578,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     void StopTrack()
     {
-        CancelInsertMode();
         ReleaseKeyboardNotes();
         if (playback != null)
         {
@@ -592,9 +589,21 @@ public sealed partial class MainViewModel : ObservableObject
         SetState("stopped");
     }
 
+    // Pause: the playback stops where it is, and no note keeps sounding (see MidiTools.ReleaseNotes).
+    void PausePlayback()
+    {
+        playback.Stop();
+        ReleaseNotes();
+        SetState("paused");
+    }
+
+    void ReleaseNotes()
+    {
+        if (output != null) MidiTools.ReleaseNotes(output, ChannelMixer.Sustain, ChannelMixer.Sostenuto);
+    }
+
     void StartTrack(PlaylistItem item)
     {
-        CancelInsertMode();
         // Another file with unsaved settings: ask before losing them.
         if (settingsFile != null && settingsFile != item.Path && !ConfirmLeaveSettings()) return;
         StopTrack();
@@ -612,7 +621,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         settingsFile = item.Path;
 
-        var midi = ReadTrackFile(item.Path);   // with its insertions (Insert button)
+        var midi = ReadTrackFile(item.Path);   // with its changes (Event Editor: changes, Record)
         var std = selectedMode == "Auto" ? MidiTools.GetStandard(midi) : selectedMode;
         ChannelMixer.ForceMode = isForced;   // file resets ignored
         ChannelMixer.Mt32Mode = std == "MT-32";   // MT-32 reverb SysEx follow the Effects tab
@@ -630,7 +639,6 @@ public sealed partial class MainViewModel : ObservableObject
 
         loopsDone = 0;
         var pb = CreatePlayback(midi);
-        RefreshMarkers();
         SetPosition(0);
         TimeText = $"00:00 / {durationText}";
         ShowTrackInfo(midi, item, std);
@@ -657,7 +665,7 @@ public sealed partial class MainViewModel : ObservableObject
         CurrentStandard = std;
     }
 
-    // Playback of a track (file + insertions) on the output, its tempo map and duration.
+    // Playback of a track (with its changes) on the output, its tempo map and duration.
     Playback CreatePlayback(MidiFile midi)
     {
         var pb = midi.GetPlayback(output);
@@ -690,7 +698,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Clears the manual settings (mixer, forced mode, effects) without sending anything to the module
     // (a reset follows at the start of the track). Returns true if there were any.
-    bool ClearManualSettings()
+    // edits: the changes of the Event Editor too.
+    bool ClearManualSettings(bool edits = true)
     {
         bool had = Mixer.ClearManualSettings();
         if (isForced)
@@ -704,8 +713,7 @@ public sealed partial class MainViewModel : ObservableObject
             had = true;
         }
         had |= Effects.ClearManualSettings();
-        had |= ClearInsertions();
-        had |= ClearEdits();   // Event Editor
+        if (edits) had |= ClearEdits();   // Event Editor
         return had;
     }
 
@@ -734,11 +742,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     void TogglePlayPause()
     {
-        // Insert mode: releasing Insert inserts the settings (playback stays paused); Play does nothing meanwhile.
-        if (insertMode) { Status = "Insert mode: release Insert to insert the settings (Stop: cancel)."; return; }
         switch (state)
         {
-            case "playing": playback.Stop(); SetState("paused"); break;
+            case "playing": PausePlayback(); break;
             case "paused": playback.Start(); SetState("playing"); break;
             default:
                 var item = SelectedTrack ?? current ?? Playlist.FirstOrDefault();
@@ -760,7 +766,6 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (playback != null && ((TimeSpan)playback.GetCurrentTime<MetricTimeSpan>()).TotalSeconds > 3)
         {
-            CancelInsertMode();
             playback.MoveToTime(new MidiTimeSpan(0));   // not MoveToStart: with a loop, that would be the loop start
             ApplyMixerState();
         }
@@ -774,7 +779,6 @@ public sealed partial class MainViewModel : ObservableObject
         Mixer.Refresh();
         Effects.Refresh();
         DisplayText = ModuleDisplay.Text;
-        UpdateInsertEnabled();
         LoadEvents();
         RefreshEventsFixed();
         if (playback == null || state != "playing") return;

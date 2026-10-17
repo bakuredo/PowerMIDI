@@ -75,6 +75,23 @@ public static class MidiTools
         }
     }
 
+    // Silences every note at a pause, without changing the state of the channels. The playback library only releases
+    // the notes it holds (one per key): a key started again while held (two Note On) keeps a voice, and the notes
+    // released while a pedal is down keep ringing. All Sound Off (GS, XG, GM2) and All Notes Off (MT-32, which does
+    // not know All Sound Off) are sent with the pedals up, then the pedals are put back as the file left them.
+    public static void ReleaseNotes(IOutputDevice device, int[] sustain, int[] sostenuto)
+    {
+        for (int ch = 0; ch < 16; ch++)
+        {
+            if (sustain[ch] >= 64) device.SendEvent(Cc(ch, 64, 0));
+            if (sostenuto[ch] >= 64) device.SendEvent(Cc(ch, 66, 0));
+            device.SendEvent(Cc(ch, 120, 0));   // All Sound Off
+            device.SendEvent(Cc(ch, 123, 0));   // All Notes Off
+            if (sustain[ch] >= 64) device.SendEvent(Cc(ch, 64, sustain[ch]));
+            if (sostenuto[ch] >= 64) device.SendEvent(Cc(ch, 66, sostenuto[ch]));
+        }
+    }
+
     public static void SendReset(IOutputDevice device, string standard)
     {
         if (Resets.TryGetValue(standard, out var reset))

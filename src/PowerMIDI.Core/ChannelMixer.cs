@@ -137,6 +137,8 @@ public static class ChannelMixer
     public static readonly int[] BankLsb = new int[16];      // CC32
     public static readonly bool[] Used = new bool[16];       // channel has received a Program Change or a note
     public static readonly int[] RhythmPart = new int[16];   // GS "Use for Rhythm Part": 0 = melodic, 1/2 = drums
+    public static readonly int[] Sustain = new int[16];      // CC64 (hold pedal), given back after a pause
+    public static readonly int[] Sostenuto = new int[16];    // CC66
 
     // Instrument chosen by user: replaces file's CC0 / CC32 / Program Change.
     public static readonly bool[] Override = new bool[16];
@@ -187,6 +189,7 @@ public static class ChannelMixer
             Used[i] = false;
             LastNoteOn[i] = 0;
             RhythmPart[i] = 0;
+            Sustain[i] = Sostenuto[i] = 0;
             SysExPatch[i] = false;
             // instruments and fixed values (Override, CcOverride) are not touched here:
             // player clears them itself when it moves to another file.
@@ -300,7 +303,7 @@ public static class ChannelMixer
 
     static NormalSysExEvent VoiceMapEvent(int map) => new(new byte[] { 0x43, 0x10, 0x49, 0x00, 0x00, 0x12, (byte)map, 0xF7 });
 
-    static bool IsVoiceMapSysEx(byte[] d) =>
+    internal static bool IsVoiceMapSysEx(byte[] d) =>
         d.Length >= 8 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x49 && d[3] == 0 && d[4] == 0 && d[5] == 0x12;
 
     // Chooses the voice map (-1 = Auto: back to the file's) and sends it to the module in XG mode.
@@ -396,7 +399,7 @@ public static class ChannelMixer
         return new NormalSysExEvent(data);
     }
 
-    static bool IsGsDefaultMapSysEx(byte[] d) =>
+    internal static bool IsGsDefaultMapSysEx(byte[] d) =>
         d.Length >= 10 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x40 && (d[5] & 0xF0) == 0x40 && d[6] == 0x01;
 
     static void SendGsDefaultMap(IOutputDevice device, int map)
@@ -496,6 +499,15 @@ public static class ChannelMixer
                     if (entered == null && again == null) entered = XgPartParams.ReadDataEntry(cc, entry, out again);
                     if (again != null) SendLater(again);
                     return entered ?? e;
+                case 64:
+                    Sustain[channel] = cc.ControlValue;
+                    break;
+                case 66:
+                    Sostenuto[channel] = cc.ControlValue;
+                    break;
+                case 121:   // Reset All Controllers: pedals released
+                    Sustain[channel] = Sostenuto[channel] = 0;
+                    break;
                 case 126:
                 case 127:
                     // Mono / poly mode: stored, and replaced by the one fixed in the Effects tab (XG, GS).

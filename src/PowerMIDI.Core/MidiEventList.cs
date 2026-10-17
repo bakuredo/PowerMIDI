@@ -5,17 +5,15 @@ using Melanchall.DryWetMidi.Interaction;
 namespace PowerMIDI.Core;
 
 // One row of the event list (Event Editor): an event of the file, a note being one row (Note On and its Note Off).
-// Tick: position in the file; Track: track number (1-based; 0: an event inserted with the Insert button, not in the
-// file); Channel: 0-15, -1 for an event without channel (SysEx, meta); Kind: group used by the filters; Type, Data and
-// Description: the texts of the row; Event: the event (the Note On of a note); Index: its place in its track (for the
-// changes, see MidiEventEdits; -1: inserted); OffIndex / Length: the Note Off of a note (-1 / 0 otherwise).
+// Tick: position in the file; Track: track number (1-based); Channel: 0-15, -1 for an event without channel (SysEx,
+// meta); Kind: group used by the filters; Type, Data and Description: the texts of the row; Event: the event (the Note On
+// of a note); Index: its place in its track (for the changes, see MidiEventEdits); OffIndex / Length: the Note Off of a
+// note (-1 / 0 otherwise); Entry: for a data entry (CC6, CC38), the RPN / NRPN it writes.
 public sealed record MidiEventRow(long Tick, int Track, int Channel, EventKind Kind, string Type, string Data, string Description,
-                                  MidiEvent Event = null, int Index = -1, int OffIndex = -1, long Length = 0)
-{
-    public bool IsInserted => Track == 0;
-}
+                                  MidiEvent Event = null, int Index = -1, int OffIndex = -1, long Length = 0, DataEntry? Entry = null);
 
-public enum EventKind { Note, Controller, Program, PitchBend, Aftertouch, SysEx, Meta }
+// Setting: not an event of the file, a value fixed in the Mixer or Effects tab, sent at the start (see EventEditorViewModel).
+public enum EventKind { Note, Controller, Program, PitchBend, Aftertouch, SysEx, Meta, Setting }
 
 // The events of a file as a list (Event Editor), sorted by position then track, with readable texts: note names,
 // controller names, instruments of the Program Changes in the standard of the file, RPN / NRPN of the data entries,
@@ -24,10 +22,8 @@ public static class MidiEventList
 {
     // instrumentName(channel, program, bank MSB, bank LSB, GS rhythm part): name of the instrument the channel plays.
     // describeSysEx(data): description of a SysEx (null: the generic one).
-    // inserted: events written by the Insert button (position, event), listed with the file's ones.
     public static List<MidiEventRow> Build(MidiFile file, Func<int, int, int, int, int, string> instrumentName,
-                                           Func<byte[], string> describeSysEx = null,
-                                           IEnumerable<(long Tick, MidiEvent Event)> inserted = null)
+                                           Func<byte[], string> describeSysEx = null)
     {
         // All the events of all tracks in the order they play (position, then track, then place in the track). A note:
         // its Note On with the place and position of its Note Off (the first Note Off of the same channel and key after it).
@@ -57,26 +53,20 @@ public static class MidiEventList
                 else objects.Add((time, track, i, e, -1, 0));
             }
         }
-        int order = 0;
-        foreach (var (tick, e) in inserted ?? Enumerable.Empty<(long, MidiEvent)>()) objects.Add((tick, 0, order++, e, -1, 0));
-        // Inserted events: after the file's ones at the same position (as MidiInsertions writes them).
-        objects.Sort((a, b) => a.Tick != b.Tick ? a.Tick.CompareTo(b.Tick)
-                             : (a.Track == 0) != (b.Track == 0) ? (a.Track == 0 ? 1 : -1)
-                             : a.Track != b.Track ? a.Track.CompareTo(b.Track) : a.Index.CompareTo(b.Index));
+        objects.Sort((a, b) => a.Tick != b.Tick ? a.Tick.CompareTo(b.Tick) : a.Track != b.Track ? a.Track.CompareTo(b.Track) : a.Index.CompareTo(b.Index));
 
         // State of the channels while reading: bank, program, GS rhythm part, RPN / NRPN selected.
         int[] msb = new int[16], lsb = new int[16], program = new int[16], rhythm = new int[16];
         rhythm[9] = 1;
-        var parameter = new (bool Rpn, int Msb, int Lsb)?[16];
+        var nrpn = new NrpnState();   // as the player reads them (ChannelMixer)
         var names = new string[16];   // instrument of each channel, worked out again after a change
         string Instrument(int c) => names[c] ??= instrumentName?.Invoke(c, program[c], msb[c], lsb[c], rhythm[c]) ?? "";
 
         var rows = new List<MidiEventRow>(objects.Count);
         foreach (var (tick, t, index, e, offIndex, offTick) in objects)
         {
-            int i = t == 0 ? -1 : index;
             MidiEventRow Row(int channel, EventKind kind, string type, string data, string description) =>
-                new(tick, t, channel, kind, type, data, description, e, i);
+                new(tick, t, channel, kind, type, data, description, e, index);
             switch (e)
             {
                 case NoteOnEvent on when offIndex >= 0:
@@ -93,19 +83,11 @@ public static class MidiEventList
                 {
                     int c = cc.Channel, n = cc.ControlNumber, v = cc.ControlValue;
                     string text = ControllerName(n);
-                    switch (n)
-                    {
-                        case 0: msb[c] = v; names[c] = null; break;
-                        case 32: lsb[c] = v; names[c] = null; break;
-                        case 99: parameter[c] = (false, v, parameter[c] is { Rpn: false } p99 ? p99.Lsb : 127); break;
-                        case 98: parameter[c] = (false, parameter[c] is { Rpn: false } p98 ? p98.Msb : 127, v); break;
-                        case 101: parameter[c] = (true, v, parameter[c] is { Rpn: true } p101 ? p101.Lsb : 127); break;
-                        case 100: parameter[c] = (true, parameter[c] is { Rpn: true } p100 ? p100.Msb : 127, v); break;
-                        case 6 or 38 when parameter[c] is { } p:
-                            text += $" · {ParameterName(p.Rpn, p.Msb, p.Lsb)}";
-                            break;
-                    }
-                    rows.Add(Row(c, EventKind.Controller, "Control Change", $"{n} = {v}", text));
+                    if (n == 0) (msb[c], names[c]) = (v, null);
+                    if (n == 32) (lsb[c], names[c]) = (v, null);
+                    var entry = nrpn.Read(cc);
+                    if (entry is { } p) text += $" · {ParameterName(p.Rpn, p.Msb, p.Lsb)}";
+                    rows.Add(Row(c, EventKind.Controller, "Control Change", $"{n} = {v}", text) with { Entry = entry });
                     break;
                 }
                 case ProgramChangeEvent pc:
@@ -142,21 +124,47 @@ public static class MidiEventList
     // ---------- Values fixed in the interface ----------
 
     // What replaces an event of the file during playback (and in the saved file): a value fixed in the Mixer or Effects
-    // tab (blue there); null if the event plays as it is. Not the data entries of the NRPN / RPN of the Part and Drums
-    // pages (the selection of the parameter is in earlier events).
-    public static string FixedText(MidiEventRow row)
+    // tab (blue there), or the mode forced in the interface; null if the event plays as it is. Same cases as
+    // ChannelMixer.Callback (the data entries: the RPN / NRPN selected before them, see Build). instrumentName: as for
+    // Build, to name the instrument chosen in the Mixer tab.
+    public static string FixedText(MidiEventRow row, Func<int, int, int, int, int, string> instrumentName = null)
     {
         int c = row.Channel;
+        // The instrument chosen in the Mixer tab for a channel.
+        (int, int, int)? Chosen(int ch) => ChannelMixer.Override[ch] ? (ChannelMixer.OverrideMsb[ch], ChannelMixer.OverrideLsb[ch], ChannelMixer.OverrideProgram[ch]) : null;
+        string Instrument(int ch)
+        {
+            var (msb, lsb, program) = Chosen(ch).Value;
+            var name = instrumentName?.Invoke(ch, program, msb, lsb, ChannelMixer.Rhythm(ch));
+            return string.IsNullOrEmpty(name) ? $"Mixer: bank {msb} / {lsb}, PC {program + 1}" : $"Mixer: {name} (bank {msb} / {lsb}, PC {program + 1})";
+        }
         switch (row.Event)
         {
             case ProgramChangeEvent when ChannelMixer.Override[c]:
             case ControlChangeEvent bank when (int)bank.ControlNumber is 0 or 32 && ChannelMixer.Override[c]:
-                return "Instrument chosen in Mixer tab";
+                return Instrument(c);
             case ControlChangeEvent cc when ChannelMixer.ControllerIndex(cc.ControlNumber) is int k and >= 0 && ChannelMixer.IsFixed(k, c):
                 return $"Fixed in Mixer tab: {ChannelMixer.FixedValue(k, c)}";
+            case ControlChangeEvent cc when (int)cc.ControlNumber == ChannelMixer.PortamentoSwitch && ChannelMixer.IsFixed(ChannelMixer.PortamentoTime, c):
+                return $"Portamento time fixed in Mixer tab: switch {ChannelMixer.PortamentoSwitchValue(c)}";
+            case ControlChangeEvent cc when (int)cc.ControlNumber is 126 or 127:
+                return (ChannelMixer.GsMode ? GsPartParams.FixMonoPoly(cc) : ChannelMixer.XgMode ? XgPartParams.FixMonoPoly(cc) : null) != null
+                    ? "Fixed in Effects tab (Part)" : null;
+            case ControlChangeEvent cc when row.Entry is { } entry:
+                return IsDataEntryFixed(cc, entry) ? "Fixed in Effects tab (Drums / Part)" : null;
             case SysExEvent sx:
             {
                 var d = sx.Data;
+                if (ChannelMixer.ForceMode && (MidiFileEditor.IsReset(sx) || MidiFileEditor.IsOtherModeSysEx(d, ChannelMixer.DropManufacturers)))
+                    return "Ignored: mode forced";
+                if (ChannelMixer.IsVoiceMapSysEx(d) && ChannelMixer.VoiceMapOverride >= 0) return "Voice map chosen in Mixer tab";
+                if (ChannelMixer.IsGsDefaultMapSysEx(d) && ChannelMixer.GsDefaultMapOverride >= 1) return "Default map chosen in Mixer tab";
+                if (ChannelMixer.MultiPartChannel(d) is int mp and >= 0)
+                {
+                    if (Chosen(mp) is { } chosen && ChannelMixer.ReplaceMultiPart(d, chosen, k => -1) != null) return Instrument(mp);
+                    if (ChannelMixer.ReplaceMultiPart(d, null, k => ChannelMixer.IsFixed(k, mp) ? ChannelMixer.FixedValue(k, mp) : -1, XgDrumSetup.PartModeOverride[mp]) != null)
+                        return "Fixed in Mixer tab (Multi Part)";
+                }
                 if (ChannelMixer.RhythmPartChannel(d) is int part and >= 0 && ChannelMixer.RhythmOverride[part] >= 0) return "Drum part chosen in Mixer tab";
                 if (GsXgEffects.ValuesOf(d).Any(x => GsXgEffects.IsFixed(x.Param))) return "Fixed in Effects tab";
                 var positions = new List<(int Position, int Param)>();
@@ -173,6 +181,18 @@ public static class MidiEventList
             default:
                 return null;
         }
+    }
+
+    // A data entry replaced by a value of the Part or Drums page, in the mode of the track (as ChannelMixer.Callback).
+    static bool IsDataEntryFixed(ControlChangeEvent cc, DataEntry entry)
+    {
+        if (ChannelMixer.GsMode)
+            return GsDrumMap.NrpnParam(cc.Channel, entry, GsDrumMap.MapOf) is { } map && GsDrumMap.IsFixed(map.Map, map.Note, map.Param) ||
+                   GsPartParams.FixDataEntry(cc, entry) != null;
+        if (ChannelMixer.Gm2Mode) return Gm2PartParams.FixDataEntry(cc, entry) != null;
+        if (!ChannelMixer.XgMode) return false;
+        return XgDrumSetup.NrpnParams(cc.Channel, entry, XgDrumSetup.SetupOf) is { } setup && setup.Params.Any(p => XgDrumSetup.IsFixed(setup.Setup, setup.Note, p)) ||
+               XgPartParams.FixDataEntry(cc, entry, out _) != null;
     }
 
     // ---------- Texts ----------

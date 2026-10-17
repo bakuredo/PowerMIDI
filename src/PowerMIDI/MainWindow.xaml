@@ -85,18 +85,6 @@
     <Style TargetType="TextBlock">
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
-    <!-- Insert button of the Mixer and Effects tabs (see MainViewModel.Insert.cs). Their DataContext is
-         the mixer / effects view model: the binding goes to the window's. -->
-    <Style x:Key="InsertButton" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
-      <Setter Property="Content" Value="Insert"/>
-      <Setter Property="Margin" Value="0,0,6,0"/>
-      <Setter Property="Padding" Value="8,2"/>
-      <Setter Property="FontSize" Value="12"/>
-      <Setter Property="IsChecked" Value="{Binding DataContext.IsInsertMode, RelativeSource={RelativeSource AncestorType=Window}}"/>
-      <Setter Property="IsEnabled" Value="{Binding DataContext.InsertEnabled, RelativeSource={RelativeSource AncestorType=Window}}"/>
-      <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
-      <Setter Property="ToolTip" Value="Inserts at the current position the settings changed while it is pressed."/>
-    </Style>
     <!-- Dark tabs: wider headers, light text; selected tab is lighter. -->
     <Style TargetType="TabItem">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -139,8 +127,6 @@
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
                 Padding="8,2" FontSize="12" ToolTip="Back to the file's settings"/>
-        <!-- Insert mode: see MainViewModel.Insert.cs. The tab's DataContext is the mixer. -->
-        <ToggleButton DockPanel.Dock="Right" Style="{StaticResource InsertButton}"/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
         <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}" b:Wheel.ComboStep="True"
                   ToolTip="Controller set by the sliders">
@@ -535,7 +521,6 @@
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
                 Padding="8,2" FontSize="12" ToolTip="Back to the file's effects"/>
-        <ToggleButton DockPanel.Dock="Right" Style="{StaticResource InsertButton}"/>
         <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
       </DockPanel>
       <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">
@@ -694,14 +679,13 @@
           <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14"/>
           <TextBlock Text="{Binding Title}" ToolTip="{Binding TitleToolTip}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
         </DockPanel>
-        <!-- Position: the jump happens when the mouse button is released. Above it, the markers of the
-             insertions (Insert button): tooltip = what was inserted, right click = remove it. -->
+        <!-- Position: the jump happens when the mouse button is released. -->
         <Grid Grid.Row="2">
           <!-- Mouse down / up handlers: added in MainWindow.xaml.cs (they must also get the clicks the slider handles). -->
           <Slider x:Name="PositionBar" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
                   IsMoveToPointEnabled="True" IsEnabled="{Binding HasTrack}"/>
           <!-- Loop of a video game track (loopStart / loopEnd, [ / ], CC111): green markers above the bar, at its
-               start and end (same shape as the insertion markers). -->
+               start and end. -->
           <Canvas x:Name="LoopCanvas" VerticalAlignment="Top" Height="9" Margin="0,1,0,0"
                   Visibility="{Binding HasLoop, Converter={StaticResource BoolToVisibility}}">
             <Canvas.Resources>
@@ -724,35 +708,6 @@
               </Canvas.Left>
             </Path>
           </Canvas>
-          <ItemsControl ItemsSource="{Binding InsertMarkers}" VerticalAlignment="Top" Height="9" Margin="0,1,0,0">
-            <ItemsControl.Resources>
-              <b:FractionToOffset x:Key="FractionToOffset"/>
-            </ItemsControl.Resources>
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemContainerStyle>
-              <Style TargetType="ContentPresenter">
-                <Setter Property="Canvas.Left">
-                  <Setter.Value>
-                    <MultiBinding Converter="{StaticResource FractionToOffset}">
-                      <Binding Path="Fraction"/>
-                      <Binding Path="ActualWidth" RelativeSource="{RelativeSource AncestorType=ItemsControl}"/>
-                    </MultiBinding>
-                  </Setter.Value>
-                </Setter>
-              </Style>
-            </ItemsControl.ItemContainerStyle>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource AccentBrush}" ToolTip="{Binding ToolTip}" Cursor="Hand">
-                  <Path.InputBindings>
-                    <MouseBinding Gesture="RightClick" Command="{Binding RemoveCommand}"/>
-                  </Path.InputBindings>
-                </Path>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </Grid>
         <DockPanel Grid.Row="3">
           <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
@@ -774,10 +729,10 @@
                     ToolTip="Event list of track"/>
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-            <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,8,0"/>
-            <Slider Width="140" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True"
+            <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0" VerticalAlignment="Center"/>
+            <Slider Width="110" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
-            <TextBlock Text="{Binding MasterVolumeText}" Width="32" Margin="6,0,0,0" FontFamily="Consolas"/>
+            <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>
           </StackPanel>
           <Grid/>
         </DockPanel>

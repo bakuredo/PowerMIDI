@@ -1,5 +1,3 @@
-using System.Collections.ObjectModel;
-using System.Windows.Input;
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
 using Melanchall.DryWetMidi.Interaction;
@@ -7,92 +5,94 @@ using PowerMIDI.Core;
 
 namespace PowerMIDI.ViewModels;
 
-// "Insert" mode: writes Mixer / Effects settings at a position of the track instead of the whole track.
-// - Insert pressed (Mixer or Effects tab; stopped: at the start of the track): playback pauses. Settings applied
-//   to the whole track (blue values, forced mode) must be saved first: the saved file then replaces the track at
-//   the same position (cancelled save: no Insert mode). The position is snapped to the start of the beat; the
-//   settings are remembered.
-// - The user changes settings in the Mixer and Effects tabs (heard right away).
-// - Insert released: the settings changed since then are inserted at that position (in memory, written by
-//   "Save MIDI file…"), become free again (or go back to their previous fixed value); playback stays paused there.
-// - Stop, a seek or another track: cancelled, the changed settings go back to how they were.
-// Each insertion shows as a marker above the position bar; right click on it removes it.
+// Append / Replace of the Event Editor. First click: the settings in blue so far (blue values, forced mode) are written
+// in the whole track (WriteSettingsInTrack), so that nothing is blue. The settings are then changed in the Mixer and
+// Effects tabs (heard right away). Second click: those settings (Mixer: drum parts, instruments, controllers; Effects
+// tab: every settings module) are written as events at the event selected (Append: after it; Replace: instead of the
+// selected events). They go into the copy of the track the Event Editor changes (MainViewModel.Events.cs: undo, saved by
+// "Save MIDI file…"); the settings written become free again: the file's values, now set by these events.
 public sealed partial class MainViewModel
 {
-    readonly List<MidiInsertion> insertions = new();   // insertions of the current track (settingsFile)
-    TempoMap tempoMap;                                   // tempo map of the current track
-    SettingsSnapshot snapshot;                           // settings when the Insert mode started
-    long insertTick;
-
-    public ObservableCollection<InsertMarker> InsertMarkers { get; } = new();
-
-    bool insertMode;
-    public bool IsInsertMode
-    {
-        get => insertMode;
-        set
-        {
-            if (value != insertMode) Run(() => { if (value) BeginInsert(); else CommitInsert(); });
-            OnPropertyChanged();   // the button follows the real state (e.g. not available: stays off)
-        }
-    }
-
-    // Insert button available: in Insert mode (to release it), or when a track is loaded (stopped: at its start).
-    bool insertEnabled;
-    public bool InsertEnabled { get => insertEnabled; private set => Set(ref insertEnabled, value); }
-
-    // Called by the main timer and after each playback change.
-    void UpdateInsertEnabled() => InsertEnabled = insertMode || current != null;
+    TempoMap tempoMap;   // tempo map of the current track
 
     long CurrentTick() => playback != null ? ((MidiTimeSpan)playback.GetCurrentTime<MidiTimeSpan>()).TimeSpan : 0;
 
-    // The track to play: the file (with the changes of the Event Editor) and the insertions, if it is the one they
+    // The track to play: the file, with the changes of the Event Editor (and the insertions) if it is the one they
     // belong to.
-    MidiFile ReadTrackFile(string path)
+    MidiFile ReadTrackFile(string path) =>
+        path == settingsFile && editedFile != null ? editedFile.Clone() : MidiTools.ReadFile(path);
+
+    // Writes the settings in blue as events of a track at a position: after the event at index (-1: before the events
+    // there), or, with replaced, instead of those events (at the place of the event at index, one of them). Returns
+    // what was written (null: nothing in blue). Playback stays where it is.
+    public string WriteFixed(int track, int index, long tick, IReadOnlyList<(int Track, int Index)> replaced)
     {
-        var midi = path == settingsFile && editedFile != null ? editedFile.Clone() : MidiTools.ReadFile(path);
-        if (path == settingsFile && insertions.Count > 0) MidiInsertions.Apply(midi, insertions);
-        return midi;
+        if (EditBlocked != null) return null;
+        var (events, description) = BuildInsertion();
+        if (events.Count == 0) return null;
+        long position = CurrentTick();
+        bool wasPlaying = state == "playing";
+        Edit(file =>
+        {
+            int place = MidiEventEdits.Insert(file, track, index, tick, events, replaced);
+            return (track, place + events.Count - 1);   // the last event written: selected
+        }, position, false);
+        // The file's values as they are now at the position (with the events written), sent as the settings are freed.
+        RebuildFileState(editedFile, position, CurrentStandard);
+        ClearWrittenSettings();
+        Mixer.Refresh();
+        Effects.Refresh();
+        if (wasPlaying) { playback.Start(); SetState("playing"); UpdateNumbers(); }
+        return description;
     }
 
-    void BeginInsert()
+    // The settings of the whole track (blue values, forced mode) become events of its copy, as the save writes them
+    // (Event Editor: one change, undone with Ctrl+Z), at the same position, playing or not; they are cleared without
+    // sending anything: the module already has them, and the track now contains them.
+    public void WriteSettingsInTrack()
     {
-        UpdateInsertEnabled();
-        if (current == null || tempoMap == null) { Status = "Insert: play a track first."; return; }
+        if (EditBlocked != null || !HasGlobalSettings()) return;
+        long tick = CurrentTick();
         bool wasPlaying = state == "playing";
-        if (wasPlaying) { playback.Stop(); SetState("paused"); UpdateNumbers(); }
+        var (channels, modules, forceMode) = SettingsToWrite();
+        Edit(file => { WriteSettings(file, channels, modules, forceMode); return null; }, tick, false);
+        var muted = (bool[])ChannelMixer.Muted.Clone();   // mutes are a listening aid, not settings: kept
+        ClearManualSettings(edits: false);
+        for (int c = 0; c < 16; c++) if (muted[c]) Mixer.SetMute(c, true, false);
+        var std = MidiTools.GetStandard(editedFile);
+        ChannelMixer.Mt32Mode = std == "MT-32";
+        ChannelMixer.Gm2Mode = std == "GM2";
+        ChannelMixer.XgMode = std == "XG";
+        ChannelMixer.GsMode = std == "GS";
+        Mixer.Standard = std;
+        Effects.Standard = std;
+        CurrentStandard = std;
+        RebuildFileState(editedFile, tick, std);
+        Mixer.Refresh();
+        Effects.Refresh();
+        if (wasPlaying) { playback.Start(); SetState("playing"); UpdateNumbers(); }
+    }
 
-        // Settings applied to the whole track (blue values, forced mode) must be saved first: the saved file then
-        // replaces the track, at the same position. Nothing is blue any more, so that every change made from here
-        // is an insertion (the two kinds of changes were too easy to mix up).
-        if (HasGlobalSettings())
+    // Append / Replace cancelled: the settings in blue go back to the file's values (sent).
+    public void DropFixed()
+    {
+        ClearWrittenSettings();
+        Mixer.Refresh();
+        Effects.Refresh();
+    }
+
+    // The settings written (see BuildInsertion) go back to the file's values, sent to the module.
+    void ClearWrittenSettings()
+    {
+        for (int c = 0; c < 16; c++)
         {
-            // Already saved and unchanged since: that file is used as it is. Otherwise saved now (to the file of the
-            // previous save if there is one, else the dialog asks where).
-            bool confirmed;
-            prompting = true;
-            try { confirmed = view.Confirm("Settings in blue must be saved before using Insert. File will be saved, then reloaded."); }
-            finally { prompting = false; }
-            bool saved = confirmed &&
-                ((!HasUnsavedSettings() && lastSavedTarget != null && File.Exists(lastSavedTarget)) || SaveModifiedMidi(quiet: true));
-            if (!saved)
-            {
-                if (wasPlaying) { playback.Start(); SetState("playing"); UpdateNumbers(); }
-                Status = "Insert: the settings of the whole track (in blue) must be saved first — cancelled.";
-                return;
-            }
-            // (Saved over the track itself: the save has already loaded it again.)
-            if (HasGlobalSettings() || !SamePath(current.Path, lastSavedTarget)) SwitchToSavedFile(lastSavedTarget);
+            if (ChannelMixer.RhythmOverride[c] >= 0) ChannelMixer.ClearRhythmOverride(output, c);
+            if (ChannelMixer.Override[c]) ChannelMixer.ClearOverride(output, c);
+            for (int k = 0; k < MixerViewModel.ControllerCount; k++)
+                if (ChannelMixer.IsFixed(k, c)) ChannelMixer.ClearController(output, k, c);
         }
-
-        insertTick = MidiInsertions.SnapToBeat(CurrentTick(), tempoMap);
-        var at = TickToTime(insertTick);
-        SetPosition(at.TotalSeconds);
-        TimeText = $"{MidiTools.FormatTime(at)} / {durationText}";
-        snapshot = SettingsSnapshot.Take();
-        insertMode = true;
-        Status = $"Insert at {MidiTools.FormatTime(at)} ({BarBeat(insertTick)}): change the Mixer / Effects settings, " +
-                 "then release Insert to insert them · Stop: cancel";
+        foreach (var m in ModuleSettings.All)
+            if (m.HasFixed) m.ClearAll(m.IsActive() ? output : null);
     }
 
     // The saved file (track + its settings, now written in it) replaces the current track in the playlist and in
@@ -101,7 +101,7 @@ public sealed partial class MainViewModel
     void SwitchToSavedFile(string target)
     {
         long tick = CurrentTick();
-        if (playback != null) { playback.Stop(); playback.Dispose(); playback = null; }
+        if (playback != null) { playback.Stop(); ReleaseNotes(); playback.Dispose(); playback = null; }
 
         var midi = MidiTools.ReadFile(target);
         var item = new PlaylistItem
@@ -141,7 +141,6 @@ public sealed partial class MainViewModel
         SetState("paused");
         SelectedTrack = item;
         UpdateNumbers();
-        RefreshMarkers();
         Mixer.Refresh();
         Effects.Refresh();
     }
@@ -165,45 +164,12 @@ public sealed partial class MainViewModel
         finally { ChannelMixer.Device = device; }
     }
 
-    // Cancels the Insert mode: the settings changed since it started go back to how they were (sent to the module).
-    void CancelInsertMode()
-    {
-        if (!insertMode) return;
-        insertMode = false;
-        OnPropertyChanged(nameof(IsInsertMode));
-        snapshot.Restore(output);
-        snapshot = null;
-        Mixer.Refresh();
-        Effects.Refresh();
-        UpdateInsertEnabled();
-        Status = "Insert cancelled.";
-    }
 
-    // Insert released: inserts the changed settings; playback stays paused at the insertion point.
-    void CommitInsert()
-    {
-        if (!insertMode) return;
-        insertMode = false;
-        OnPropertyChanged(nameof(IsInsertMode));
-        var (events, description) = BuildInsertion(snapshot);
-        if (events.Count > 0)
-        {
-            // Inserted settings become free again (or go back to their previous fixed value): the inserted events,
-            // played from the insertion point, now set them. Nothing is sent: the module already has these values.
-            snapshot.Restore(null);
-            insertions.Add(new MidiInsertion { Tick = insertTick, Events = events, Description = description });
-        }
-        snapshot = null;
-        ReloadPlayback(insertTick, false);
-        Status = events.Count > 0 ? $"Inserted at {MidiTools.FormatTime(TickToTime(insertTick))} ({BarBeat(insertTick)}): {description}"
-                                  : "Nothing changed: no insertion.";
-    }
-
-    // Rebuilds the playback (file + insertions) at a tick, playing or not.
+    // Rebuilds the playback (the track, with its changes) at a tick, playing or not.
     void ReloadPlayback(long tick, bool play)
     {
         if (current == null) return;
-        if (playback != null) { playback.Stop(); playback.Dispose(); playback = null; }
+        if (playback != null) { playback.Stop(); ReleaseNotes(); playback.Dispose(); playback = null; }
         CreatePlayback(ReadTrackFile(current.Path));
         var at = TickToTime(tick);
         playback.MoveToTime(new MetricTimeSpan(at));
@@ -213,172 +179,55 @@ public sealed partial class MainViewModel
         if (play) { playback.Start(); SetState("playing"); }
         else SetState("paused");
         UpdateNumbers();
-        RefreshMarkers();
-        UpdateInsertEnabled();
-    }
-
-    void RemoveInsertion(MidiInsertion insertion)
-    {
-        if (insertMode) return;
-        insertions.Remove(insertion);
-        if (playback != null) ReloadPlayback(CurrentTick(), state == "playing");
-        else RefreshMarkers();
-        Status = $"Insertion removed: {insertion.Description}";
-    }
-
-    // Clears the insertions (another track, or the track removed from the playlist). Returns true if there were any.
-    bool ClearInsertions()
-    {
-        bool had = insertions.Count > 0;
-        insertions.Clear();
-        RefreshMarkers();
-        return had;
-    }
-
-    void RefreshMarkers()
-    {
-        InsertMarkers.Clear();
-        if (tempoMap == null) return;
-        foreach (var insertion in insertions.OrderBy(i => i.Tick))
-        {
-            var at = TickToTime(insertion.Tick);
-            var ins = insertion;
-            InsertMarkers.Add(new InsertMarker
-            {
-                Fraction = Math.Min(1, at.TotalSeconds / Duration),
-                ToolTip = $"Insertion at {MidiTools.FormatTime(at)}: {insertion.Description} (right click: remove)",
-                RemoveCommand = new RelayCommand(() => Run(() => RemoveInsertion(ins))),
-            });
-        }
     }
 
     TimeSpan TickToTime(long tick) => TimeConverter.ConvertTo<MetricTimeSpan>(tick, tempoMap);
 
-    string BarBeat(long tick)
-    {
-        var bbt = TimeConverter.ConvertTo<BarBeatTicksTimeSpan>(tick, tempoMap);
-        return $"bar {bbt.Bars + 1}, beat {bbt.Beats + 1}";
-    }
 
-    // Events of the settings changed since the snapshot (now fixed with another value), with their description.
-    // Order: per channel the drum part, the instrument, the controllers; then the effects, types first.
-    (List<(int Channel, MidiEvent Event)> Events, string Description) BuildInsertion(SettingsSnapshot s)
+    // Events of the settings in blue, with their description. Order: per channel the drum part, the instrument, the
+    // controllers; then the effects, module by module (effect types before their parameters, part modes before drum
+    // setups).
+    (List<MidiEvent> Events, string Description) BuildInsertion()
     {
-        var events = new List<(int, MidiEvent)>();
+        var events = new List<MidiEvent>();
         var texts = new List<string>();
         for (int c = 0; c < 16; c++)
         {
             var parts = new List<string>();
             int rhythm = ChannelMixer.RhythmOverride[c];
-            bool rhythmChanged = rhythm >= 0 && rhythm != s.Rhythm[c];
-            bool instrumentChanged = ChannelMixer.Override[c] &&
-                (!s.Override[c] || (ChannelMixer.OverrideMsb[c], ChannelMixer.OverrideLsb[c], ChannelMixer.OverrideProgram[c]) != (s.Msb[c], s.Lsb[c], s.Program[c]));
-            if (rhythmChanged)
+            if (rhythm >= 0)
             {
-                events.Add((c, ChannelMixer.RhythmPartEvent(c, rhythm)));
+                events.Add(ChannelMixer.RhythmPartEvent(c, rhythm));
                 parts.Add(rhythm == 0 ? "normal part" : $"drum part {rhythm}");
             }
-            if (rhythmChanged || instrumentChanged)
+            if (rhythm >= 0 || ChannelMixer.Override[c])
             {
-                // After a drum part change, the module reads the program again: the instrument is always resent.
+                // After a drum part change, the module reads the program again: the instrument is always written.
                 var (msb, lsb, program) = ChannelMixer.Override[c]
                     ? (ChannelMixer.OverrideMsb[c], ChannelMixer.OverrideLsb[c], ChannelMixer.OverrideProgram[c])
                     : (ChannelMixer.BankMsb[c], ChannelMixer.BankLsb[c], ChannelMixer.Program[c]);
-                events.Add((c, new ControlChangeEvent((SevenBitNumber)0, (SevenBitNumber)msb) { Channel = (FourBitNumber)c }));
-                events.Add((c, new ControlChangeEvent((SevenBitNumber)32, (SevenBitNumber)lsb) { Channel = (FourBitNumber)c }));
-                events.Add((c, new ProgramChangeEvent((SevenBitNumber)program) { Channel = (FourBitNumber)c }));
-                if (instrumentChanged) parts.Add(Mixer.InstrumentName(c, msb, lsb, program));
+                events.Add(new ControlChangeEvent((SevenBitNumber)0, (SevenBitNumber)msb) { Channel = (FourBitNumber)c });
+                events.Add(new ControlChangeEvent((SevenBitNumber)32, (SevenBitNumber)lsb) { Channel = (FourBitNumber)c });
+                events.Add(new ProgramChangeEvent((SevenBitNumber)program) { Channel = (FourBitNumber)c });
+                if (ChannelMixer.Override[c]) parts.Add(Mixer.InstrumentName(c, msb, lsb, program));
             }
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
             {
                 if (!ChannelMixer.IsFixed(k, c)) continue;
                 int v = ChannelMixer.FixedValue(k, c);
-                if (s.CcFixed[k, c] && s.CcValue[k, c] == v) continue;
-                events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.ControllerNumbers[k], (SevenBitNumber)v) { Channel = (FourBitNumber)c }));
+                events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.ControllerNumbers[k], (SevenBitNumber)v) { Channel = (FourBitNumber)c });
                 if (k == ChannelMixer.PortamentoTime)   // heard only with the portamento on (off at 0)
-                    events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(v)) { Channel = (FourBitNumber)c }));
+                    events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(v)) { Channel = (FourBitNumber)c });
                 parts.Add($"{MixerViewModel.ControllerNames[k]} {MixerViewModel.FormatControllerValue(k, v)}");
             }
             if (parts.Count > 0) texts.Add($"ch {c + 1}: {string.Join(", ", parts)}");
         }
-
-        // Effects tab (effects, Part and Drums pages): the values fixed since the snapshot, module by module (effect
-        // types before their parameters, part modes before drum setups).
         foreach (var m in ModuleSettings.All)
             foreach (var (key, v) in m.Fixed())
             {
-                if (s.Modules[m].TryGetValue(key, out int before) && before == v) continue;
-                int channel = m.ChannelOf(key);
-                foreach (var e in m.Events(key, v)) events.Add((channel, e));
+                events.AddRange(m.Events(key, v));
                 texts.Add(m.Describe(key, v));
             }
         return (events, string.Join(" · ", texts));
     }
-
-    // Manual settings at a given moment: instruments, drum parts, fixed controllers and effects.
-    sealed class SettingsSnapshot
-    {
-        public readonly bool[] Override = new bool[16];
-        public readonly int[] Msb = new int[16], Lsb = new int[16], Program = new int[16], Rhythm = new int[16];
-        public readonly bool[,] CcFixed = new bool[MixerViewModel.ControllerCount, 16];
-        public readonly int[,] CcValue = new int[MixerViewModel.ControllerCount, 16];
-        public readonly Dictionary<SettingsModule, Dictionary<SettingKey, int>> Modules = new();   // Effects tab
-
-        public static SettingsSnapshot Take()
-        {
-            var s = new SettingsSnapshot();
-            for (int c = 0; c < 16; c++)
-            {
-                s.Override[c] = ChannelMixer.Override[c];
-                (s.Msb[c], s.Lsb[c], s.Program[c]) = (ChannelMixer.OverrideMsb[c], ChannelMixer.OverrideLsb[c], ChannelMixer.OverrideProgram[c]);
-                s.Rhythm[c] = ChannelMixer.RhythmOverride[c];
-                for (int k = 0; k < MixerViewModel.ControllerCount; k++)
-                    (s.CcFixed[k, c], s.CcValue[k, c]) = (ChannelMixer.IsFixed(k, c), ChannelMixer.FixedValue(k, c));
-            }
-            foreach (var m in ModuleSettings.All) s.Modules[m] = m.FixedValues();
-            return s;
-        }
-
-        // Puts back the settings that changed since the snapshot. device: where to send them (null: nothing sent).
-        public void Restore(Melanchall.DryWetMidi.Multimedia.IOutputDevice device)
-        {
-            for (int c = 0; c < 16; c++)
-            {
-                if (ChannelMixer.RhythmOverride[c] != Rhythm[c])
-                {
-                    if (Rhythm[c] >= 0) ChannelMixer.SetRhythmOverride(device, c, Rhythm[c]);
-                    else ChannelMixer.ClearRhythmOverride(device, c);
-                }
-                if (ChannelMixer.Override[c] != Override[c] ||
-                    (Override[c] && (ChannelMixer.OverrideMsb[c], ChannelMixer.OverrideLsb[c], ChannelMixer.OverrideProgram[c]) != (Msb[c], Lsb[c], Program[c])))
-                {
-                    if (Override[c]) ChannelMixer.SetOverride(device, c, Msb[c], Lsb[c], Program[c]);
-                    else ChannelMixer.ClearOverride(device, c);
-                }
-                for (int k = 0; k < MixerViewModel.ControllerCount; k++)
-                {
-                    if (ChannelMixer.IsFixed(k, c) == CcFixed[k, c] && (!CcFixed[k, c] || ChannelMixer.FixedValue(k, c) == CcValue[k, c])) continue;
-                    if (CcFixed[k, c]) ChannelMixer.SetController(device, k, c, CcValue[k, c]);
-                    else ChannelMixer.ClearController(device, k, c);
-                }
-            }
-            // Effects tab, module by module: values cleared since the snapshot, then values set again.
-            foreach (var m in ModuleSettings.All)
-            {
-                var target = m.IsActive() ? device : null;
-                var now = m.FixedValues();
-                foreach (var key in now.Keys.Where(k => !Modules[m].ContainsKey(k))) m.Clear(target, key);
-                foreach (var (key, v) in Modules[m])
-                    if (!now.TryGetValue(key, out int current) || current != v) m.Set(target, key, v);
-            }
-        }
-    }
-}
-
-// Marker of an insertion above the position bar.
-public sealed class InsertMarker
-{
-    public double Fraction { get; init; }   // position in the track, 0..1
-    public string ToolTip { get; init; }
-    public ICommand RemoveCommand { get; init; }
 }

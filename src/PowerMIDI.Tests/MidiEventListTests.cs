@@ -73,14 +73,47 @@ public class MidiEventListTests
             ChannelMixer.SetController(null, volume, 0, 90);
             ChannelMixer.SetOverride(null, 0, 0, 0, 10);
             GsXgEffects.Set(null, reverbMacro, 5);
-            Assert.Equal(new[] { "Fixed in Mixer tab: 90", null, "Instrument chosen in Mixer tab", "Instrument chosen in Mixer tab", "Fixed in Effects tab", null },
-                         rows.Select(MidiEventList.FixedText));
+            Assert.Equal(new[] { "Fixed in Mixer tab: 90", null, "Mixer: bank 0 / 0, PC 11", "Mixer: bank 0 / 0, PC 11", "Fixed in Effects tab", null },
+                         rows.Select(r => MidiEventList.FixedText(r)));
         }
         finally
         {
             ChannelMixer.ClearController(null, volume, 0);
             ChannelMixer.ClearOverride(null, 0);
             GsXgEffects.Clear(null, reverbMacro);
+        }
+    }
+
+    [Fact]
+    public void Xg_events_replaced_by_fixed_values()
+    {
+        // XG track: voice map, Multi Part (volume of part 1), portamento switch, mono, pitch bend range (RPN 0 0).
+        var voiceMap = new NormalSysExEvent(new byte[] { 0x43, 0x10, 0x49, 0x00, 0x00, 0x12, 0x00, 0xF7 });
+        var multiPart = new NormalSysExEvent(new byte[] { 0x43, 0x10, 0x4C, 0x08, 0x00, 0x0B, 0x64, 0xF7 });
+        var rows = Build(new TrackChunk(voiceMap, multiPart, Cc(65, 0), Cc(126, 0), Cc(101, 0), Cc(100, 0), Cc(6, 2)));
+        int volume = ChannelMixer.ControllerIndex(7);
+        bool xg = ChannelMixer.XgMode;
+        ChannelMixer.XgMode = true;
+        try
+        {
+            Assert.All(rows, r => Assert.Null(MidiEventList.FixedText(r)));
+            ChannelMixer.VoiceMapOverride = 1;
+            ChannelMixer.SetController(null, volume, 0, 90);
+            ChannelMixer.SetController(null, ChannelMixer.PortamentoTime, 0, 20);
+            XgPartParams.Set(null, 0, XgPartParams.MonoPoly, 1);   // poly
+            XgPartParams.Set(null, 0, XgPartParams.BendRange, 0x40 + 12);
+            Assert.Equal(new[] { "Voice map chosen in Mixer tab", "Fixed in Mixer tab (Multi Part)", "Portamento time fixed in Mixer tab: switch 127",
+                                 "Fixed in Effects tab (Part)", null, null, "Fixed in Effects tab (Drums / Part)" },
+                         rows.Select(r => MidiEventList.FixedText(r)));
+        }
+        finally
+        {
+            ChannelMixer.XgMode = xg;
+            ChannelMixer.VoiceMapOverride = -1;
+            ChannelMixer.ClearController(null, volume, 0);
+            ChannelMixer.ClearController(null, ChannelMixer.PortamentoTime, 0);
+            XgPartParams.Clear(null, 0, XgPartParams.MonoPoly);
+            XgPartParams.Clear(null, 0, XgPartParams.BendRange);
         }
     }
 }

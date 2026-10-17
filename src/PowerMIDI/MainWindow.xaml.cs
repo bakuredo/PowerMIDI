@@ -227,9 +227,6 @@ public partial class MainWindow : Window, IMainView
             _ => null,
         };
 
-    public bool Confirm(string text) =>
-        MessageBox.Show(this, text, "PowerMIDI", MessageBoxButton.OKCancel, MessageBoxImage.Information) == MessageBoxResult.OK;
-
     public void SetBusy(bool busy) => Cursor = busy ? Cursors.Wait : null;
 
     // Event Editor: one window, of its own (not kept above this one), closed with this one.

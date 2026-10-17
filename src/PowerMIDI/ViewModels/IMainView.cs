@@ -19,9 +19,6 @@ public interface IMainView
     // Yes = true, No = false, Cancel = null.
     bool? AskYesNoCancel(string text);
 
-    // OK = true, Cancel = false.
-    bool Confirm(string text) => true;
-
     // Writes PowerMIDI.ini (port, playback options and window geometry).
     void SaveSettings();
 

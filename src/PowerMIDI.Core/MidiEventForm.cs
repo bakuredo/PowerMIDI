@@ -28,7 +28,7 @@ public static class MidiEventForm
     // Fields of an event of the list.
     public static EventForm Of(MidiEventRow row)
     {
-        if (row.IsInserted) return new(row.Type, false, 0, None, None, null, null, "Inserted with Insert button: remove it there (right click on its marker)");
+
         int c = row.Channel;
         switch (row.Event)
         {

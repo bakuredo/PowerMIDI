@@ -10,11 +10,13 @@ namespace PowerMIDI.ViewModels;
 
 // A row of the Event Editor: an event of the current track (see MidiEventList), with its position as bar:beat:tick and
 // its time, worked out when the row is shown (the list only shows its visible rows: a long file is listed at once).
-// FixedText: what replaces the event (a value fixed in the Mixer or Effects tab: the row is blue), or null.
+// FixedText: what replaces the event (a value fixed in the Mixer or Effects tab: the row is blue, its description says
+// it), or null.
 public sealed class EventRowViewModel : ObservableObject
 {
     public MidiEventRow Row { get; init; }
     public TempoMap TempoMap { get; init; }
+    public Func<MidiEventRow, string> FixedOf { get; init; }   // what replaces an event (EventEditorViewModel.FixedOf)
     string position, time;
 
     public string Position => position ??= BarBeat(TimeConverter.ConvertTo<BarBeatTicksTimeSpan>(Row.Tick, TempoMap));
@@ -22,17 +24,27 @@ public sealed class EventRowViewModel : ObservableObject
     public double Seconds => ((TimeSpan)TimeConverter.ConvertTo<MetricTimeSpan>(Row.Tick, TempoMap)).TotalSeconds;
 
     static string BarBeat(BarBeatTicksTimeSpan bbt) => $"{bbt.Bars + 1}:{bbt.Beats + 1}:{bbt.Ticks:000}";
-    public string Track => Row.IsInserted ? "Ins" : Row.Track.ToString();
+    public string Track => Row.Track > 0 ? Row.Track.ToString() : "";   // a setting: none
     public string Channel => Row.Channel >= 0 ? (Row.Channel + 1).ToString() : "";
     public string Type => Row.Type;
     public string Data => Row.Data;
-    public string Description => Row.Description;
+    public string Description => fixedText == null || Row.Kind == EventKind.Setting ? Row.Description
+                               : Row.Description == "" ? $"→ {fixedText}" : $"{Row.Description} → {fixedText}";
 
     string fixedText;
-    public string FixedText { get => fixedText; private set { if (Set(ref fixedText, value)) OnPropertyChanged(nameof(IsFixed)); } }
+    public string FixedText
+    {
+        get => fixedText;
+        private set
+        {
+            if (!Set(ref fixedText, value)) return;
+            OnPropertyChanged(nameof(IsFixed));
+            OnPropertyChanged(nameof(Description));
+        }
+    }
     public bool IsFixed => fixedText != null;
 
-    internal void UpdateFixed() => FixedText = MidiEventList.FixedText(Row);
+    internal void UpdateFixed() => FixedText = FixedOf(Row);
 }
 
 // A value of the edit panel: its label and its text.
@@ -53,6 +65,14 @@ public interface IEventEditing
     int TicksPerQuarter { get; }
     // Makes a change on the track; it returns the event to select afterwards (track, place), if any.
     void Edit(Func<MidiFile, (int Track, int Index)?> change);
+    // Append / Replace started: the settings in blue so far are written in the whole track (as the save does), so that
+    // the settings changed from here are the ones written at the end.
+    void WriteSettingsInTrack();
+    // Writes the settings in blue (Mixer / Effects tabs) as events: after the event at index of a track (-1: before the
+    // events at tick), or instead of the events replaced; returns what was written (null: nothing in blue).
+    string WriteFixed(int track, int index, long tick, IReadOnlyList<(int Track, int Index)> replaced);
+    // Append / Replace cancelled: the settings in blue go back to the file's values.
+    void DropFixed();
     void Undo();
     void Redo();
 }
@@ -61,7 +81,11 @@ public interface IEventEditing
 // text; the row being played is followed during playback (Follow); double click on a row: playback from there. The
 // list is built again when the track changes (start, insertion, save, change). The edit panel under the list changes
 // the selected event (Apply), deletes the selected ones, adds an event at the position of the selected one; undo /
-// redo. The events written by the Insert button are shown but not changed here.
+// redo. Append / Replace, in two clicks: the first one starts (the settings in blue so far go into the whole track), the
+// settings are then changed in the Mixer / Effects tabs, the second click writes them as events after the selected
+// event, or instead of the selected events (see MainViewModel.Insert.cs); Cancel drops them. The values fixed in the
+// Mixer and Effects tabs are
+// listed first, in blue, as settings sent at the start (not events of the file: changed in those tabs).
 public sealed class EventEditorViewModel : ObservableObject
 {
     readonly InstrumentDefinitions defs;
@@ -80,6 +104,9 @@ public sealed class EventEditorViewModel : ObservableObject
         ApplyCommand = new RelayCommand(Apply);
         DeleteCommand = new RelayCommand(p => Delete((p as System.Collections.IList)?.Cast<EventRowViewModel>().ToList()));
         AddCommand = new RelayCommand(Add);
+        AppendCommand = new RelayCommand(p => Write("Append", (p as System.Collections.IList)?.Cast<EventRowViewModel>().ToList()));
+        ReplaceCommand = new RelayCommand(p => Write("Replace", (p as System.Collections.IList)?.Cast<EventRowViewModel>().ToList()));
+        CancelCommand = new RelayCommand(Cancel);
         UndoCommand = new RelayCommand(() => Change(editing.Undo, "Undone"));
         RedoCommand = new RelayCommand(() => Change(editing.Redo, "Redone"));
         View = CollectionViewSource.GetDefaultView(rows);
@@ -90,6 +117,9 @@ public sealed class EventEditorViewModel : ObservableObject
     public ICommand ApplyCommand { get; }
     public ICommand DeleteCommand { get; }   // parameter: the selected rows
     public ICommand AddCommand { get; }
+    public ICommand AppendCommand { get; }
+    public ICommand ReplaceCommand { get; }   // parameter: the selected rows
+    public ICommand CancelCommand { get; }    // Append / Replace: drops the settings changed
     public ICommand UndoCommand { get; }
     public ICommand RedoCommand { get; }
 
@@ -101,24 +131,26 @@ public sealed class EventEditorViewModel : ObservableObject
 
     // ---------- Track ----------
 
-    // Builds the list of a track (file, or its copy with the changes) and of its insertions, in its standard (names of
-    // the instruments). The filters are kept while it is the same file.
-    public void Load(MidiFile midi, IEnumerable<(long Tick, MidiEvent Event)> inserted, string standard, string fileName)
+    // Builds the list of a track (file, or its copy with the changes), in its standard (names of the instruments). The
+    // filters are kept while it is the same file.
+    public void Load(MidiFile midi, string standard, string fileName)
     {
         tempoMap = midi.GetTempoMap();
-        var list = MidiEventList.Build(midi, (c, program, msb, lsb, rhythm) => defs.Resolve(standard, c, program, msb, lsb, rhythm).Name,
-                                       DescribeSysEx, inserted);
-        rows = list.Select(r => new EventRowViewModel { Row = r, TempoMap = tempoMap }).ToList();
-        RefreshFixed();
+        Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) => defs.Resolve(standard, c, program, msb, lsb, rhythm).Name;
+        var list = MidiEventList.Build(midi, name, DescribeSysEx);
+        instrumentName = name;
+        rows = list.Select(r => new EventRowViewModel { Row = r, TempoMap = tempoMap, FixedOf = FixedOf }).ToList();
+        settingCount = 0;
+        RefreshFixed(false);
         Title = $"Events · {fileName}";
 
         // Tracks: their name (first Track Name of each).
         var names = list.Where(r => r.Kind == EventKind.Meta && r.Type == "Track Name").GroupBy(r => r.Track).ToDictionary(g => g.Key, g => g.First().Data);
-        Tracks = new[] { "All tracks" }.Concat(list.Select(r => r.Track).Where(t => t > 0).Distinct().OrderBy(t => t)
+        Tracks = new[] { "All tracks" }.Concat(list.Select(r => r.Track).Distinct().OrderBy(t => t)
                                                    .Select(t => names.TryGetValue(t, out var n) && n != "" ? $"{t} · {n}" : $"{t}")).ToList();
         var file = fileName.TrimEnd(' ', '*');
         if (file != loadedFile || trackFilter >= Tracks.Count) trackFilter = 0;
-        if (file != loadedFile) { channelFilter = kindFilter = 0; searchText = ""; }
+        if (file != loadedFile) { channelFilter = kindFilter = 0; searchText = ""; SetPending(null); }   // another track: Append / Replace over
         loadedFile = file;
         OnPropertyChanged(nameof(TrackFilter));
         OnPropertyChanged(nameof(ChannelFilter));
@@ -148,10 +180,108 @@ public sealed class EventEditorViewModel : ObservableObject
         return string.Join(" · ", texts.Take(3)) + (texts.Count > 3 ? $" · +{texts.Count - 3} more" : "");
     }
 
-    // The values fixed in the Mixer or Effects tab changed: the rows they replace turn blue (or back).
-    public void RefreshFixed()
+    // What replaces an event (blue row): MidiEventList.FixedText, with the values of the Effects tab named as in the Insert
+    // mode: those of the settings modules whose messages write the same parameters as the event.
+    Func<int, int, int, int, int, string> instrumentName;
+
+    string FixedOf(MidiEventRow row)
     {
+        if (row.Kind == EventKind.Setting) return "Sent at start: change it in Mixer / Effects tab";
+        var text = MidiEventList.FixedText(row, instrumentName);
+        if (text == null || !text.StartsWith("Fixed in Effects tab", StringComparison.Ordinal)) return text;
+        var texts = new List<string>();
+        foreach (var m in ModuleSettings.All)
+        {
+            if (!m.IsActive() || m.Describe == null) continue;
+            foreach (var (key, value) in m.Fixed())
+                if (Writes(m.Events(key, value).ToList(), row)) texts.Add(m.Describe(key, value));
+        }
+        texts = texts.Distinct().ToList();
+        if (texts.Count == 0) return text;
+        return "Effects: " + string.Join(" · ", texts.Take(3)) + (texts.Count > 3 ? $" · +{texts.Count - 3} more" : "");
+    }
+
+    // The messages of a fixed value write a parameter of the event: a SysEx at an address it covers (same module
+    // model), or the RPN / NRPN of a data entry on its channel.
+    static bool Writes(List<MidiEvent> events, MidiEventRow row)
+    {
+        if (row.Event is SysExEvent sx)
+            return SysExSpan(sx.Data) is { } target &&
+                   events.Any(e => e is SysExEvent own && SysExSpan(own.Data) is { } span && span.Model == target.Model &&
+                                   span.Address < target.Address + target.Count && target.Address < span.Address + span.Count);
+        if (row.Event is not ControlChangeEvent cc || row.Entry is not { } entry) return false;
+        int msbNumber = entry.Rpn ? 101 : 99, lsbNumber = entry.Rpn ? 100 : 98;
+        var own = events.OfType<ControlChangeEvent>().Where(e => e.Channel == cc.Channel).ToList();
+        return own.Any(e => e.ControlNumber == msbNumber && e.ControlValue == entry.Msb) && own.Any(e => e.ControlNumber == lsbNumber && e.ControlValue == entry.Lsb);
+    }
+
+    // Module (manufacturer and model), first address and number of data bytes of a SysEx: Roland DT1 (41 dev model 12
+    // a a a data sum), Yamaha parameter change (43 1n model a a a data); another SysEx: its bytes but the last value.
+    static (int Model, int Address, int Count)? SysExSpan(byte[] d)
+    {
+        int end = d.Length > 0 && d[^1] == 0xF7 ? d.Length - 1 : d.Length;
+        if (end >= 9 && d[0] == 0x41 && d[3] == 0x12) return (0x4100 | d[2], d[4] << 14 | d[5] << 7 | d[6], end - 8);
+        if (end >= 7 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10) return (0x4300 | d[2], d[3] << 14 | d[4] << 7 | d[5], end - 6);
+        if (end < 2) return null;
+        int hash = 17;
+        for (int i = 0; i < end - 1; i++) hash = hash * 31 + d[i];
+        return (hash, 0, 1);
+    }
+
+    // The values fixed in the Mixer or Effects tab changed: the settings at the top of the list are listed again, the
+    // rows they replace turn blue (or back).
+    public void RefreshFixed() => RefreshFixed(true);
+
+    int settingCount;   // the first rows: the settings
+
+    void RefreshFixed(bool refresh)
+    {
+        var selected = selectedRow;
+        rows.RemoveRange(0, settingCount);
+        // No track loaded: no settings to list either.
+        var settings = (tempoMap == null ? Enumerable.Empty<(int Channel, string Tab, string Text)>() : Settings()).Select(s => new EventRowViewModel
+        {
+            Row = new MidiEventRow(0, 0, s.Channel, EventKind.Setting, "Setting", s.Tab, s.Text), TempoMap = tempoMap, FixedOf = FixedOf,
+        }).ToList();
+        rows.InsertRange(0, settings);
+        settingCount = settings.Count;
         foreach (var row in rows) row.UpdateFixed();
+        if (!refresh) return;
+        View.Refresh();
+        UpdateCount();
+        // A setting selected: the same one again if it is still there (same channel, tab and name).
+        if (selected?.Row.Kind == EventKind.Setting)
+            SelectedRow = settings.FirstOrDefault(r => r.Row.Channel == selected.Row.Channel && r.Row.Data == selected.Row.Data &&
+                                                       r.Row.Description.Split(':')[0] == selected.Row.Description.Split(':')[0]);
+    }
+
+    // The values fixed in the Mixer tab (instruments, drum parts, controllers, maps) and in the Effects tab (the settings
+    // modules of the mode of the track), named as in the Insert mode; channel -1: none.
+    IEnumerable<(int Channel, string Tab, string Text)> Settings()
+    {
+        for (int c = 0; c < 16; c++)
+        {
+            if (ChannelMixer.Override[c])
+            {
+                int msb = ChannelMixer.OverrideMsb[c], lsb = ChannelMixer.OverrideLsb[c], program = ChannelMixer.OverrideProgram[c];
+                var name = instrumentName?.Invoke(c, program, msb, lsb, ChannelMixer.Rhythm(c));
+                yield return (c, "Mixer", $"Instrument: {(string.IsNullOrEmpty(name) ? "" : name + " ")}(bank {msb} / {lsb}, PC {program + 1})");
+            }
+            if (ChannelMixer.RhythmOverride[c] >= 0)
+                yield return (c, "Mixer", ChannelMixer.RhythmOverride[c] == 0 ? "Part: normal" : $"Part: drum part {ChannelMixer.RhythmOverride[c]}");
+            for (int k = 0; k < ChannelMixer.ControllerNames.Length; k++)
+                if (ChannelMixer.IsFixed(k, c))
+                    yield return (c, "Mixer", $"{char.ToUpperInvariant(ChannelMixer.ControllerNames[k][0])}{ChannelMixer.ControllerNames[k][1..]}: {ChannelMixer.FixedValue(k, c)}");
+        }
+        // The maps chosen in the Mixer tab play only in their mode (see ChannelMixer.ApplyVoiceMap, ApplyGsDefaultMap).
+        if (ChannelMixer.XgMode && ChannelMixer.VoiceMapOverride >= 0) yield return (-1, "Mixer", $"XG voice map: {MixerViewModel.VoiceMapNames[2 - ChannelMixer.VoiceMapOverride]}");
+        if (ChannelMixer.GsMode && ChannelMixer.GsDefaultMapOverride >= 1) yield return (-1, "Mixer", $"GS default map: {MixerViewModel.GsDefaultMapNames[5 - ChannelMixer.GsDefaultMapOverride]}");
+        foreach (var m in ModuleSettings.All)
+        {
+            if (!m.IsActive()) continue;
+            foreach (var (key, value) in m.Fixed())
+                yield return (m.ChannelOf(key), "Effects", m.Describe?.Invoke(key, value) ?? $"{m.Name} {key.A}/{key.B}/{key.C} = {value}");
+        }
     }
 
     // ---------- Filters ----------
@@ -165,9 +295,12 @@ public sealed class EventEditorViewModel : ObservableObject
 
     public IReadOnlyList<string> Kinds => KindNames;
     static readonly IReadOnlyList<string> KindNames =
-        new[] { "All events", "Notes", "Control Change", "Program Change", "Pitch Bend", "Pressure", "SysEx", "Meta / text" };
-    static readonly EventKind?[] KindOf =
-        { null, EventKind.Note, EventKind.Controller, EventKind.Program, EventKind.PitchBend, EventKind.Aftertouch, EventKind.SysEx, EventKind.Meta };
+        new[] { "All events", "Notes", "Control Change", "Program Change", "CC + PC", "Pitch Bend", "Pressure", "SysEx", "Meta / text",
+                "Mixer / Effects settings" };
+    // Kinds shown by each item of the list (null: all).
+    static readonly EventKind[][] KindOf =
+        { null, new[] { EventKind.Note }, new[] { EventKind.Controller }, new[] { EventKind.Program }, new[] { EventKind.Controller, EventKind.Program },
+          new[] { EventKind.PitchBend }, new[] { EventKind.Aftertouch }, new[] { EventKind.SysEx }, new[] { EventKind.Meta }, new[] { EventKind.Setting } };
 
     int trackFilter, channelFilter, kindFilter;
     string searchText = "";
@@ -185,7 +318,7 @@ public sealed class EventEditorViewModel : ObservableObject
         if (trackFilter > 0 && row.Track != TrackNumber(trackFilter)) return false;
         if (channelFilter is > 0 and <= 16 && row.Channel != channelFilter - 1) return false;
         if (channelFilter == 17 && row.Channel >= 0) return false;
-        if (KindOf[kindFilter] is { } kind && row.Kind != kind) return false;
+        if (KindOf[kindFilter] is { } kinds && !kinds.Contains(row.Kind)) return false;
         return searchText == "" || row.Type.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                row.Data.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                row.Description.Contains(searchText, StringComparison.OrdinalIgnoreCase);
@@ -204,7 +337,7 @@ public sealed class EventEditorViewModel : ObservableObject
 
     // ---------- Follow and selection ----------
 
-    bool follow = true;
+    bool follow;   // off at the start: the list stays where it is
     public bool Follow { get => follow; set { if (Set(ref follow, value) && !value) current = null; } }
 
     EventRowViewModel current;
@@ -264,6 +397,7 @@ public sealed class EventEditorViewModel : ObservableObject
         if (row != null && Matches(row)) Select(row);
     }
 
+
     // ---------- Edit panel ----------
 
     EventForm form;
@@ -280,6 +414,7 @@ public sealed class EventEditorViewModel : ObservableObject
     // Why the selected event cannot be changed (null: it can), or why nothing can be changed now.
     public string NotEditable { get => notEditable; private set { if (Set(ref notEditable, value)) OnPropertyChanged(nameof(CanApply)); } }
     public bool CanApply => form != null && notEditable == null;
+    public bool HasForm => form != null;   // an event is selected: its fields and Apply are shown
     public string Error { get => error; private set => Set(ref error, value); }
     public string Status { get => status; private set => Set(ref status, value); }
 
@@ -295,15 +430,16 @@ public sealed class EventEditorViewModel : ObservableObject
     // Fields of the selected row.
     void ShowForm()
     {
-        form = selectedRow != null ? MidiEventForm.Of(selectedRow.Row) : null;
+        form = selectedRow is { Row.Kind: not EventKind.Setting } ? MidiEventForm.Of(selectedRow.Row) : null;
         Fields.Clear();
         Error = null;
+        OnPropertyChanged(nameof(HasForm));
         if (form == null)
         {
             EditKind = "";
             HasChannel = false;
             TextLabel = null;
-            NotEditable = "Select an event";
+            NotEditable = selectedRow != null ? "Setting: change it in Mixer / Effects tab" : "Select an event";
             return;
         }
         EditKind = form.Kind;
@@ -317,13 +453,15 @@ public sealed class EventEditorViewModel : ObservableObject
     }
 
     // Makes a change (Follow stops: the selection is the event changed) and shows the result.
-    void Change(Action action, string done)
+    bool Change(Action action, string done)
     {
-        if (editing.EditBlocked is { } blocked) { Error = blocked; return; }
+        if (editing.EditBlocked is { } blocked) { Error = blocked; return false; }
+        if (pending != null) { Error = $"{pending}: click {pending} again to write the settings, or Cancel"; return false; }
         Follow = false;
         action();
         UpdateUndo();
         Status = done;
+        return true;
     }
 
     // Apply: the selected event gets the values of the panel.
@@ -342,20 +480,111 @@ public sealed class EventEditorViewModel : ObservableObject
         }), $"Changed: {form.Kind} at {selectedRow.Position} (Ctrl+Z: undo)");
     }
 
-    // Deletes the selected events (not the inserted ones); the row after them is selected.
+    // Deletes the selected events; the row after them is selected.
     void Delete(List<EventRowViewModel> selected)
     {
-        var deleted = (selected ?? new List<EventRowViewModel>()).Where(r => !r.Row.IsInserted).ToList();
-        if (deleted.Count == 0) { Error = "Select events of the file to delete"; return; }
+        var deleted = (selected ?? new List<EventRowViewModel>()).Where(r => r.Row.Kind != EventKind.Setting).ToList();
+        if (deleted.Count == 0) { Error = selected?.Count > 0 ? "Settings: change them in Mixer / Effects tabs" : "Select events to delete"; return; }
         long tick = deleted.Min(r => r.Row.Tick);
-        Change(() => editing.Edit(file =>
+        if (!Change(() => editing.Edit(file =>
         {
             MidiEventEdits.Delete(file, deleted.SelectMany(r => r.Row.OffIndex >= 0
                 ? new[] { (r.Row.Track, r.Row.Index), (r.Row.Track, r.Row.OffIndex) } : new[] { (r.Row.Track, r.Row.Index) }));
             return null;
-        }), $"Deleted: {deleted.Count} event(s) (Ctrl+Z: undo)");
+        }), $"Deleted: {deleted.Count} event(s) (Ctrl+Z: undo)")) return;
         var next = rows.FirstOrDefault(r => r.Row.Tick >= tick && Matches(r)) ?? LastAtOrBefore(tick);
         if (next != null) Select(next);
+    }
+
+    // ---------- Append / Replace ----------
+
+    // "Append" or "Replace" while the settings are being changed (between the two clicks), otherwise null; the rows
+    // chosen at the first click (Append: the selected one, none: at the start of the first track; Replace: the selected
+    // ones), by their track, position, type and rank among the same ones there: the first click may write the settings
+    // so far in the track, which changes the places of the events (and their values).
+    string pending;
+    List<(int Track, long Tick, string Type, int Rank)> targets = new();
+
+    // Pressed while pending (the click itself changes nothing: the commands do, then the state is shown again).
+    public bool IsAppending { get => pending == "Append"; set => OnPropertyChanged(); }
+    public bool IsReplacing { get => pending == "Replace"; set => OnPropertyChanged(); }
+    public bool CanAppend => pending != "Replace";
+    public bool CanReplace => pending != "Append";
+    public bool IsPending => pending != null;
+
+    void SetPending(string value)
+    {
+        pending = value;
+        foreach (var name in new[] { nameof(IsAppending), nameof(IsReplacing), nameof(CanAppend), nameof(CanReplace), nameof(IsPending) })
+            OnPropertyChanged(name);
+    }
+
+    (int Track, long Tick, string Type, int Rank) Target(EventRowViewModel row) =>
+        (row.Row.Track, row.Row.Tick, row.Row.Type, rows.Count(r => Same(r.Row, row.Row) && r.Row.Index < row.Row.Index));
+
+    static bool Same(MidiEventRow a, MidiEventRow b) => a.Track == b.Track && a.Tick == b.Tick && a.Type == b.Type;
+
+    EventRowViewModel Find((int Track, long Tick, string Type, int Rank) t) =>
+        rows.Where(r => r.Row.Kind != EventKind.Setting && r.Row.Track == t.Track && r.Row.Tick == t.Tick && r.Row.Type == t.Type)
+            .OrderBy(r => r.Row.Index).Skip(t.Rank).FirstOrDefault();
+
+    // First click: remembers where to write, writes the settings in blue so far in the track; second click: writes the
+    // settings changed since.
+    void Write(string kind, List<EventRowViewModel> selected)
+    {
+        try { Start(kind, selected); }
+        finally { SetPending(pending); }   // the buttons show the real state
+    }
+
+    void Start(string kind, List<EventRowViewModel> selected)
+    {
+        if (pending == kind) { Confirm(); return; }
+        if (pending != null) return;
+        if (editing.EditBlocked is { } blocked) { Error = blocked; return; }
+        var chosen = (kind == "Append" ? new[] { selectedRow }.ToList() : selected ?? new List<EventRowViewModel>())
+            .Where(r => r != null && r.Row.Kind != EventKind.Setting)
+            .OrderBy(r => r.Row.Tick).ThenBy(r => r.Row.Track).ThenBy(r => r.Row.Index).ToList();
+        if (kind == "Replace" && chosen.Count == 0) { Error = "Select events to replace"; return; }
+        Follow = false;
+        Error = null;
+        targets = chosen.Select(Target).ToList();
+        editing.WriteSettingsInTrack();
+        UpdateUndo();
+        SetPending(kind);
+        Status = $"{kind}: change settings in Mixer / Effects tabs, then click {kind} again (Cancel: drop them)";
+    }
+
+    void Confirm()
+    {
+        string kind = pending;
+        var found = targets.Select(Find).ToList();
+        SetPending(null);
+        if (found.Any(r => r == null)) { Error = "Events changed meanwhile: nothing written"; editing.DropFixed(); return; }
+        int track = 1, index = -1;
+        long tick = 0;
+        string position = "1:1:000";
+        var replaced = new List<(int Track, int Index)>();
+        if (found.Count > 0)
+        {
+            (track, index, tick, position) = (found[0].Row.Track, found[0].Row.Index, found[0].Row.Tick, found[0].Position);
+            if (kind == "Replace")
+                replaced = found.SelectMany(r => r.Row.OffIndex >= 0 ? new[] { (r.Row.Track, r.Row.Index), (r.Row.Track, r.Row.OffIndex) }
+                                                                     : new[] { (r.Row.Track, r.Row.Index) }).ToList();
+        }
+        string written = null;
+        Change(() => written = editing.WriteFixed(track, index, tick, replaced), "");
+        if (editing.EditBlocked != null) return;
+        if (written == null) { Status = "Nothing changed in Mixer / Effects tabs: nothing written"; return; }
+        Status = $"{(kind == "Append" ? "Appended" : $"Replaced {found.Count} event(s)")} at {position}: {written} (Ctrl+Z: undo)";
+    }
+
+    void Cancel()
+    {
+        if (pending == null) return;
+        string kind = pending;
+        SetPending(null);
+        editing.DropFixed();
+        Status = $"{kind} cancelled: settings back to file's";
     }
 
     // Adds an event of the chosen kind at the position of the selected row (its track and channel), with default
@@ -363,7 +592,7 @@ public sealed class EventEditorViewModel : ObservableObject
     void Add()
     {
         var at = selectedRow?.Row;
-        int track = at is { Track: > 0 } ? at.Track : 1;
+        int track = at is { Track: > 0 } ? at.Track : 1;   // a setting (track 0): first track
         long tick = at?.Tick ?? 0;
         int channel = at is { Channel: >= 0 } ? at.Channel : 0;
         var empty = MidiEventForm.New(AddKind, channel, editing.TicksPerQuarter);

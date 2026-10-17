@@ -86,6 +86,25 @@ public static class MidiEventEdits
         return i;
     }
 
+    // Inserts events at a position of a track: right after the event at index (-1: before the events already there).
+    // With delete (a note: its Note On and its Note Off), those events are deleted first; the event at index may be one
+    // of them: the new ones then take its place. Returns the place of the first one.
+    public static int Insert(MidiFile file, int track, int index, long time, IReadOnlyList<MidiEvent> events,
+                             IEnumerable<(int Track, int Index)> delete = null)
+    {
+        var deleted = (delete ?? Array.Empty<(int, int)>()).Where(x => x.Track > 0 && x.Index >= 0).Distinct().ToList();
+        bool replaced = deleted.Contains((track, index));
+        int before = deleted.Count(x => x.Track == track && x.Index < index);   // deleted events before it: places move
+        Delete(file, deleted);
+        var chunk = Track(file, track);
+        var list = Timed(chunk);
+        int place = index < 0 ? list.FindIndex(x => x.Time >= time) : index - before + (replaced ? 0 : 1);
+        if (place < 0) place = list.Count;
+        list.InsertRange(place, events.Select(e => (time, e)));
+        Write(chunk, list);
+        return place;
+    }
+
     // Adds a note; returns the place of its Note On.
     public static int AddNote(MidiFile file, int track, long time, int channel, int note, int velocity, long length)
     {

@@ -10,7 +10,8 @@
         d:DataContext="{d:DesignInstance vm:EventEditorViewModel}">
   <!-- Event Editor (see EventEditorViewModel): the events of the current track, filtered; the row being played is
        selected while Follow is on; double click (or Enter) on a row: playback from there. Edit panel under the list:
-       change the selected event, delete the selected ones (Delete), add one at the selected position; Ctrl+Z / Ctrl+Y.
+       change the selected event, delete the selected ones (Delete), add one at the selected position, write the
+       settings in blue (Mixer / Effects tabs) after the selected event (Append) or instead of it (Replace); Ctrl+Z / Ctrl+Y.
        A window of its own (not kept above the main one), closed with it. -->
   <Window.InputBindings>
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}"/>
@@ -25,11 +26,6 @@
       <Style TargetType="ListViewItem" BasedOn="{StaticResource ThemedListViewItem}">
         <EventSetter Event="MouseDoubleClick" Handler="OnRowDoubleClick"/>
         <Style.Triggers>
-          <!-- Written by the Insert button: shown, changed there. -->
-          <DataTrigger Binding="{Binding Row.IsInserted}" Value="True">
-            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="ToolTip" Value="Inserted with Insert button"/>
-          </DataTrigger>
           <DataTrigger Binding="{Binding IsFixed}" Value="True">
             <Setter Property="Foreground" Value="{DynamicResource FixedBrush}"/>
             <Setter Property="ToolTip" Value="{Binding FixedText}"/>
@@ -72,7 +68,8 @@
                  VerticalAlignment="Center" Margin="0,0,12,0"/>
     </DockPanel>
 
-    <!-- Edit panel: the selected event (Apply or Enter), deletion, addition, undo / redo. -->
+    <!-- Edit panel: addition, deletion, Append / Replace, undo / redo, then the selected event (Apply or Enter, shown with a
+         selection; a text or SysEx on the same line, up to Apply). -->
     <Border DockPanel.Dock="Bottom" Margin="0,8,0,0" Padding="10,8" Background="{DynamicResource PanelBrush}"
             BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="4" TextElement.Foreground="{DynamicResource TextBrush}">
       <Border.InputBindings>
@@ -80,6 +77,34 @@
       </Border.InputBindings>
       <StackPanel>
         <DockPanel LastChildFill="False">
+          <TextBlock Text="Add" VerticalAlignment="Center" MinWidth="110" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Width="150" ItemsSource="{Binding NewKinds}" SelectedItem="{Binding AddKind}" ToolTip="Kind of event to add"/>
+          <Button Content="Add" Margin="8,0,6,0" Command="{Binding AddCommand}"
+                  ToolTip="Adds event at position of selected one (its track and channel)"/>
+          <Button Content="Delete" Command="{Binding DeleteCommand}" CommandParameter="{Binding SelectedItems, ElementName=EventList}"
+                  ToolTip="Deletes selected events (Delete)"/>
+          <!-- Two clicks: the first one starts (pressed), the settings are changed in the Mixer / Effects tabs, the second
+               one writes them as events, after the selected event or instead of the selected events; Cancel drops them. -->
+          <ToggleButton Content="Append" Margin="12,0,6,0" Padding="10,3" Command="{Binding AppendCommand}"
+                        CommandParameter="{Binding SelectedItems, ElementName=EventList}"
+                        IsChecked="{Binding IsAppending}" IsEnabled="{Binding CanAppend}"
+                        ToolTip="Click, change settings in Mixer / Effects tabs, click again: they are written below selected event"/>
+          <ToggleButton Content="Replace" Padding="10,3" Command="{Binding ReplaceCommand}"
+                        CommandParameter="{Binding SelectedItems, ElementName=EventList}"
+                        IsChecked="{Binding IsReplacing}" IsEnabled="{Binding CanReplace}"
+                        ToolTip="Click, change settings in Mixer / Effects tabs, click again: they replace selected events"/>
+          <Button Content="Cancel" Margin="6,0,0,0" Command="{Binding CancelCommand}"
+                  Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}"
+                  ToolTip="Drops settings changed since Append / Replace was clicked"/>
+          <TextBlock Text="{Binding Error}" Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+          <TextBlock Text="{Binding NotEditable}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+          <Button DockPanel.Dock="Right" Content="Redo" Margin="0" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}"
+                  ToolTip="Redo (Ctrl+Y)"/>
+          <Button DockPanel.Dock="Right" Content="Undo" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}"
+                  ToolTip="Undo (Ctrl+Z)"/>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="12,0,12,0"/>
+        </DockPanel>
+        <DockPanel Margin="0,8,0,0">
           <TextBlock Text="{Binding EditKind}" FontWeight="SemiBold" MinWidth="110" VerticalAlignment="Center"/>
           <StackPanel Orientation="Horizontal" Visibility="{Binding HasChannel, Converter={StaticResource BoolToVisibility}}">
             <TextBlock Text="Channel" Style="{StaticResource Label}"/>
@@ -99,28 +124,25 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <Button Content="Apply" Margin="12,0,6,0" Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply}"
-                  ToolTip="Changes selected event (Enter)"/>
-          <Button DockPanel.Dock="Right" Content="Redo" Margin="0" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}"
-                  ToolTip="Redo (Ctrl+Y)"/>
-          <Button DockPanel.Dock="Right" Content="Undo" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}"
-                  ToolTip="Undo (Ctrl+Z)"/>
-        </DockPanel>
-        <DockPanel Margin="0,6,0,0" Visibility="{Binding HasText, Converter={StaticResource BoolToVisibility}}">
-          <TextBlock Text="{Binding TextLabel}" VerticalAlignment="Center" MinWidth="110" Foreground="{DynamicResource TextSoftBrush}"/>
-          <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Padding="2,1" TextWrapping="Wrap" MaxHeight="60"
-                   VerticalScrollBarVisibility="Auto" FontFamily="Consolas" IsEnabled="{Binding CanApply}"/>
-        </DockPanel>
-        <DockPanel Margin="0,8,0,0" LastChildFill="False">
-          <TextBlock Text="Add" VerticalAlignment="Center" MinWidth="110" Foreground="{DynamicResource TextSoftBrush}"/>
-          <ComboBox Width="150" ItemsSource="{Binding NewKinds}" SelectedItem="{Binding AddKind}" ToolTip="Kind of event to add"/>
-          <Button Content="Add" Margin="8,0,6,0" Command="{Binding AddCommand}"
-                  ToolTip="Adds event at position of selected one (its track and channel)"/>
-          <Button Content="Delete" Command="{Binding DeleteCommand}" CommandParameter="{Binding SelectedItems, ElementName=EventList}"
-                  ToolTip="Deletes selected events (Delete)"/>
-          <TextBlock Text="{Binding Error}" Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/>
-          <TextBlock Text="{Binding NotEditable}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/>
-          <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center"/>
+          <!-- After the fields; with a text, at the right end (the text fills the line up to it). -->
+          <Button Content="Apply" Margin="12,0,0,0" Command="{Binding ApplyCommand}" IsEnabled="{Binding CanApply}"
+                  Visibility="{Binding HasForm, Converter={StaticResource BoolToVisibility}}" ToolTip="Changes selected event (Enter)">
+            <Button.Style>
+              <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="DockPanel.Dock" Value="Left"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding HasText}" Value="True">
+                    <Setter Property="DockPanel.Dock" Value="Right"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Button.Style>
+          </Button>
+          <DockPanel Visibility="{Binding HasText, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding TextLabel}" Style="{StaticResource Label}"/>
+            <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Padding="2,1" VerticalAlignment="Center"
+                     FontFamily="Consolas" IsEnabled="{Binding CanApply}"/>
+          </DockPanel>
         </DockPanel>
       </StackPanel>
     </Border>

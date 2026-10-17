@@ -88,6 +88,29 @@ public class MidiEventEditsTests
 
         var marker = (MarkerEvent)MidiEventForm.Read(MidiEventForm.New("Marker", 0, 480), 0, Array.Empty<string>(), "Boucle é").Event;
         Assert.Equal("Boucle é", MidiTools.DecodeText(marker.Text));   // UTF-8 in the file, read back
-        Assert.NotNull(MidiEventForm.Of(new MidiEventRow(0, 0, 0, EventKind.Controller, "Control Change", "", "", MidiTools.Cc(0, 7, 1))).NotEditable);
+        Assert.NotNull(MidiEventForm.Of(new MidiEventRow(0, 1, -1, EventKind.Meta, "Time Signature", "3/4", "", new TimeSignatureEvent(3, 4), 0)).NotEditable);   // not yet
+    }
+
+    static ControlChangeEvent Cc(int number, int value) => new((SevenBitNumber)number, (SevenBitNumber)value);
+
+    [Fact]
+    public void Insert_appends_after_an_event_or_replaces_events()
+    {
+        // Append (settings in blue): right after the volume, at its position.
+        var f = File();
+        Assert.Equal(2, MidiEventEdits.Insert(f, 1, 1, 240, new MidiEvent[] { Cc(10, 20), Cc(91, 5) }));
+        Assert.Equal("0:on60/90 240:cc7=100 240:cc10=20 240:cc91=5 480:off60 480:on64/90 960:off64", Track1(f));
+        // No event: before the events at the position.
+        f = File();
+        Assert.Equal(0, MidiEventEdits.Insert(f, 1, -1, 0, new MidiEvent[] { Cc(0, 1) }));
+        Assert.Equal("0:cc0=1 0:on60/90 240:cc7=100 480:off60 480:on64/90 960:off64", Track1(f));
+        // Replace the volume: the new events take its place.
+        f = File();
+        Assert.Equal(1, MidiEventEdits.Insert(f, 1, 1, 240, new MidiEvent[] { Cc(7, 50), Cc(10, 20) }, new[] { (1, 1) }));
+        Assert.Equal("0:on60/90 240:cc7=50 240:cc10=20 480:off60 480:on64/90 960:off64", Track1(f));
+        // Replace the volume and the note E3 (Note On and Note Off): at the place of the volume.
+        f = File();
+        Assert.Equal(1, MidiEventEdits.Insert(f, 1, 1, 240, new MidiEvent[] { Cc(11, 9) }, new[] { (1, 1), (1, 3), (1, 4) }));
+        Assert.Equal("0:on60/90 240:cc11=9 480:off60", Track1(f));
     }
 }

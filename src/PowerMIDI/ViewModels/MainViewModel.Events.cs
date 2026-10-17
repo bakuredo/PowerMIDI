@@ -5,8 +5,8 @@ namespace PowerMIDI.ViewModels;
 
 // Event Editor (separate window, see EventEditorViewModel): the events of the current track, and its changes.
 // The changes are made on a copy of the track in memory (editedFile), never on the file itself: the playback goes on
-// from that copy at the same position, and "Save MIDI file…" writes it (with the settings in blue and the insertions,
-// as for the file). Undo / redo keep the previous states. Leaving the track asks first, as for the settings.
+// from that copy at the same position, and "Save MIDI file…" writes it (with the settings in blue, as for the file).
+// Record (Insert mode) writes its settings there too. Undo / redo keep the previous states. Leaving the track asks first, as for the settings.
 public sealed partial class MainViewModel : IEventEditing
 {
     EventEditorViewModel eventEditor;   // null while the window is closed
@@ -33,23 +33,25 @@ public sealed partial class MainViewModel : IEventEditing
     // The track as listed and played: the copy with the changes, otherwise the file.
     MidiFile BaseFile() => editedFile?.Clone() ?? MidiTools.ReadFile(settingsFile);
 
-    // Lists the events of the current track and its insertions (a long file takes a moment: not before the playback
-    // starts).
+    // Lists the events of the current track (a long file takes a moment: not before the playback starts).
     void LoadEvents()
     {
         if (!eventsPending || eventEditor == null || settingsFile == null) return;
         eventsPending = false;
-        var inserted = insertions.SelectMany(i => i.Events.Select(x => (i.Tick, x.Event)));
-        eventEditor.Load(BaseFile(), inserted, Mixer.Standard, Path.GetFileName(settingsFile) + (editedFile != null ? " *" : ""));
+        eventEditor.Load(BaseFile(), Mixer.Standard, Path.GetFileName(settingsFile) + (editedFile != null ? " *" : ""));
     }
 
-    // Values fixed in the Mixer or Effects tab (blue): the Event Editor shows the events they replace in blue too.
+    // Values fixed in the Mixer or Effects tab (blue): the Event Editor shows the events they replace in blue too
+    // (MidiEventList.FixedText), checked at each timer tick. Besides the saved settings, the rows depend on the maps
+    // chosen in the Mixer tab, the mode of the track, and the drum part / part mode of each channel (drum NRPN).
     string eventsFixed = "";
 
     void RefreshEventsFixed()
     {
         if (eventEditor == null) return;
-        var signature = GetSettingsSignature(false);
+        var signature = GetSettingsSignature(false) +
+            $"|{ChannelMixer.VoiceMapOverride}/{ChannelMixer.GsDefaultMapOverride}/{ChannelMixer.ForceMode}/{CurrentStandard}|" +
+            string.Join(",", Enumerable.Range(0, 16).Select(c => $"{ChannelMixer.Rhythm(c)}{XgDrumSetup.PartMode(c)}"));
         if (signature == eventsFixed) return;
         eventsFixed = signature;
         eventEditor.RefreshFixed();
@@ -67,7 +69,7 @@ public sealed partial class MainViewModel : IEventEditing
     // ---------- Changes (IEventEditing) ----------
 
     public string EditBlocked =>
-        current == null || settingsFile == null ? "Play a track first." : insertMode ? "Release Insert first." : null;
+        current == null || settingsFile == null ? "Play a track first." : null;
 
     public bool CanUndo => undoEdits.Count > 0;
     public bool CanRedo => redoEdits.Count > 0;
@@ -77,7 +79,10 @@ public sealed partial class MainViewModel : IEventEditing
         : tempoMap?.TimeDivision is TicksPerQuarterNoteTimeDivision t ? t.TicksPerQuarterNote : 480;
 
     // Makes a change on a copy of the track; change returns the event to select afterwards (track, place), if any.
-    public void Edit(Func<MidiFile, (int Track, int Index)?> change)
+    public void Edit(Func<MidiFile, (int Track, int Index)?> change) => Edit(change, null, null);
+
+    // Same; playback afterwards at a position, playing or not (null: where it is, as it is).
+    void Edit(Func<MidiFile, (int Track, int Index)?> change, long? at, bool? play)
     {
         if (EditBlocked != null) return;
         var work = BaseFile();
@@ -85,7 +90,7 @@ public sealed partial class MainViewModel : IEventEditing
         undoEdits.Add(editedFile);
         if (undoEdits.Count > UndoLimit) undoEdits.RemoveAt(0);
         redoEdits.Clear();
-        UseEdits(work, select);
+        UseEdits(work, select, at, play);
     }
 
     public void Undo()
@@ -106,12 +111,13 @@ public sealed partial class MainViewModel : IEventEditing
         UseEdits(next, null);
     }
 
-    // The track is now this file (null: the file on disk): playback rebuilt at the same position, list built again.
-    void UseEdits(MidiFile file, (int Track, int Index)? select)
+    // The track is now this file (null: the file on disk): playback rebuilt at the same position (or at), list built
+    // again.
+    void UseEdits(MidiFile file, (int Track, int Index)? select, long? at = null, bool? play = null)
     {
         editedFile = file;
         editVersion++;
-        if (playback != null) ReloadPlayback(CurrentTick(), state == "playing");
+        if (playback != null || at != null) ReloadPlayback(at ?? CurrentTick(), play ?? state == "playing");
         eventsPending = true;
         LoadEvents();
         if (select is { } s) eventEditor?.SelectEvent(s.Track, s.Index);
