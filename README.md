@@ -18,9 +18,8 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
   chorus, delay / variation, filter and envelope settings), with instrument names for each mode.
 - **Effects**: Reverb, Chorus, Delay, EQ, EFX, Drums, Part in GS mode - Reverb, Chorus, Variation, Insertion, Multi-EQ, Drums, Part in XG -
   Reverb, Drums, Part in MT-32 - Reverb, Chorus, Drums, Part in GM2.
-- **Event editor**: List all events of file and editing with filters, add, append and replace functions.
-- **Saving**: Changed settings (in blue) are written into a copy of MIDI file, for whole track or at a position
-  of track (Insert mode).
+- **Event editor**: List all events from file and editing with filters, add, append and replace functions.
+- **Saving**: Changed settings in Mixer/Effects and Event editor can be written into a copy of MIDI file.
 - **File loops markers**: `loopStart` / `loopEnd`, `[` / `]` markers and CC111 are followed.
 - **LCD module support**: Show text and dot pictures from file during playback.
 - **Color themes**: Built-in XAML themes; can be edited !
