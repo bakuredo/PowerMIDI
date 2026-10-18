@@ -219,6 +219,9 @@ public sealed class EffectBlockViewModel : ObservableObject
     public bool HasFollow { get; init; }
     bool follow;
     public bool Follow { get => follow; set => Set(ref follow, value); }
+    // Drums pages: Audition button, at the left of Follow (the note chosen, or changed, is played).
+    bool audition;
+    public bool Audition { get => audition; set => Set(ref audition, value); }
     public bool HasChannels => Channels.Count > 0;
 }
 

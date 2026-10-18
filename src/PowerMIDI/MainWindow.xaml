@@ -499,6 +499,9 @@
             <ToggleButton DockPanel.Dock="Right" Content="Follow" IsChecked="{Binding Follow}" VerticalAlignment="Top"
                           Padding="9,2" Height="22" Margin="0,0,0,4" FontSize="12" ToolTip="Note list follows notes played"
                           Visibility="{Binding HasFollow, Converter={StaticResource BoolToVisibility}}"/>
+            <ToggleButton DockPanel.Dock="Right" Content="Audition" IsChecked="{Binding Audition}" VerticalAlignment="Top"
+                          Padding="9,2" Height="22" Margin="0,0,6,4" FontSize="12" ToolTip="Plays note chosen or changed (on first channel of group)"
+                          Visibility="{Binding HasFollow, Converter={StaticResource BoolToVisibility}}"/>
             <ItemsControl ItemsSource="{Binding Channels}" Margin="8,0,0,0">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
@@ -595,14 +598,14 @@
     </Grid.RowDefinitions>
 
     <!-- Port and mode -->
-    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-      <TextBlock Text="MIDI port" Margin="0,0,8,0"/>
+    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
+      <TextBlock Text="MIDI port" Margin="0,0,8,0" VerticalAlignment="Center"/>
       <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}"/>
       <Button Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="6,0,18,0" Command="{Binding RefreshPortsCommand}"
               ToolTip="Refresh port list"/>
-      <TextBlock Text="Mode" Margin="0,0,8,0"/>
+      <TextBlock Text="Mode" Margin="0,0,8,0" VerticalAlignment="Center"/>
       <ComboBox Width="120" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
-                ToolTip="Auto follows the file; any other mode is forced on it.">
+                ToolTip="Auto follows file; other mode forced on it (SysEx of other modes ignored)">
         <ComboBoxItem Content="Auto"/>
         <ComboBoxItem Content="GS"/>
         <ComboBoxItem Content="XG"/>
@@ -611,9 +614,7 @@
         <ComboBoxItem Content="MT-32"
                       ToolTip="Roland MT-32 / CM-32L"/>
       </ComboBox>
-      <ToggleButton Content="Clean" Margin="6,0,0,0" Padding="10,2" IsChecked="{Binding IsCleaned}" IsEnabled="{Binding CleanEnabled}"
-                    ToolTip="With a forced mode, also removes the SysEx of the other modes."/>
-    </StackPanel>
+    </DockPanel>
 
     <!-- Playlist: double click (see the ListViewItem style) or Enter plays the track, Del removes the selected tracks. -->
     <ListView x:Name="PlaylistView" Grid.Row="1" Style="{StaticResource ThemedListView}"
@@ -682,8 +683,18 @@
         <!-- Position: the jump happens when the mouse button is released. -->
         <Grid Grid.Row="2">
           <!-- Mouse down / up handlers: added in MainWindow.xaml.cs (they must also get the clicks the slider handles). -->
+          <!-- Right click: the loop of the track (loopStart / loopEnd markers), at the bar clicked (MainViewModel.Loop.cs). -->
           <Slider x:Name="PositionBar" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
-                  IsMoveToPointEnabled="True" IsEnabled="{Binding HasTrack}"/>
+                  IsMoveToPointEnabled="True" IsEnabled="{Binding HasTrack}">
+            <Slider.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="{Binding LoopStartMenuText}" Command="{Binding SetLoopStartCommand}"/>
+                <MenuItem Header="{Binding LoopEndMenuText}" Command="{Binding SetLoopEndCommand}"/>
+                <Separator/>
+                <MenuItem Header="Remove loop" Command="{Binding RemoveLoopCommand}" IsEnabled="{Binding HasLoop}"/>
+              </ContextMenu>
+            </Slider.ContextMenu>
+          </Slider>
           <!-- Loop of a video game track (loopStart / loopEnd, [ / ], CC111): green markers above the bar, at its
                start and end. -->
           <Canvas x:Name="LoopCanvas" VerticalAlignment="Top" Height="9" Margin="0,1,0,0"
@@ -730,7 +741,7 @@
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0" VerticalAlignment="Center"/>
-            <Slider Width="110" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True"
+            <Slider Width="110" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
             <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>
           </StackPanel>

@@ -71,6 +71,8 @@ public interface IEventEditing
     // Writes the settings in blue (Mixer / Effects tabs) as events: after the event at index of a track (-1: before the
     // events at tick), or instead of the events replaced; returns what was written (null: nothing in blue).
     string WriteFixed(int track, int index, long tick, IReadOnlyList<(int Track, int Index)> replaced);
+    // Audition: plays a note on its own (Note Off after length).
+    void PlayNote(int channel, int note, int velocity, TimeSpan length);
     // Append / Replace cancelled: the settings in blue go back to the file's values.
     void DropFixed();
     void Undo();
@@ -352,7 +354,20 @@ public sealed class EventEditorViewModel : ObservableObject
             if (!Set(ref selectedRow, value)) return;
             if (!following && value != null && follow && value != current) Follow = false;
             ShowForm();
+            if (!following) PlaySelected(value);
         }
+    }
+
+    // Audition: the note selected by hand is played (its channel, key and velocity; at most 2 s).
+    bool audition;
+    public bool Audition { get => audition; set => Set(ref audition, value); }
+
+    void PlaySelected(EventRowViewModel row)
+    {
+        if (!audition || row?.Row.Event is not NoteOnEvent on || on.Velocity == 0) return;
+        double seconds = row.Row.Length > 0 && tempoMap != null
+            ? ((TimeSpan)LengthConverter.ConvertTo<MetricTimeSpan>(row.Row.Length, row.Row.Tick, tempoMap)).TotalSeconds : 0.5;
+        editing.PlayNote(on.Channel, on.NoteNumber, on.Velocity, TimeSpan.FromSeconds(Math.Clamp(seconds, 0.1, 2)));
     }
 
     // The row to bring into view (the window scrolls to it).

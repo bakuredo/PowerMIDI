@@ -28,6 +28,7 @@ public partial class MainWindow : Window, IMainView
         // in XAML would miss it; without IsSeeking, the timer would put the bar back before the button is released.
         PositionBar.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(OnPositionMouseDown), true);
         PositionBar.AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnPositionMouseUp), true);
+        PositionBar.PreviewMouseRightButtonDown += OnPositionRightClick;
         var defs =InstrumentDefinitions.Load(Path.Combine(BaseDir, "instruments"));
         vm = new MainViewModel(this, defs);
         DataContext = vm;
@@ -164,6 +165,13 @@ public partial class MainWindow : Window, IMainView
     // Position bar: the jump happens when the mouse button is released.
     void OnPositionMouseDown(object sender, MouseButtonEventArgs e) => vm.IsSeeking = true;
     void OnPositionMouseUp(object sender, MouseButtonEventArgs e) => vm.EndSeek();
+
+    // Right click: the time under the mouse, for the loop menu.
+    void OnPositionRightClick(object sender, MouseButtonEventArgs e)
+    {
+        double width = PositionBar.ActualWidth;
+        if (width > 0) vm.PrepareLoopMenu(Math.Clamp(e.GetPosition(PositionBar).X / width, 0, 1) * PositionBar.Maximum);
+    }
 
     // Link of the About tab: opened in the default browser.
     void OnLinkNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)

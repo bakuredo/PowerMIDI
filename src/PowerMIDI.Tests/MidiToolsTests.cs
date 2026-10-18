@@ -1,5 +1,6 @@
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
+using Melanchall.DryWetMidi.Interaction;
 using PowerMIDI.Core;
 
 namespace PowerMIDI.Tests;
@@ -82,6 +83,33 @@ public class MidiToolsTests
         var loop = MidiTools.GetLoop(File(On(72), Off(72, 480), Cc(111, 0), On(60), Off(60, 960)));
         Assert.NotNull(loop);
         Assert.Equal((480, 1440, "CC111"), loop.Value);
+    }
+
+    [Fact]
+    public void System_mode_set_is_a_gs_reset()
+    {
+        // SC-88 and later: DT1 00 00 7F (single / double module mode) initializes the module, as a GS Reset.
+        var modeSet = new NormalSysExEvent(new byte[] { 0x41, 0x10, 0x42, 0x12, 0x00, 0x00, 0x7F, 0x00, 0x01, 0xF7 });
+        Assert.True(MidiFileEditor.IsReset(modeSet));
+        Assert.Equal("GS", MidiTools.GetStandard(File(modeSet, On(60), Off(60, 480))));
+        Assert.False(MidiFileEditor.IsReset(new NormalSysExEvent(new byte[] { 0x41, 0x10, 0x42, 0x12, 0x00, 0x00, 0x7E, 0x00, 0x02, 0xF7 })));
+    }
+
+    [Fact]
+    public void Loop_points_set_and_removed()
+    {
+        // A "[" / "]" loop and a CC111: setting the start replaces "[" and the CC111, the end replaces "]".
+        var file = File(On(72), Off(72, 480), Cc(111, 0), new MarkerEvent("["), On(60), Off(60, 960), new MarkerEvent("]"), On(79), Off(79, 480));
+        MidiEventEdits.SetLoopPoint(file, MidiTools.LoopPoint.Start, 960);
+        MidiEventEdits.SetLoopPoint(file, MidiTools.LoopPoint.End, 1920);
+        Assert.Equal((960L, 1920L, "loopStart / loopEnd"), MidiTools.GetLoop(file).Value);
+        Assert.Equal(2, file.GetTimedEvents().Count(t => MidiTools.LoopPointOf(t.Event) != MidiTools.LoopPoint.None));
+        Assert.Equal(6, file.GetTimedEvents().Count(t => t.Event is NoteEvent));   // the notes kept, at their place
+        // Removed: no loop any more.
+        MidiEventEdits.SetLoopPoint(file, MidiTools.LoopPoint.Start, null);
+        MidiEventEdits.SetLoopPoint(file, MidiTools.LoopPoint.End, null);
+        Assert.Null(MidiTools.GetLoop(file));
+        Assert.Equal(1920L, file.GetTimedEvents().Max(t => t.Time));   // the last Note Off, at its place
     }
 
     [Fact]

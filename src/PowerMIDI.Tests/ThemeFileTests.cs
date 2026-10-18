@@ -63,7 +63,7 @@ public class ThemeFileTests : IDisposable
     {
         var themes = Path.Combine(AppContext.BaseDirectory, "themes");
         var names = ThemeFile.GetNames(themes);
-        Assert.Equal(6, names.Count);
+        Assert.Equal(7, names.Count);
         var keys = ThemeFile.ReadColors(Path.Combine(themes, "Dark.xaml")).Keys.OrderBy(k => k).ToList();
         Assert.NotEmpty(keys);
         foreach (var name in names)

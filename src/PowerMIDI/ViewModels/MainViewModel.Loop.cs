@@ -27,7 +27,7 @@ public sealed partial class MainViewModel
     // New playback of the current track (start, seek rebuild, insertion): its loop and how it plays.
     void SetUpLoop(MidiFile midi, Playback pb)
     {
-        loop = MidiTools.GetLoop(midi);
+        ShowLoop(midi);
         pb.RepeatStarted += (_, _) => { loopsDone++; RestoreLoopStart(); };
         loopRestore = null;
         loopEndNotes = null;
@@ -36,6 +36,16 @@ public sealed partial class MainViewModel
             loopRestore = MidiTools.GetLoopRestore(midi, l.Start, l.End);
             var from = TimeConverter.ConvertFrom(new MetricTimeSpan(Math.Max(0, (long)(TickToTime(l.End) - LoopEndWindow).TotalMicroseconds)), tempoMap);
             loopEndNotes = MidiTools.GetLoopEndNotes(midi, l.Start, from, l.End);
+        }
+        ApplyLoopMode();
+    }
+
+    // The loop of a track, and its markers above the position bar.
+    void ShowLoop(MidiFile midi)
+    {
+        loop = MidiTools.GetLoop(midi);
+        if (loop is { } l)
+        {
             double start = TickToTime(l.Start).TotalSeconds, end = TickToTime(l.End).TotalSeconds;
             LoopStartFraction = Math.Min(1, start / Duration);
             LoopEndFraction = Math.Min(1, end / Duration);
@@ -45,7 +55,48 @@ public sealed partial class MainViewModel
         OnPropertyChanged(nameof(LoopStartFraction));
         OnPropertyChanged(nameof(LoopEndFraction));
         OnPropertyChanged(nameof(LoopToolTip));
-        ApplyLoopMode();
+    }
+
+    // ---------- Loop menu (right click on the position bar) ----------
+
+    // The bar clicked: the loop starts at its start, or ends at its end (the start of the next bar, at most the end of the
+    // track). The markers go into the copy of the track the Event Editor changes (undo, saved by "Save MIDI file…").
+    long menuBarStart, menuBarEnd;
+    string loopStartMenuText = "Loop start", loopEndMenuText = "Loop end";
+    public string LoopStartMenuText { get => loopStartMenuText; private set => Set(ref loopStartMenuText, value); }
+    public string LoopEndMenuText { get => loopEndMenuText; private set => Set(ref loopEndMenuText, value); }
+
+    // Right click at a time of the bar (seconds): the bar there, in the texts of the menu.
+    public void PrepareLoopMenu(double seconds)
+    {
+        if (tempoMap == null) return;
+        long tick = TimeConverter.ConvertFrom(new MetricTimeSpan((long)(Math.Clamp(seconds, 0, Duration) * 1_000_000)), tempoMap);
+        long bar = TimeConverter.ConvertTo<BarBeatTicksTimeSpan>(tick, tempoMap).Bars;
+        long last = TimeConverter.ConvertFrom(new MetricTimeSpan((long)(Duration * 1_000_000)), tempoMap);
+        menuBarStart = TimeConverter.ConvertFrom(new BarBeatTicksTimeSpan(bar, 0, 0), tempoMap);
+        menuBarEnd = Math.Min(TimeConverter.ConvertFrom(new BarBeatTicksTimeSpan(bar + 1, 0, 0), tempoMap), last);
+        LoopStartMenuText = $"Loop start at bar {bar + 1} ({MidiTools.FormatTime(TickToTime(menuBarStart))})";
+        LoopEndMenuText = $"Loop end after bar {bar + 1} ({MidiTools.FormatTime(TickToTime(menuBarEnd))})";
+    }
+
+    void SetLoopPoint(MidiTools.LoopPoint point, long? tick)
+    {
+        if (EditBlocked is { } blocked) { Status = blocked; return; }
+        if (tick is long at && loop is { } l &&
+            (point == MidiTools.LoopPoint.Start ? at >= l.End : at <= l.Start))
+        {
+            Status = point == MidiTools.LoopPoint.Start ? "Loop start must be before loop end" : "Loop end must be after loop start";
+            return;
+        }
+        Edit(file =>
+        {
+            if (tick == null) { MidiEventEdits.SetLoopPoint(file, MidiTools.LoopPoint.Start, null); MidiEventEdits.SetLoopPoint(file, MidiTools.LoopPoint.End, null); }
+            else MidiEventEdits.SetLoopPoint(file, point, tick);
+            return null;
+        });
+        if (loop == null && tick != null) { Status = "Loop end set: set loop start too (none in track)"; return; }
+        Status = loop is { } now ? $"Loop from {MidiTools.FormatTime(TickToTime(now.Start))} to {MidiTools.FormatTime(TickToTime(now.End))} (Ctrl+Z in Event Editor: undo)"
+                                 : "No loop";
     }
 
     // The loop restarts (playback thread): the module still has the settings of the loop end (e.g. the volume after

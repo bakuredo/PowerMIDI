@@ -13,7 +13,8 @@ namespace PowerMIDI.ViewModels;
 // It owns the mixer and effects view models; saving the MIDI file is in MainViewModel.Save.cs.
 // - Playlist (drag and drop, files, folders), autoplay of the first added file, shuffle,
 //   repeat (playlist / track), master volume.
-// - Mode detected (last reset in the file, Auto) or chosen in the list, which forces it on the file; "Clean" also removes the other modes' SysEx.
+// - Mode detected (last reset in the file, Auto) or chosen in the list, which forces it on the file: the SysEx of the other
+//   modes are then ignored (and removed by the save).
 public sealed partial class MainViewModel : ObservableObject
 {
     const string GlyphPlay = "";
@@ -51,6 +52,9 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshPortsCommand = Command(UpdatePortList);
         PlaySelectedCommand = Command(() => { if (SelectedTrack != null) StartTrack(SelectedTrack); });
         PlayPauseCommand = Command(TogglePlayPause);
+        SetLoopStartCommand = Command(() => SetLoopPoint(MidiTools.LoopPoint.Start, menuBarStart));
+        SetLoopEndCommand = Command(() => SetLoopPoint(MidiTools.LoopPoint.End, menuBarEnd));
+        RemoveLoopCommand = Command(() => SetLoopPoint(MidiTools.LoopPoint.None, null));
         StopCommand = Command(Stop);
         NextCommand = Command(() => MoveTrack(1));
         PreviousCommand = Command(Previous);
@@ -85,6 +89,9 @@ public sealed partial class MainViewModel : ObservableObject
     public ICommand RefreshPortsCommand { get; }
     public ICommand PlaySelectedCommand { get; }
     public ICommand PlayPauseCommand { get; }
+    public ICommand SetLoopStartCommand { get; }   // menu of the position bar (MainViewModel.Loop.cs)
+    public ICommand SetLoopEndCommand { get; }
+    public ICommand RemoveLoopCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand NextCommand { get; }
     public ICommand PreviousCommand { get; }
@@ -225,7 +232,7 @@ public sealed partial class MainViewModel : ObservableObject
                 UpdateForceMode();
                 if (current == null) { ApplyModeWithoutTrack(); return; }
                 StartTrack(current);   // new mode applied right away: replay (same file: the other manual settings are kept)
-                Status = isForced ? $"Mode {selectedMode} forced: the file's resets are ignored ('Save MIDI file…' replaces them)"
+                Status = isForced ? $"Mode {selectedMode} forced: file resets and SysEx of other modes ignored ('Save MIDI file…' writes file in this mode)"
                                   : $"File mode restored: {CurrentStandard}";
             });
         }
@@ -257,34 +264,9 @@ public sealed partial class MainViewModel : ObservableObject
     // Forced mode: any mode chosen in the list other than Auto is forced on the file.
     bool isForced => selectedMode != "Auto";
 
-    // "Clean": also ignores the SysEx specific to the other modes; applied immediately (replay).
-    bool isCleaned;
-    public bool IsCleaned
-    {
-        get => isCleaned;
-        set
-        {
-            if (!Set(ref isCleaned, value)) return;
-            Run(() =>
-            {
-                if (current != null) StartTrack(current);
-                Status = value ? "SysEx of the other modes ignored ('Save MIDI file…' removes them)" : "SysEx of the other modes kept";
-            });
-        }
-    }
-
-    public bool CleanEnabled => isForced;
-
     void SetModeQuietly(string mode) { selectedMode = mode; OnPropertyChanged(nameof(SelectedMode)); }
-    void SetCleanedQuietly(bool value) { isCleaned = value; OnPropertyChanged(nameof(IsCleaned)); }
 
-    void UpdateForceMode()
-    {
-        // "Clean" only makes sense with a forced mode.
-        if (!isForced && isCleaned) SetCleanedQuietly(false);
-        ChannelMixer.ForceMode = isForced;
-        OnPropertyChanged(nameof(CleanEnabled));
-    }
+    void UpdateForceMode() => ChannelMixer.ForceMode = isForced;
 
     // ---------- Playlist ----------
 
@@ -491,10 +473,9 @@ public sealed partial class MainViewModel : ObservableObject
         IsSeeking = false;
         Run(() =>
         {
-            if (playback == null) return;
-            playback.MoveToTime(new MetricTimeSpan(TimeSpan.FromSeconds(position)));
-            // The seek resends the file's CC7 and programs: reapply sliders and manual choices.
-            ApplyMixerState();
+            // Stopped: the position is kept, Play starts there (see TogglePlayPause).
+            if (playback == null) { if (current != null) TimeText = $"{MidiTools.FormatTime(TimeSpan.FromSeconds(position))} / {durationText}"; return; }
+            MoveTo(new MetricTimeSpan(TimeSpan.FromSeconds(position)));   // the channels as the file has them there
         });
     }
 
@@ -602,7 +583,8 @@ public sealed partial class MainViewModel : ObservableObject
         if (output != null) MidiTools.ReleaseNotes(output, ChannelMixer.Sustain, ChannelMixer.Sostenuto);
     }
 
-    void StartTrack(PlaylistItem item)
+    // from: start position (seconds), when the track is played from a point of the position bar.
+    void StartTrack(PlaylistItem item, double from = 0)
     {
         // Another file with unsaved settings: ask before losing them.
         if (settingsFile != null && settingsFile != item.Path && !ConfirmLeaveSettings()) return;
@@ -628,7 +610,7 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.Gm2Mode = std == "GM2";      // GM2 reverb / chorus SysEx too
         ChannelMixer.XgMode = std == "XG";        // XG voice map chosen in the Mixer tab
         ChannelMixer.GsMode = std == "GS";
-        ChannelMixer.DropManufacturers = isCleaned ? MidiTools.GetOtherModeManufacturers(std) : Array.Empty<int>();
+        ChannelMixer.DropManufacturers = isForced ? MidiTools.GetOtherModeManufacturers(std) : Array.Empty<int>();   // forced: other modes' SysEx ignored
 
         MidiTools.SendReset(output, std);
         ChannelMixer.ResetChannelState(std == "XG");
@@ -644,6 +626,14 @@ public sealed partial class MainViewModel : ObservableObject
         ShowTrackInfo(midi, item, std);
 
         current = item;
+        if (from > 0)
+        {
+            var at = TimeSpan.FromSeconds(from);
+            pb.MoveToTime(new MetricTimeSpan(at));
+            ChaseState(CurrentTick());   // the channels as the file has them there
+            SetPosition(from);
+            TimeText = $"{MidiTools.FormatTime(at)} / {durationText}";
+        }
         pb.Start();
         SetState("playing");
         SelectedTrack = item;
@@ -669,6 +659,7 @@ public sealed partial class MainViewModel : ObservableObject
     Playback CreatePlayback(MidiFile midi)
     {
         var pb = midi.GetPlayback(output);
+        playedFile = midi;
         pb.InterruptNotesOnStop = true;
         // Every Note On and Note Off of the file is played, as the file has them. By default the playback library keeps
         // one active note per key: it drops the Note On of a key already held, and the Note Off of a key it does not
@@ -706,10 +697,8 @@ public sealed partial class MainViewModel : ObservableObject
         {
             // Back to the mode detected in the file.
             SetModeQuietly("Auto");
-            SetCleanedQuietly(false);
             ChannelMixer.ForceMode = false;
             ChannelMixer.DropManufacturers = Array.Empty<int>();
-            OnPropertyChanged(nameof(CleanEnabled));
             had = true;
         }
         had |= Effects.ClearManualSettings();
@@ -747,8 +736,9 @@ public sealed partial class MainViewModel : ObservableObject
             case "playing": PausePlayback(); break;
             case "paused": playback.Start(); SetState("playing"); break;
             default:
+                // Stopped: the current track from the position chosen on the bar (the start once at its end).
                 var item = SelectedTrack ?? current ?? Playlist.FirstOrDefault();
-                if (item != null) StartTrack(item);
+                if (item != null) StartTrack(item, item == current && position < Duration - 0.5 ? position : 0);
                 break;
         }
         UpdateNumbers();
@@ -766,8 +756,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (playback != null && ((TimeSpan)playback.GetCurrentTime<MetricTimeSpan>()).TotalSeconds > 3)
         {
-            playback.MoveToTime(new MidiTimeSpan(0));   // not MoveToStart: with a loop, that would be the loop start
-            ApplyMixerState();
+            MoveTo(new MidiTimeSpan(0));   // not MoveToStart: with a loop, that would be the loop start
         }
         else MoveTrack(-1);
     }

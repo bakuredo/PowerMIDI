@@ -105,6 +105,21 @@ public static class MidiEventEdits
         return place;
     }
 
+    // Loop of the track (see MidiTools.GetLoop): the loop start or end at a position (time), written as a marker
+    // "loopStart" / "loopEnd" in the first track; the other events of that kind are removed (for the start, a CC111
+    // too). time null: removed only.
+    public static void SetLoopPoint(MidiFile file, MidiTools.LoopPoint point, long? time)
+    {
+        var chunks = file.GetTrackChunks().ToList();
+        for (int t = 0; t < chunks.Count; t++)
+        {
+            var list = Timed(chunks[t]);
+            if (list.RemoveAll(x => MidiTools.LoopPointOf(x.Event) == point) > 0) Write(chunks[t], list);
+        }
+        if (time is long at && chunks.Count > 0)
+            Add(file, 1, at, new MarkerEvent(point == MidiTools.LoopPoint.Start ? "loopStart" : "loopEnd"));
+    }
+
     // Adds a note; returns the place of its Note On.
     public static int AddNote(MidiFile file, int track, long time, int channel, int note, int velocity, long length)
     {

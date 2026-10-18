@@ -173,7 +173,7 @@ public sealed partial class MainViewModel
         CreatePlayback(ReadTrackFile(current.Path));
         var at = TickToTime(tick);
         playback.MoveToTime(new MetricTimeSpan(at));
-        ApplyMixerState();
+        ChaseState(tick);   // the channels as the changed track has them there
         SetPosition(at.TotalSeconds);
         TimeText = $"{MidiTools.FormatTime(at)} / {durationText}";
         if (play) { playback.Start(); SetState("playing"); }

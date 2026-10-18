@@ -241,7 +241,7 @@ public static class MidiEventList
     // SysEx: resets, GS rhythm part, module display; otherwise its maker and address.
     public static string DescribeSysEx(byte[] d)
     {
-        if (d.Length >= 7 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x40 && d[5] == 0x00 && d[6] == 0x7F) return "GS Reset";
+        if (MidiTools.IsGsReset(d)) return d[4] == 0x40 ? "GS Reset" : $"GS System Mode Set (mode {(d.Length > 7 ? d[7] + 1 : 1)})";
         if (d.Length >= 6 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0 && d[4] == 0 && d[5] == 0x7E) return "XG System On";
         if (d.Length >= 4 && d[0] == 0x7E && d[2] == 0x09) return d[3] switch { 1 => "GM System On", 2 => "GM System Off", 3 => "GM2 System On", _ => "GM message" };
         if (d.Length >= 7 && d[0] == 0x41 && d[2] == 0x16 && d[3] == 0x12 && d[4] == 0x7F && d[5] == 0 && d[6] == 0) return "MT-32 Reset";

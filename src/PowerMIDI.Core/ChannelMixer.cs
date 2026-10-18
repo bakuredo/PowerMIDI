@@ -46,7 +46,7 @@ public static class ChannelMixer
     // ---------- Master volume (universal SysEx Master Volume: F0 7F 7F 04 01 lsb msb F7) ----------
     // Volume sent = file's master volume × interface slider / 127.
     public static bool ForceMode;             // forced mode: file resets ignored during playback
-    public static int[] DropManufacturers = new int[0];   // + "Clean": manufacturers of ignored SysEx
+    public static int[] DropManufacturers = new int[0];   // forced mode: manufacturers of the ignored SysEx (other modes)
     public static int MasterVolume = 127;     // interface slider
     static int fileMasterVolume = 127;        // last master volume requested by file (127 after a reset)
     public static IOutputDevice Device;       // output port, for resending after a reset in file
@@ -548,7 +548,7 @@ public static class ChannelMixer
                 fileMasterVolume = d[5];
                 return MasterVolumeEvent();
             }
-            // Forced mode + "Clean": SysEx of other modes ignored (manufacturer 41 Roland / 43 Yamaha).
+            // Forced mode: SysEx of other modes ignored (manufacturer 41 Roland / 43 Yamaha).
             if (ForceMode && MidiFileEditor.IsOtherModeSysEx(d, DropManufacturers)) return null;
             // XG voice map asked by the file: remembered; replaced if one is chosen in the interface.
             if (IsVoiceMapSysEx(d))

@@ -60,7 +60,7 @@ public sealed partial class MainViewModel : IEventEditing
     // Playback from a time (seconds), as when the position bar is released there.
     void SeekTo(double seconds)
     {
-        if (playback == null) return;
+        if (playback == null) { if (current != null) Run(() => StartTrack(current, seconds)); return; }   // stopped: played from there
         SetPosition(seconds);
         EndSeek();
         TimeText = $"{MidiTools.FormatTime(TimeSpan.FromSeconds(seconds))} / {durationText}";
@@ -70,6 +70,8 @@ public sealed partial class MainViewModel : IEventEditing
 
     public string EditBlocked =>
         current == null || settingsFile == null ? "Play a track first." : null;
+
+    public void PlayNote(int channel, int note, int velocity, TimeSpan length) => MidiTools.PlayNote(output, channel, note, velocity, length);
 
     public bool CanUndo => undoEdits.Count > 0;
     public bool CanRedo => redoEdits.Count > 0;
@@ -118,6 +120,7 @@ public sealed partial class MainViewModel : IEventEditing
         editedFile = file;
         editVersion++;
         if (playback != null || at != null) ReloadPlayback(at ?? CurrentTick(), play ?? state == "playing");
+        else if (current != null && tempoMap != null) ShowLoop(BaseFile());   // stopped: the loop markers of the bar all the same
         eventsPending = true;
         LoadEvents();
         if (select is { } s) eventEditor?.SelectEvent(s.Track, s.Index);

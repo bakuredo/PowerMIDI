@@ -15,13 +15,13 @@ namespace PowerMIDI.Core;
 //   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams, WriteGsDrumMap, WriteGsPartParams, WriteGm2DrumParams, WriteGm2PartParams, WriteMt32PartParams, WriteMt32DrumParams).
 public static class MidiFileEditor
 {
-    // GS Reset, XG System On, GM / GM2 On or MT-32 Reset.
+    // GS Reset (or System Mode Set, see MidiTools.IsGsReset), XG System On, GM / GM2 On or MT-32 Reset.
     public static bool IsReset(MidiEvent e)
     {
         var sysEx = e as SysExEvent;
         if (sysEx == null) return false;
         var d = sysEx.Data;
-        if (d.Length >= 7 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x40 && d[5] == 0x00 && d[6] == 0x7F) return true;  // GS Reset
+        if (MidiTools.IsGsReset(d)) return true;                                                                                            // GS Reset
         if (d.Length >= 6 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0 && d[4] == 0 && d[5] == 0x7E) return true; // XG System On
         if (d.Length >= 4 && d[0] == 0x7E && d[2] == 0x09 && (d[3] == 0x01 || d[3] == 0x03)) return true;                                  // GM / GM2 On
         if (d.Length >= 7 && d[0] == 0x41 && d[2] == 0x16 && d[3] == 0x12 && d[4] == 0x7F && d[5] == 0 && d[6] == 0) return true;         // MT-32 Reset
@@ -221,7 +221,7 @@ public static class MidiFileEditor
         return !(d[0] == 0x41 && d[2] == 0x45);
     }
 
-    // dropManufacturers: SysEx of other modes to remove as well ("Clean" option), see IsOtherModeSysEx.
+    // dropManufacturers: SysEx of other modes to remove as well, see IsOtherModeSysEx.
     public static string ForceReset(MidiFile file, MidiEvent[] resetEvents, int[] dropManufacturers)
     {
         int tpqn = 480;

@@ -64,6 +64,8 @@
                Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search in type, data and description"/>
       <ToggleButton DockPanel.Dock="Right" Content="Follow" Padding="10,3" IsChecked="{Binding Follow}"
                     ToolTip="Select event being played"/>
+      <ToggleButton DockPanel.Dock="Right" Content="Audition" Padding="10,3" Margin="0,0,6,0" IsChecked="{Binding Audition}"
+                    ToolTip="Plays note selected"/>
       <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" Foreground="{DynamicResource WindowTextMutedBrush}"
                  VerticalAlignment="Center" Margin="0,0,12,0"/>
     </DockPanel>

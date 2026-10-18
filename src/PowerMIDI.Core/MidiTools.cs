@@ -51,6 +51,18 @@ public static class MidiTools
     public static ProgramChangeEvent Pc(int channel, int program) =>
         new((SevenBitNumber)(byte)program) { Channel = (FourBitNumber)(byte)channel };
 
+    // Plays a note on its own (Audition buttons): Note On now, its Note Off after a while.
+    public static void PlayNote(IOutputDevice device, int channel, int note, int velocity, TimeSpan length)
+    {
+        if (device == null) return;
+        device.SendEvent(NoteOn(channel, note, Math.Clamp(velocity, 1, 127)));
+        Task.Delay(length).ContinueWith(_ =>
+        {
+            try { device.SendEvent(NoteOff(channel, note, 0)); }
+            catch (Exception) { }   // port closed meanwhile
+        });
+    }
+
     public static NoteOnEvent NoteOn(int channel, int note, int velocity) =>
         new((SevenBitNumber)(byte)note, (SevenBitNumber)(byte)velocity) { Channel = (FourBitNumber)(byte)channel };
 
@@ -102,7 +114,7 @@ public static class MidiTools
         }
     }
 
-    // Manufacturers of the SysEx specific to the other modes ("Clean" option): 41 Roland (GS, MT-32), 43 Yamaha (XG).
+    // Manufacturers of the SysEx specific to the other modes (ignored with a forced mode): 41 Roland (GS, MT-32), 43 Yamaha (XG).
     public static int[] GetOtherModeManufacturers(string mode) => mode switch
     {
         "GS" or "MT-32" => new[] { 0x43 },
@@ -139,7 +151,7 @@ public static class MidiTools
                 var d = sysEx.Data;
                 if (d.Length < 4) continue;
                 string reset = null;
-                if (d.Length >= 7 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x40 && d[5] == 0 && d[6] == 0x7F) reset = "GS";
+                if (IsGsReset(d)) reset = "GS";
                 else if (d.Length >= 6 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0 && d[4] == 0 && d[5] == 0x7E) reset = "XG";
                 else if (d[0] == 0x7E && d[2] == 0x09 && d[3] == 0x03) reset = "GM2";
                 else if (d[0] == 0x7E && d[2] == 0x09 && d[3] == 0x01) reset = "GM";
@@ -175,21 +187,34 @@ public static class MidiTools
         if (events.Count == 0) return null;
         foreach (var t in events)
         {
-            if (t.Event is MarkerEvent or TextEvent or CuePointEvent)
-            {
-                var text = ((BaseTextEvent)t.Event).Text?.Trim().Replace(" ", "").Replace("_", "").ToLowerInvariant();
-                if (start == null && text is "loopstart" or "[") { start = t.Time; source = ((BaseTextEvent)t.Event).Text.Trim(); }
-                else if (start != null && end == null && text is "loopend" or "]") { end = t.Time; source += " / " + ((BaseTextEvent)t.Event).Text.Trim(); }
-            }
-            else if (start == null && t.Event is ControlChangeEvent cc && cc.ControlNumber == 111)
+            var point = LoopPointOf(t.Event);
+            if (start == null && point == LoopPoint.Start)
             {
                 start = t.Time;
-                source = "CC111";
+                source = t.Event is BaseTextEvent text ? text.Text.Trim() : "CC111";
             }
+            else if (start != null && end == null && point == LoopPoint.End) { end = t.Time; source += " / " + ((BaseTextEvent)t.Event).Text.Trim(); }
         }
         if (start == null) return null;
         end ??= events.Max(t => t.Time);
         return end > start ? (start.Value, end.Value, source) : null;
+    }
+
+    // GS Reset (DT1 40 00 7F), or System Mode Set of the SC-88 and later (DT1 00 00 7F: single / double module mode),
+    // which initializes the module in the same way.
+    public static bool IsGsReset(byte[] d) =>
+        d.Length >= 7 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[5] == 0x00 && d[6] == 0x7F && d[4] is 0x40 or 0x00;
+
+    public enum LoopPoint { None, Start, End }
+
+    // What an event is for the loop (see GetLoop): a marker (or text, cue point) loopStart / "[" or a CC111 starts it,
+    // a marker loopEnd / "]" ends it.
+    public static LoopPoint LoopPointOf(MidiEvent e)
+    {
+        if (e is ControlChangeEvent cc) return cc.ControlNumber == 111 ? LoopPoint.Start : LoopPoint.None;
+        if (e is not (MarkerEvent or TextEvent or CuePointEvent)) return LoopPoint.None;
+        var text = ((BaseTextEvent)e).Text?.Trim().Replace(" ", "").Replace("_", "").ToLowerInvariant();
+        return text is "loopstart" or "[" ? LoopPoint.Start : text is "loopend" or "]" ? LoopPoint.End : LoopPoint.None;
     }
 
     // Values of the controllers a file never sets (those of the modules after a reset), for GetLoopRestore.

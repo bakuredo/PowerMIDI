@@ -141,13 +141,22 @@ public sealed class SettingsPage
             if (value >= 0) Group = value;
             foreach (var button in groupButtons) button.Key = "";   // pressed again: stays pressed
         }
-        else if (fx == baseIndex + 1) Note = value;
+        else if (fx == baseIndex + 1) { Note = value; Audition(); }
         else
         {
             var param = Params[fx - baseIndex - 10];
             if (param.OwnSet != null) param.OwnSet(Group, value);
             else Set(Device(), Group, HasNotes ? Note : 0, fx - baseIndex - 10, value);
+            Audition();
         }
+    }
+
+    // Audition: the note shown, played on the first channel of the group (none: nothing), after the value changed.
+    void Audition()
+    {
+        if (!HasNotes || !Block.Audition) return;
+        int channel = Enumerable.Range(0, 16).FirstOrDefault(c => GroupHasChannel(Group, c), -1);
+        if (channel >= 0) MidiTools.PlayNote(effects.Output(), channel, Note, 100, TimeSpan.FromMilliseconds(400));
     }
 
     // Right click: back to the file for a parameter, for the note (on the list) or for the whole group (on its button).

@@ -52,16 +52,15 @@ public sealed partial class MainViewModel
 
         savedSignature = GetSettingsSignature();
         lastSavedTarget = target;
-        // Saved over the track being played: its settings and changed events are now in the file. It is loaded again at
-        // the same position, with nothing pending (otherwise the next save would write the settings twice).
-        if (reload && current != null && SamePath(target, current.Path) && SamePath(source, current.Path))
-        {
-            bool wasPlaying = state == "playing";
-            SwitchToSavedFile(target);
-            if (wasPlaying) { playback.Start(); SetState("playing"); UpdateNumbers(); }
-        }
+        bool wasPlaying = state == "playing";
+        // Saved over the track being played: its settings and changed events are now in the file. It is loaded again,
+        // with nothing pending (otherwise the next save would write the settings twice).
+        if (reload && current != null && SamePath(target, current.Path) && SamePath(source, current.Path)) SwitchToSavedFile(target);
         Status = $"Saved: {target}";
         if (!quiet) view.ShowMessage($"File saved:\n{target}\n\n{string.Join("\n", report.Where(s => !string.IsNullOrEmpty(s)))}");
+        // Playing during the save: the track starts again from its beginning (once the report is closed), as it is now
+        // (not when the track is being left: reload false).
+        if (reload && wasPlaying && current != null) StartTrack(current);
         return true;
     }
 
@@ -99,10 +98,9 @@ public sealed partial class MainViewModel
         if (forceMode != null)
         {
             var reset = MidiTools.GetModeEvents(forceMode);
-            // GM / GM2 have no GS or XG parameters: their SysEx are always removed, otherwise the file would still
-            // be detected (and played) as GS / XG ("GM On followed by GS / XG SysEx").
-            bool clean = isCleaned || forceMode is "GM" or "GM2";
-            var drop = clean ? MidiTools.GetOtherModeManufacturers(forceMode) : Array.Empty<int>();
+            // The SysEx of the other modes are removed (ignored during playback too): for GM / GM2, otherwise the
+            // file would still be detected (and played) as GS / XG ("GM On followed by GS / XG SysEx").
+            var drop = MidiTools.GetOtherModeManufacturers(forceMode);
             report.Add($"{MidiFileEditor.ForceReset(midi, reset, drop)} (mode {forceMode})");
         }
         return report;
@@ -136,7 +134,7 @@ public sealed partial class MainViewModel
         }
         foreach (var m in ModuleSettings.All)
             foreach (var (key, v) in m.Fixed()) parts.Add($"{m.Name}{key.A}/{key.B}/{key.C}={v}");
-        if (isForced) parts.Add($"mode={selectedMode}/{isCleaned}");
+        if (isForced) parts.Add($"mode={selectedMode}");
         if (withEdits && editedFile != null) parts.Add($"edits={editVersion}");   // Event Editor (changes, Record)
         return string.Join(";", parts);
     }
