@@ -66,7 +66,7 @@ public sealed partial class MainViewModel : ObservableObject
         Mixer.KeyboardToggle = c => Run(() => ToggleKeyboardChannel(c));
 
         timer.Tick += (_, _) => Run(OnTimer);
-        ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); } catch { } };
+        ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); UpdateLyrics(); } catch { } };
     }
 
     RelayCommand Command(Action action) => new(() => Run(action));
@@ -433,14 +433,48 @@ public sealed partial class MainViewModel : ObservableObject
     public string CurrentStandard { get => currentStandard; private set => Set(ref currentStandard, value); }
 
     // Screen of the module, in the player: the text the file writes on it (MT-32, Sound Canvas, MU; null until the file
-    // sends one) and its dot picture (below). Shown when the file sends some, unless hidden with the display button.
+    // sends one) and its dot picture (below); otherwise the lyrics of a karaoke file (see UpdateLyrics). Shown when there
+    // is some, unless hidden with the display button.
     string displayText;
-    public string DisplayText { get => displayText; private set { if (Set(ref displayText, value)) NotifyDisplay(); } }
+    public string DisplayText { get => displayText; private set { if (Set(ref displayText, value)) { NotifyDisplay(); ShowText(); } } }
     bool showDisplay = true;
     public bool ShowDisplay { get => showDisplay; set { if (Set(ref showDisplay, value)) NotifyDisplay(); } }
     public bool HasDisplayDots => ModuleDisplay.HasDots;
-    // The file has sent a text or a picture: the screen is shown, unless hidden with the display button.
-    public bool HasDisplay => displayText != null || HasDisplayDots;
+    // The file has sent a text or a picture, or has lyrics: the screen is shown, unless hidden with the display button.
+    public bool HasDisplay => displayText != null || HasDisplayDots || lyrics != null;
+
+    // Text of the screen in two parts: the lyrics already sung (highlighted) and the rest; the file's text in the rest.
+    string displaySung = "", displayComing = "";
+    public string DisplaySung { get => displaySung; private set => Set(ref displaySung, value); }
+    public string DisplayComing { get => displayComing; private set => Set(ref displayComing, value); }
+
+    // Lyrics of the current track (KaraokeLyrics; null: none): the line being sung, with what is sung so far, on two lines
+    // when longer than the screen. Updated with the LEDs (30 ms); the text the file writes on the screen comes first.
+    KaraokeLyrics lyrics;
+    (string Sung, string Coming) lyricsShown = ("", "");
+
+    void SetLyrics(KaraokeLyrics value)
+    {
+        lyrics = value;
+        lyricsShown = value?.At(0, ModuleDisplay.Width) ?? ("", "");
+        NotifyDisplay();
+        ShowText();
+    }
+
+    void UpdateLyrics()
+    {
+        if (lyrics == null || playback == null || tempoMap == null) return;
+        var now = lyrics.At(CurrentTick(), ModuleDisplay.Width);
+        if (now == lyricsShown) return;
+        lyricsShown = now;
+        ShowText();
+    }
+
+    void ShowText()
+    {
+        if (displayText != null || lyrics == null) (DisplaySung, DisplayComing) = ("", displayText ?? "");
+        else (DisplaySung, DisplayComing) = lyricsShown;
+    }
     public bool DisplayShown => showDisplay && HasDisplay;
     // Display button: pressed while the screen is shown (released while the file has sent nothing, and then inactive).
     public bool DisplayButton { get => DisplayShown; set { if (HasDisplay) ShowDisplay = value; OnPropertyChanged(); } }
@@ -527,6 +561,7 @@ public sealed partial class MainViewModel : ObservableObject
         TimeText = "00:00 / 00:00";
         SetPosition(0);
         eventEditor?.Clear();   // nothing to list
+        SetLyrics(null);
     }
 
     string playGlyph = GlyphPlay;
@@ -688,6 +723,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var pb = midi.GetPlayback(output);
         playedFile = midi;
+        SetLyrics(KaraokeLyrics.Read(midi));   // a karaoke file: its lyrics on the screen
         pb.InterruptNotesOnStop = true;
         // Every Note On and Note Off of the file is played, as the file has them. By default the playback library keeps
         // one active note per key: it drops the Note On of a key already held, and the Note Off of a key it does not
