@@ -21,10 +21,9 @@ public sealed partial class MainViewModel
     // (even if it was removed from the playlist in the meantime).
     // The file is chosen the first time; afterwards it is saved again to the same file, unless ask is true
     // (right click on the button: the dialog again).
-    // quiet: no report shown afterwards.
     // reload: saved over the track being played, the file is loaded again (its settings are now in it); false when
     // the track is being left anyway.
-    bool SaveModifiedMidi(bool quiet = false, bool ask = false, bool reload = true)
+    bool SaveModifiedMidi(bool ask = false, bool reload = true)
     {
         var source = settingsFile ?? current?.Path;
         if (source == null) { Status = "No current track to save."; return false; }
@@ -57,7 +56,7 @@ public sealed partial class MainViewModel
         // with nothing pending (otherwise the next save would write the settings twice).
         if (reload && current != null && SamePath(target, current.Path) && SamePath(source, current.Path)) SwitchToSavedFile(target);
         Status = $"Saved: {target}";
-        if (!quiet) view.ShowMessage($"File saved:\n{target}\n\n{string.Join("\n", report.Where(s => !string.IsNullOrEmpty(s)))}");
+        view.ShowMessage($"File saved:\n{target}\n\n{string.Join("\n", report.Where(s => !string.IsNullOrEmpty(s)))}");
         // Playing during the save: the track starts again from its beginning (once the report is closed), as it is now
         // (not when the track is being left: reload false).
         if (reload && wasPlaying && current != null) StartTrack(current);

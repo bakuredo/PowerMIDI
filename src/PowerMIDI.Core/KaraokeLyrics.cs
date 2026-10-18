@@ -22,7 +22,8 @@ public sealed class KaraokeLyrics
         if (lyrics.Count == 0)
         {
             var texts = events.Where(t => t.Event is TextEvent).Select(t => (t.Time, Text: ((TextEvent)t.Event).Text ?? "")).ToList();
-            if (texts.Any(t => t.Text.StartsWith("@K", StringComparison.OrdinalIgnoreCase) || t.Text.StartsWith("@T") || t.Text.StartsWith("@L")))
+            if (texts.Any(t => t.Text.StartsWith("@K", StringComparison.OrdinalIgnoreCase) || t.Text.StartsWith("@T", StringComparison.Ordinal) ||
+                                 t.Text.StartsWith("@L", StringComparison.Ordinal)))
                 lyrics = texts.Where(t => !t.Text.StartsWith('@')).Select(t => (t.Time, t.Text, Kar: true)).ToList();
         }
         var lines = new List<List<Syllable>> { new() };

@@ -86,8 +86,8 @@ public interface IEventEditing
 // redo. Append / Replace, in two clicks: the first one starts (the settings in blue so far go into the whole track), the
 // settings are then changed in the Mixer / Effects tabs, the second click writes them as events after the selected
 // event, or instead of the selected events (see MainViewModel.Insert.cs); Cancel drops them. The values fixed in the
-// Mixer and Effects tabs are
-// listed first, in blue, as settings sent at the start (not events of the file: changed in those tabs).
+// Mixer and Effects tabs are listed first, in blue, as settings sent at the start (not events of the file: changed in
+// those tabs).
 public sealed class EventEditorViewModel : ObservableObject
 {
     readonly InstrumentDefinitions defs;
@@ -205,8 +205,8 @@ public sealed class EventEditorViewModel : ObservableObject
         return string.Join(" · ", texts.Take(3)) + (texts.Count > 3 ? $" · +{texts.Count - 3} more" : "");
     }
 
-    // What replaces an event (blue row): MidiEventList.FixedText, with the values of the Effects tab named as in the Insert
-    // mode: those of the settings modules whose messages write the same parameters as the event.
+    // What replaces an event (blue row): MidiEventList.FixedText, with the values of the Effects tab named as by Append /
+    // Replace: those of the settings modules whose messages write the same parameters as the event.
     Func<int, int, int, int, int, string> instrumentName;
 
     string FixedOf(MidiEventRow row)
@@ -281,7 +281,7 @@ public sealed class EventEditorViewModel : ObservableObject
     }
 
     // The values fixed in the Mixer tab (instruments, drum parts, controllers, maps) and in the Effects tab (the settings
-    // modules of the mode of the track), named as in the Insert mode; channel -1: none.
+    // modules of the mode of the track), named as by Append / Replace; channel -1: none.
     IEnumerable<(int Channel, string Tab, string Text)> Settings()
     {
         for (int c = 0; c < 16; c++)
@@ -434,7 +434,6 @@ public sealed class EventEditorViewModel : ObservableObject
         var row = rows.FirstOrDefault(r => r.Row.Track == track && r.Row.Index == index);
         if (row != null && Matches(row)) Select(row);
     }
-
 
     // ---------- Edit panel ----------
 

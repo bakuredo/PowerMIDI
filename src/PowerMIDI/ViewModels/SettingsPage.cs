@@ -71,7 +71,7 @@ public sealed class SettingsPage
     public int FirstNote { get; init; }
     public int LastNote { get; init; } = 127;
 
-    // Texts: of an unknown value (tooltip), and the start of a description (Insert mode): group, note.
+    // Texts: of an unknown value (tooltip), and the start of a description (Event Editor, Append / Replace): group, note.
     public string AutoText { get; init; } = "Set by module";
     public Func<int, int, string> DescribePrefix { get; init; }
 

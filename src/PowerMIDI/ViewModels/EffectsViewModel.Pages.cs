@@ -41,7 +41,7 @@ public sealed partial class EffectsViewModel
         mt32Blocks.Add(mt32Part.Block);
         pages.AddRange(new[] { xgDrums, xgPart, gsDrums, gsPart, gm2Drums, gm2Part, mt32Drums, mt32Part });
 
-        // Texts of the settings (Insert mode), with the names and units of the pages.
+        // Texts of the settings (Event Editor, Append / Replace), with the names and units of the pages.
         ModuleSettings.GsXgFx.Describe = (k, v) => DescribeEffect(k.C, v);
         ModuleSettings.Mt32Reverb.Describe = (k, v) => DescribeMt32(k.C, v);
         ModuleSettings.Gm2Fx.Describe = (k, v) => DescribeGm2(k.C, v);

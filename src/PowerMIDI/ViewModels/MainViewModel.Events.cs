@@ -6,7 +6,8 @@ namespace PowerMIDI.ViewModels;
 // Event Editor (separate window, see EventEditorViewModel): the events of the current track, and its changes.
 // The changes are made on a copy of the track in memory (editedFile), never on the file itself: the playback goes on
 // from that copy at the same position, and "Save MIDI file…" writes it (with the settings in blue, as for the file).
-// Record (Insert mode) writes its settings there too. Undo / redo keep the previous states. Leaving the track asks first, as for the settings.
+// Append / Replace write their settings there too (MainViewModel.Insert.cs). Undo / redo keep the previous states.
+// Leaving the track asks first, as for the settings.
 public sealed partial class MainViewModel : IEventEditing
 {
     EventEditorViewModel eventEditor;   // null while the window is closed

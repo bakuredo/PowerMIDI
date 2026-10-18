@@ -7,7 +7,7 @@ namespace PowerMIDI.Core;
 public readonly record struct SettingKey(int A, int B = 0, int C = 0);
 
 // One kind of settings fixed in the Effects tab (GsXgEffects, Mt32Effects, Gm2Effects, and the Part and Drums pages:
-// XgPartParams, XgDrumSetup, GsDrumMap…), seen in the same way by the player, the Insert mode and the save: its fixed
+// XgPartParams, XgDrumSetup, GsDrumMap…), seen in the same way by the player, the Event Editor and the save: its fixed
 // values, how to set, clear, send and write them.
 public sealed class SettingsModule
 {
@@ -21,9 +21,9 @@ public sealed class SettingsModule
     public Action ResetFile { get; init; }                // reset of the module: the file's values back to defaults
     public Action<IOutputDevice> Apply { get; init; }     // sends the fixed values
     public Func<SettingKey, int, IEnumerable<MidiEvent>> Events { get; init; }   // messages writing one value
-    public Func<SettingKey, int> ChannelOf { get; init; } // channel whose track gets them in an insertion (-1: first track)
+    public Func<SettingKey, int> ChannelOf { get; init; } // channel of a value (Event Editor: its settings rows; -1: none)
     public Func<MidiFile, string> Write { get; init; }    // writes the fixed values in a saved file; returns a report
-    // Text of a value (Insert mode), set by the interface (EffectsViewModel), which knows the names and units.
+    // Text of a value (Event Editor), set by the interface (EffectsViewModel), which knows the names and units.
     public Func<SettingKey, int, string> Describe { get; set; }
 
     public bool HasFixed => Fixed().Any();

@@ -28,7 +28,6 @@ public static class MidiEventForm
     // Fields of an event of the list.
     public static EventForm Of(MidiEventRow row)
     {
-
         int c = row.Channel;
         switch (row.Event)
         {

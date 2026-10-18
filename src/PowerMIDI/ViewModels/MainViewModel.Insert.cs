@@ -17,8 +17,8 @@ public sealed partial class MainViewModel
 
     long CurrentTick() => playback != null ? ((MidiTimeSpan)playback.GetCurrentTime<MidiTimeSpan>()).TimeSpan : 0;
 
-    // The track to play: the file, with the changes of the Event Editor (and the insertions) if it is the one they
-    // belong to.
+    // The track to play: the file, with the changes of the Event Editor (Append / Replace included) if it is the one
+    // they belong to.
     MidiFile ReadTrackFile(string path) =>
         path == settingsFile && editedFile != null ? editedFile.Clone() : MidiTools.ReadFile(path);
 
@@ -164,7 +164,6 @@ public sealed partial class MainViewModel
         finally { ChannelMixer.Device = device; }
     }
 
-
     // Rebuilds the playback (the track, with its changes) at a tick, playing or not.
     void ReloadPlayback(long tick, bool play)
     {
@@ -183,10 +182,9 @@ public sealed partial class MainViewModel
 
     TimeSpan TickToTime(long tick) => TimeConverter.ConvertTo<MetricTimeSpan>(tick, tempoMap);
 
-
     // Events of the settings in blue, with their description. Order: per channel the drum part, the instrument, the
     // controllers; then the effects, module by module (effect types before their parameters, part modes before drum
-    // setups).
+    // setups), those of the mode of the track.
     (List<MidiEvent> Events, string Description) BuildInsertion()
     {
         var events = new List<MidiEvent>();
@@ -222,7 +220,7 @@ public sealed partial class MainViewModel
             }
             if (parts.Count > 0) texts.Add($"ch {c + 1}: {string.Join(", ", parts)}");
         }
-        foreach (var m in ModuleSettings.All)
+        foreach (var m in ModuleSettings.All.Where(m => m.Standard == null || m.Standard == Mixer.Standard))   // as the save
             foreach (var (key, v) in m.Fixed())
             {
                 events.AddRange(m.Events(key, v));
