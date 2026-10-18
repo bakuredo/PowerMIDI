@@ -166,6 +166,29 @@ public sealed class EventEditorViewModel : ObservableObject
         ShowForm();
     }
 
+    // No track any more (removed from the playlist): an empty list.
+    public void Clear()
+    {
+        SetPending(null);
+        tempoMap = null;
+        rows = new List<EventRowViewModel>();
+        settingCount = 0;
+        loadedFile = null;
+        current = null;
+        Title = "Events";
+        Tracks = new[] { "All tracks" };
+        trackFilter = 0;
+        OnPropertyChanged(nameof(TrackFilter));
+        View = CollectionViewSource.GetDefaultView(rows);
+        View.Filter = Matches;
+        SelectedRow = null;
+        Status = "";
+        Error = null;
+        UpdateCount();
+        UpdateUndo();
+        ShowForm();
+    }
+
     // SysEx: the effect parameters it writes (GS / XG, GM2, MT-32 reverb), otherwise MidiEventList's description.
     string DescribeSysEx(byte[] d)
     {

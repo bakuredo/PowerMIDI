@@ -64,6 +64,78 @@ public partial class MainWindow : Window, IMainView
         if (e.Data.GetDataPresent(DataFormats.FileDrop)) Run(() => vm.AddFiles((string[])e.Data.GetData(DataFormats.FileDrop)));
     }
 
+    // ---------- Playlist: moving tracks ----------
+
+    const string TracksFormat = "PowerMIDI.Tracks";   // tracks dragged inside the list (files from Explorer: FileDrop)
+    Point dragStart;
+    PlaylistItem dragItem;        // the row pressed
+    bool keepSelection;           // pressed on a row of a multiple selection: kept for the drag, set on release
+
+    PlaylistItem RowAt(DependencyObject source) =>
+        System.Windows.Controls.ItemsControl.ContainerFromElement(PlaylistView, source) is System.Windows.Controls.ListViewItem row ? row.DataContext as PlaylistItem : null;
+
+    void OnPlaylistMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        dragStart = e.GetPosition(PlaylistView);
+        dragItem = RowAt(e.OriginalSource as DependencyObject);
+        keepSelection = dragItem != null && PlaylistView.SelectedItems.Count > 1 && PlaylistView.SelectedItems.Contains(dragItem) &&
+                        e.ClickCount == 1 && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0;
+        if (keepSelection) e.Handled = true;   // otherwise the click would keep this row only
+    }
+
+    void OnPlaylistMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        // A click without drag on a row of a multiple selection: that row only, as a click does.
+        if (keepSelection && dragItem != null) { PlaylistView.SelectedItems.Clear(); PlaylistView.SelectedItem = dragItem; }
+        keepSelection = false;
+        dragItem = null;
+    }
+
+    void OnPlaylistMouseMove(object sender, MouseEventArgs e)
+    {
+        if (dragItem == null || e.LeftButton != MouseButtonState.Pressed) return;
+        var moved = e.GetPosition(PlaylistView) - dragStart;
+        if (Math.Abs(moved.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(moved.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        if (!PlaylistView.SelectedItems.Contains(dragItem)) PlaylistView.SelectedItem = dragItem;
+        var tracks = PlaylistView.SelectedItems.Cast<PlaylistItem>().ToList();
+        keepSelection = false;
+        dragItem = null;
+        DragDrop.DoDragDrop(PlaylistView, new DataObject(TracksFormat, tracks), DragDropEffects.Move);
+    }
+
+    // Place of a drop: before the row under the mouse, after it in its lower half; below the rows: at the end.
+    int DropIndex(DragEventArgs e)
+    {
+        if (System.Windows.Controls.ItemsControl.ContainerFromElement(PlaylistView, e.OriginalSource as DependencyObject) is not System.Windows.Controls.ListViewItem row) return vm.Playlist.Count;
+        int index = PlaylistView.ItemContainerGenerator.IndexFromContainer(row);
+        return e.GetPosition(row).Y > row.ActualHeight / 2 ? index + 1 : index;
+    }
+
+    void OnPlaylistDragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(TracksFormat)) return;   // files: the window takes them
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    void OnPlaylistDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(TracksFormat) is not List<PlaylistItem> tracks) return;
+        e.Handled = true;
+        Run(() => vm.MoveTracks(tracks, DropIndex(e)));
+        PlaylistView.ScrollIntoView(tracks[0]);
+    }
+
+    // Ctrl+Up / Ctrl+Down: the selected tracks one row up / down (before the list moves its focus).
+    void OnPlaylistKeyDown(object sender, KeyEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0 || e.Key is not (Key.Up or Key.Down)) return;
+        var selected = PlaylistView.SelectedItems.Cast<PlaylistItem>().ToList();
+        (e.Key == Key.Up ? vm.MoveUpCommand : vm.MoveDownCommand).Execute(selected);
+        if (selected.Count > 0) PlaylistView.ScrollIntoView(e.Key == Key.Up ? selected.MinBy(vm.Playlist.IndexOf) : selected.MaxBy(vm.Playlist.IndexOf));
+        e.Handled = true;
+    }
+
     // Shortcuts handled before the focused control (so that Space does not click the focused button).
     // Keyboard mode (a channel number clicked in the Mixer): letters play notes, Esc stops the mode.
     void OnPreviewKeyDown(object sender, KeyEventArgs e)

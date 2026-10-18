@@ -8,6 +8,9 @@
     <RootNamespace>PowerMIDI.ConsolePlayer</RootNamespace>
     <AssemblyName>PowerMIDI-Console</AssemblyName>
     <Version>1.2.1</Version>
+    <!-- No company nor copyright in the properties of the exe. -->
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
   </PropertyGroup>
 
   <ItemGroup>

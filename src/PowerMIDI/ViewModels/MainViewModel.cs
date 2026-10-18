@@ -46,6 +46,8 @@ public sealed partial class MainViewModel : ObservableObject
         AddFilesCommand = Command(AddFilesFromDialog);
         AddFolderCommand = Command(AddFolderFromDialog);
         RemoveCommand = new RelayCommand(p => Run(() => Remove(p as IList)));
+        MoveUpCommand = new RelayCommand(p => Run(() => MoveBy(p as IList, -1)));
+        MoveDownCommand = new RelayCommand(p => Run(() => MoveBy(p as IList, 1)));
         ClearCommand = Command(() => ClearPlaylist());
         SaveCommand = Command(() => SaveModifiedMidi());
         SaveAsCommand = Command(() => SaveModifiedMidi(ask: true));
@@ -83,6 +85,8 @@ public sealed partial class MainViewModel : ObservableObject
     public ICommand AddFilesCommand { get; }
     public ICommand AddFolderCommand { get; }
     public ICommand RemoveCommand { get; }       // parameter: the selected items
+    public ICommand MoveUpCommand { get; }       // Ctrl+Up / Ctrl+Down: the selected items one row up / down
+    public ICommand MoveDownCommand { get; }
     public ICommand ClearCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand SaveAsCommand { get; }       // right click on the Save button: always asks where to save
@@ -123,16 +127,15 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------- Settings (PowerMIDI.ini) ----------
 
-    // The mode and the "Sliders" menu are not remembered: PowerMIDI starts in Auto and on Volume (CC7).
+    // The mode, the "Sliders" menu, shuffle and repeat are not remembered: PowerMIDI starts in Auto, on Volume (CC7),
+    // without shuffle nor repeat.
     public void LoadSettings(IniFile ini)
     {
         savedPort = ini.Get("MIDI", "Port");
         if (savedPort == "") savedPort = null;
         lastFolder = ini.Get("Playback", "LastFolder");
         if (ini.GetInt("Playback", "MasterVolume") is int volume && volume is >= 0 and <= 127) MasterVolume = volume;
-        Shuffle = ini.Get("Playback", "Shuffle") == "1";
-        if (ini.GetInt("Playback", "Repeat") is int repeat && repeat is >= 0 and <= 2) RepeatMode = repeat;
-        Mixer.LoadVoiceMap(ini.Get("MIDI", "VoiceMap"));
+        Mixer.LoadVoiceMap(ini.Get("MIDI", "XgDefaultMap"));
         Mixer.LoadGsDefaultMap(ini.Get("MIDI", "GsDefaultMap"));
     }
 
@@ -140,10 +143,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         ini.Set("MIDI", "Port", savedPort ?? output?.Name ?? "");
         ini.Set("Playback", "MasterVolume", (int)MasterVolume);
-        ini.Set("Playback", "Shuffle", Shuffle ? 1 : 0);
-        ini.Set("Playback", "Repeat", RepeatMode);   // 0 = off, 1 = playlist, 2 = track
         ini.Set("Playback", "LastFolder", lastFolder ?? "");
-        ini.Set("MIDI", "VoiceMap", Mixer.VoiceMapSetting);
+        ini.Set("MIDI", "XgDefaultMap", Mixer.VoiceMapSetting);
         ini.Set("MIDI", "GsDefaultMap", Mixer.GsDefaultMapSetting);
     }
 
@@ -337,6 +338,32 @@ public sealed partial class MainViewModel : ObservableObject
         AddFiles(new[] { folder });
     }
 
+    // Moves tracks of the playlist (drag and drop, Ctrl+Up / Ctrl+Down) before the one at target (Count: at the end),
+    // in their order, together. The track being played goes on; Next / Previous follow the new order.
+    public void MoveTracks(IList selected, int target)
+    {
+        var moving = (selected?.Cast<PlaylistItem>() ?? Enumerable.Empty<PlaylistItem>()).Where(Playlist.Contains).OrderBy(Playlist.IndexOf).ToList();
+        if (moving.Count == 0) return;
+        target = Math.Clamp(target, 0, Playlist.Count);
+        var order = Playlist.Except(moving).ToList();
+        order.InsertRange(Math.Clamp(target - moving.Count(i => Playlist.IndexOf(i) < target), 0, order.Count), moving);
+        for (int i = 0; i < order.Count; i++)
+        {
+            int from = Playlist.IndexOf(order[i]);
+            if (from != i) Playlist.Move(from, i);   // moved, not removed: the selection stays
+        }
+        UpdateNumbers();
+    }
+
+    // One row up (-1) or down (+1); nothing at the top / bottom.
+    void MoveBy(IList selected, int direction)
+    {
+        var indexes = (selected?.Cast<PlaylistItem>() ?? Enumerable.Empty<PlaylistItem>()).Select(Playlist.IndexOf).Where(i => i >= 0).ToList();
+        if (indexes.Count == 0) return;
+        if (direction < 0 && indexes.Min() > 0) MoveTracks(selected, indexes.Min() - 1);
+        else if (direction > 0 && indexes.Max() < Playlist.Count - 1) MoveTracks(selected, indexes.Max() + 2);
+    }
+
     void Remove(IList selected)
     {
         if (selected == null) return;
@@ -499,6 +526,7 @@ public sealed partial class MainViewModel : ObservableObject
         CurrentStandard = "—";
         TimeText = "00:00 / 00:00";
         SetPosition(0);
+        eventEditor?.Clear();   // nothing to list
     }
 
     string playGlyph = GlyphPlay;

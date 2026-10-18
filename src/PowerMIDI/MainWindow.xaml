@@ -616,10 +616,14 @@
       </ComboBox>
     </DockPanel>
 
-    <!-- Playlist: double click (see the ListViewItem style) or Enter plays the track, Del removes the selected tracks. -->
+    <!-- Playlist: double click (see the ListViewItem style) or Enter plays the track, Del removes the selected tracks;
+         the selected tracks are moved by drag and drop in the list, or Ctrl+Up / Ctrl+Down (see MainWindow.xaml.cs). -->
     <ListView x:Name="PlaylistView" Grid.Row="1" Style="{StaticResource ThemedListView}"
-              SelectionMode="Extended" ItemsSource="{Binding Playlist}"
-              SelectedItem="{Binding SelectedTrack}" SelectionChanged="OnPlaylistSelectionChanged">
+              SelectionMode="Extended" ItemsSource="{Binding Playlist}" AllowDrop="True"
+              SelectedItem="{Binding SelectedTrack}" SelectionChanged="OnPlaylistSelectionChanged"
+              PreviewMouseLeftButtonDown="OnPlaylistMouseDown" PreviewMouseMove="OnPlaylistMouseMove"
+              PreviewMouseLeftButtonUp="OnPlaylistMouseUp" DragOver="OnPlaylistDragOver" Drop="OnPlaylistDrop"
+              PreviewKeyDown="OnPlaylistKeyDown">
       <ListView.InputBindings>
         <KeyBinding Key="Return" Command="{Binding PlaySelectedCommand}"/>
         <KeyBinding Key="Delete" Command="{Binding RemoveCommand}"

@@ -12,7 +12,9 @@
     <Version>1.2.1</Version>
     <Product>PowerMIDI</Product>
     <Authors>Bakuredo</Authors>
-    <Copyright>Copyright (C) 2026 Bakuredo</Copyright>
+    <!-- No company nor copyright in the properties of the exe. -->
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyCopyrightAttribute>false</GenerateAssemblyCopyrightAttribute>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
     <Description>MIDI file player and editor for sound modules (GM / GM2 / GS / XG / MT-32).</Description>
     <!-- Icon of the program (Explorer), built from ..\..\Icon.svg; also the window's (resource). -->
