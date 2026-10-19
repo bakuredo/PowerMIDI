@@ -732,9 +732,11 @@ public sealed partial class MainViewModel : ObservableObject
         // MainViewModel.Loop.cs) stays active for the library, which would not play it again.
         pb.SendNoteOnEventsForActiveNotes = true;
         pb.SendNoteOffEventsForNonActiveNotes = true;
-        // After a seek, resends the up-to-date programs, controllers and pitch bend.
-        pb.TrackProgram = true;
-        pb.TrackControlValue = true;
+        // After a seek, the pitch bend is sent again by the playback library; the programs and controllers by ChaseState
+        // (MainViewModel.Seek.cs), through the mixer: sent by the library on the next start, they would bypass it (the
+        // settings in blue replaced by the file's values).
+        pb.TrackProgram = false;
+        pb.TrackControlValue = false;
         pb.TrackPitchValue = true;
         // Passes each event through the mixer (fixed values, LEDs); while looping, the events starting at the loop end
         // are skipped (see MainViewModel.Loop.cs).
