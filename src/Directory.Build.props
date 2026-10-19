@@ -11,6 +11,13 @@
     <DebugType>none</DebugType>
   </PropertyGroup>
 
+  <!-- Standalone exe (published self-contained, for the release): .NET included, compressed (unpacked
+       in memory at startup), and only its English messages (PowerMIDI is in English): about 59 MB instead of 135 MB. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true' And '$(SelfContained)' == 'true'">
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
   <!-- DryWetMIDI also ships its macOS native library: not needed on Windows. -->
   <Target Name="RemoveMacNativeLibraries" AfterTargets="ComputeResolvedFilesToPublishList">
     <ItemGroup>
