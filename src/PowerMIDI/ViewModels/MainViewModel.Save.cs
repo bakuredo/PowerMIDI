@@ -15,8 +15,8 @@ public sealed partial class MainViewModel
         a != null && b != null && string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
 
     // Saves the current track with the chosen instruments, fixed controllers and effects, and the forced mode.
-    // On each modified channel, every bank select / Program Change (instrument) or every event of a fixed
-    // controller in the file is replaced by the choice.
+    // On each modified channel, the bank selects / Program Changes of each passage with an instrument chosen, and
+    // every event of a fixed controller in the file, are replaced by the choice.
     // Returns true if the file was written. The source file is the one the settings apply to
     // (even if it was removed from the playlist in the meantime).
     // The file is chosen the first time; afterwards it is saved again to the same file, unless ask is true
@@ -63,14 +63,13 @@ public sealed partial class MainViewModel
         return true;
     }
 
-    // Writes the settings in a file: on each modified channel, every bank select / Program Change (instrument) or every
-    // event of a fixed controller is replaced by the choice; the modules of the Effects tab; the forced mode. Returns the
-    // report.
+    // Writes the settings in a file: on each modified channel, the bank selects / Program Changes of the passages with
+    // an instrument chosen, and every event of a fixed controller, are replaced by the choice; the modules of the Effects
+    // tab; the forced mode. Returns the report.
     List<string> WriteSettings(MidiFile midi, List<int> channels, List<SettingsModule> modules, string forceMode)
     {
         int controllers = MixerViewModel.ControllerCount;
-        var apply = new bool[16];
-        int[] msb = new int[16], lsb = new int[16], program = new int[16];
+        var instruments = ChannelMixer.Instruments().Where(x => channels.Contains(x.Channel)).ToList();
         var rhythm = Enumerable.Range(0, 16).Select(c => ChannelMixer.RhythmOverride[c]).ToArray();   // -1 = the file's
         // Fixed values per controller: arrays [controller][channel].
         var applyCc = new bool[controllers][];
@@ -78,10 +77,6 @@ public sealed partial class MainViewModel
         for (int k = 0; k < controllers; k++) { applyCc[k] = new bool[16]; ccValues[k] = new int[16]; }
         foreach (int c in channels)
         {
-            apply[c] = ChannelMixer.Override[c];
-            msb[c] = ChannelMixer.OverrideMsb[c];
-            lsb[c] = ChannelMixer.OverrideLsb[c];
-            program[c] = ChannelMixer.OverrideProgram[c];
             for (int k = 0; k < controllers; k++)
             {
                 applyCc[k][c] = ChannelMixer.IsFixed(k, c);
@@ -90,7 +85,7 @@ public sealed partial class MainViewModel
         }
 
         var report = new List<string>();
-        report.Add(MidiFileEditor.ApplyChanges(midi, apply, msb, lsb, program, applyCc, ccValues, rhythm));
+        report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode));
         // Effects tab: effects, Part and Drums pages (the XG part modes and drum setups share one writer).
         foreach (var write in modules.Select(m => m.Write).Distinct()) report.Add(write(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
@@ -110,7 +105,7 @@ public sealed partial class MainViewModel
     (List<int> Channels, List<SettingsModule> Modules, string ForceMode) SettingsToWrite()
     {
         var channels = Enumerable.Range(0, 16)
-            .Where(c => ChannelMixer.Override[c] || ChannelMixer.RhythmOverride[c] >= 0 ||
+            .Where(c => ChannelMixer.HasInstruments(c) || ChannelMixer.RhythmOverride[c] >= 0 ||
                         Enumerable.Range(0, MixerViewModel.ControllerCount).Any(k => ChannelMixer.IsFixed(k, c))).ToList();
         var modules = ModuleSettings.All.Where(m => (m.Standard == null || m.Standard == Mixer.Standard) && m.HasFixed).ToList();
         return (channels, modules, isForced ? selectedMode : null);
@@ -124,9 +119,9 @@ public sealed partial class MainViewModel
     string GetSettingsSignature(bool withEdits = true)
     {
         var parts = new List<string>();
+        foreach (var (c, passage, msb, lsb, program) in ChannelMixer.Instruments()) parts.Add($"i{c}@{passage}={msb}/{lsb}/{program}");
         for (int c = 0; c < 16; c++)
         {
-            if (ChannelMixer.Override[c]) parts.Add($"i{c}={ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}");
             if (ChannelMixer.RhythmOverride[c] >= 0) parts.Add($"r{c}={ChannelMixer.RhythmOverride[c]}");
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
                 if (ChannelMixer.IsFixed(k, c)) parts.Add($"c{k}/{c}={ChannelMixer.FixedValue(k, c)}");

@@ -72,8 +72,8 @@ public sealed partial class MainViewModel
                 new ControlChangeEvent((SevenBitNumber)0, (SevenBitNumber)ChannelMixer.BankMsb[c]) { Channel = channel },
                 new ControlChangeEvent((SevenBitNumber)32, (SevenBitNumber)ChannelMixer.BankLsb[c]) { Channel = channel },
                 new ProgramChangeEvent((SevenBitNumber)ChannelMixer.Program[c]) { Channel = channel },
-            })
-                if (ChannelMixer.Callback(e, 0, TimeSpan.Zero) is { } played) output.SendEvent(played);
+            })   // at the time just before the position: the passage the channel is in (see ChannelMixer.Passages)
+                if (ChannelMixer.Callback(e, tick - 1, TimeSpan.Zero) is { } played) output.SendEvent(played);
         }
         var events = new List<MidiEvent>();
         foreach (var ((c, n), _) in controllers.OrderBy(x => x.Value.Order)) events.Add(MidiTools.Cc(c, n, controllers[(c, n)].Value));

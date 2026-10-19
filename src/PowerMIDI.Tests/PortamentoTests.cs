@@ -61,7 +61,7 @@ public class PortamentoTests
         var applyCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
         var ccValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
         (applyCc[ChannelMixer.PortamentoTime][Channel], ccValues[ChannelMixer.PortamentoTime][Channel]) = (true, 40);
-        MidiFileEditor.ApplyChanges(file, new bool[16], new int[16], new int[16], new int[16], applyCc, ccValues, Enumerable.Repeat(-1, 16).ToArray());
+        MidiFileEditor.ApplyChanges(file, Array.Empty<(int, long, int, int, int)>(), applyCc, ccValues, Enumerable.Repeat(-1, 16).ToArray());
 
         var ccs = file.GetTrackChunks().SelectMany(c => c.Events).OfType<ControlChangeEvent>().Select(c => ((int)c.ControlNumber, (int)c.ControlValue)).ToList();
         Assert.Contains((5, 40), ccs);

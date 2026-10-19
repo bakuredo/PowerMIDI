@@ -21,7 +21,7 @@ public class XgMultiPartTests
         ChannelMixer.ResetChannelState(true);
         for (int c = 0; c < 16; c++)
         {
-            ChannelMixer.Override[c] = false;
+            ChannelMixer.ClearOverride(null, c, true);
             ChannelMixer.Muted[c] = false;
             for (int k = 0; k < ChannelMixer.ControllerNumbers.Length; k++) ChannelMixer.ClearController(null, k, c);
         }
@@ -93,12 +93,10 @@ public class XgMultiPartTests
             new NoteOffEvent((SevenBitNumber)60, (SevenBitNumber)0) { Channel = (FourBitNumber)2, DeltaTime = 480 }));
 
         int controllers = ChannelMixer.ControllerNumbers.Length;
-        var apply = new bool[16]; var msb = new int[16]; var lsb = new int[16]; var program = new int[16];
         var applyCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
         var ccValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
-        (apply[2], msb[2], lsb[2], program[2]) = (true, 0, 0, 5);
         (applyCc[Volume][2], ccValues[Volume][2]) = (true, 90);
-        MidiFileEditor.ApplyChanges(file, apply, msb, lsb, program, applyCc, ccValues, Enumerable.Repeat(-1, 16).ToArray());
+        MidiFileEditor.ApplyChanges(file, new[] { (2, InstrumentPassages.First, 0, 0, 5) }, applyCc, ccValues, Enumerable.Repeat(-1, 16).ToArray());
 
         var parts = file.GetTrackChunks().SelectMany(c => c.Events).OfType<SysExEvent>().Select(e => e.Data).Where(d => d[3] == 0x08).ToList();
         Assert.Equal(new byte[] { 0x43, 0x10, 0x4C, 0x08, 0x02, 0x01, 0, 0, 5, 0xF7 }, parts[0]);

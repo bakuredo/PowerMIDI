@@ -211,7 +211,9 @@ public sealed class EventEditorViewModel : ObservableObject
 
     string FixedOf(MidiEventRow row)
     {
-        if (row.Kind == EventKind.Setting) return "Sent at start: change it in Mixer / Effects tab";
+        if (row.Kind == EventKind.Setting)
+            return row.Description.StartsWith("Instrument from ", StringComparison.Ordinal) ? "Sent from that time: change it in Mixer tab"
+                                                                                             : "Sent at start: change it in Mixer / Effects tab";
         var text = MidiEventList.FixedText(row, instrumentName);
         if (text == null || !text.StartsWith("Fixed in Effects tab", StringComparison.Ordinal)) return text;
         var texts = new List<string>();
@@ -284,13 +286,15 @@ public sealed class EventEditorViewModel : ObservableObject
     // modules of the mode of the track), named as by Append / Replace; channel -1: none.
     IEnumerable<(int Channel, string Tab, string Text)> Settings()
     {
+        var instruments = ChannelMixer.Instruments();
         for (int c = 0; c < 16; c++)
         {
-            if (ChannelMixer.Override[c])
+            // One per passage (see InstrumentPassages): named by the time of its Program Change.
+            foreach (var (_, passage, msb, lsb, program) in instruments.Where(x => x.Channel == c))
             {
-                int msb = ChannelMixer.OverrideMsb[c], lsb = ChannelMixer.OverrideLsb[c], program = ChannelMixer.OverrideProgram[c];
                 var name = instrumentName?.Invoke(c, program, msb, lsb, ChannelMixer.Rhythm(c));
-                yield return (c, "Mixer", $"Instrument: {(string.IsNullOrEmpty(name) ? "" : name + " ")}(bank {msb} / {lsb}, PC {program + 1})");
+                var from = passage == InstrumentPassages.First ? "" : $" from {MidiTools.FormatTime(TimeConverter.ConvertTo<MetricTimeSpan>(passage, tempoMap))}";
+                yield return (c, "Mixer", $"Instrument{from}: {(string.IsNullOrEmpty(name) ? "" : name + " ")}(bank {msb} / {lsb}, PC {program + 1})");
             }
             if (ChannelMixer.RhythmOverride[c] >= 0)
                 yield return (c, "Mixer", ChannelMixer.RhythmOverride[c] == 0 ? "Part: normal" : $"Part: drum part {ChannelMixer.RhythmOverride[c]}");

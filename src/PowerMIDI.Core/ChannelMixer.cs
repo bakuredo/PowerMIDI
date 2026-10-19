@@ -140,11 +140,56 @@ public static class ChannelMixer
     public static readonly int[] Sustain = new int[16];      // CC64 (hold pedal), given back after a pause
     public static readonly int[] Sostenuto = new int[16];    // CC66
 
-    // Instrument chosen by user: replaces file's CC0 / CC32 / Program Change.
+    // Instrument chosen by the user for a passage of a channel (see InstrumentPassages): replaces the file's bank
+    // selects and Program Changes of that passage. Override…: the choice for the passage being played (the one shown
+    // in the Mixer tab), or none.
     public static readonly bool[] Override = new bool[16];
     public static readonly int[] OverrideMsb = new int[16];
     public static readonly int[] OverrideLsb = new int[16];
     public static readonly int[] OverrideProgram = new int[16];
+    static readonly Dictionary<(int Channel, long Passage), (int Msb, int Lsb, int Program)> instruments = new();   // locked
+    public static readonly long[] Passage = new long[16];   // passage being played on each channel
+    // Passages of the track being played (null: one passage per channel).
+    public static volatile InstrumentPassages Passages;
+    static readonly int[] sentMsb = new int[16], sentLsb = new int[16];   // last bank sent to the module
+
+    // The instruments chosen, for all passages (save, Event Editor).
+    public static List<(int Channel, long Passage, int Msb, int Lsb, int Program)> Instruments()
+    {
+        lock (instruments)
+            return instruments.OrderBy(x => x.Key.Channel).ThenBy(x => x.Key.Passage)
+                              .Select(x => (x.Key.Channel, x.Key.Passage, x.Value.Msb, x.Value.Lsb, x.Value.Program)).ToList();
+    }
+
+    // Instrument chosen for a passage of a channel, or null.
+    public static (int Msb, int Lsb, int Program)? InstrumentOf(int channel, long passage)
+    {
+        lock (instruments) return instruments.TryGetValue((channel, passage), out var x) ? x : null;
+    }
+
+    // An instrument chosen on a channel, in any passage?
+    public static bool HasInstruments(int channel)
+    {
+        lock (instruments) return instruments.Keys.Any(k => k.Channel == channel);
+    }
+
+    // The channel plays another passage: the choice for it, if any, becomes the current one.
+    static void EnterPassage(int channel, long passage)
+    {
+        Passage[channel] = passage;
+        var chosen = InstrumentOf(channel, passage);
+        if (chosen is var (msb, lsb, program)) (OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel]) = (msb, lsb, program);
+        Override[channel] = chosen != null;
+    }
+
+    static void SendBank(int channel, int msb, int lsb)
+    {
+        var device = Device;
+        if (device == null) return;
+        device.SendEvent(Cc(channel, 0, msb));
+        device.SendEvent(Cc(channel, 32, lsb));
+        (sentMsb[channel], sentLsb[channel]) = (msb, lsb);
+    }
 
     // Drum part chosen by the user (GS "Use for Rhythm Part"): -1 = the file's, 0 = normal part,
     // 1 / 2 = drum part 1 / 2. Replaces the file's Use for Rhythm Part messages for this channel.
@@ -192,10 +237,12 @@ public static class ChannelMixer
             Sustain[i] = Sostenuto[i] = 0;
             SysExPatch[i] = false;
             // instruments and fixed values (Override, CcOverride) are not touched here:
-            // player clears them itself when it moves to another file.
+            // player clears them itself when it moves to another file. The first passage starts again.
+            EnterPassage(i, InstrumentPassages.First);
         }
         RhythmPart[9] = 1;
         if (xg) BankMsb[9] = 127;
+        for (int i = 0; i < 16; i++) (sentMsb[i], sentLsb[i]) = (BankMsb[i], BankLsb[i]);
         DrumKitProgram[1] = DrumKitProgram[2] = -1;
         fileVoiceMap = VoiceMapNative;
         fileGsDefaultMap = InstrumentDefinitions.DefaultGsMap;
@@ -467,13 +514,13 @@ public static class ChannelMixer
                     int k = ControllerIndex(cc.ControlNumber);
                     FileCc[k, channel] = cc.ControlValue;
                     return Cc(channel, cc.ControlNumber, Sent(k, channel));
+                // Bank select: played as it is; the one of an instrument chosen for the passage goes with its Program
+                // Change (it may start another passage).
                 case 0:
-                    BankMsb[channel] = cc.ControlValue;
-                    if (Override[channel]) return Cc(channel, 0, OverrideMsb[channel]);
+                    BankMsb[channel] = sentMsb[channel] = cc.ControlValue;
                     break;
                 case 32:
-                    BankLsb[channel] = cc.ControlValue;
-                    if (Override[channel]) return Cc(channel, 32, OverrideLsb[channel]);
+                    BankLsb[channel] = sentLsb[channel] = cc.ControlValue;
                     break;
                 case PortamentoSwitch:
                     filePortamento[channel] = cc.ControlValue;
@@ -521,6 +568,7 @@ public static class ChannelMixer
         if (pc != null)
         {
             int channel = pc.Channel;
+            EnterPassage(channel, Passages?.At(channel, rawTime) ?? InstrumentPassages.First);
             Program[channel] = pc.ProgramNumber;
             if (Mt32Mode) Mt32Patches.ProgramChanged(channel);
             if (Mt32Mode && Mt32PartParams.ProgramChanged(channel) is int mt32Part and >= 0) SendLater(Mt32PartParams.FixedPatchEvents(mt32Part).ToArray());
@@ -529,11 +577,15 @@ public static class ChannelMixer
             if (GsMode) SendGsDrumMapLater(GsDrumMap.ProgramChanged(channel));
             // GM2: the Key-Based Instrument Control values of a new kit are written again.
             if (Gm2Mode && Gm2DrumParams.IsChannelFixed(channel)) SendLater(Gm2DrumParams.FixedEvents(channel).ToArray());
+            // The bank of the instrument chosen for the passage first; without one, the file's bank (the module may still
+            // have the one chosen for the previous passage).
             if (Override[channel])
             {
+                SendBank(channel, OverrideMsb[channel], OverrideLsb[channel]);
                 NoteSentProgram(channel, OverrideMsb[channel], OverrideLsb[channel], OverrideProgram[channel]);
                 return Pc(channel, OverrideProgram[channel]);
             }
+            if (sentMsb[channel] != BankMsb[channel] || sentLsb[channel] != BankLsb[channel]) SendBank(channel, BankMsb[channel], BankLsb[channel]);
             NoteSentProgram(channel, BankMsb[channel], BankLsb[channel], Program[channel]);
             return e;
         }
@@ -669,6 +721,7 @@ public static class ChannelMixer
         device.SendEvent(Cc(channel, 0, msb));
         device.SendEvent(Cc(channel, 32, lsb));
         device.SendEvent(Pc(channel, program));
+        (sentMsb[channel], sentLsb[channel]) = (msb, lsb);
         // XG: the Program Change has reset the drum setup of the part; its fixed values are written again.
         if (XgMode && XgDrumSetup.ProgramChanged(channel) is int setup and >= 0) XgDrumSetup.Apply(device, setup);
         if (GsMode && GsDrumMap.ProgramChanged(channel) is int map and >= 0) foreach (var e in GsDrumMap.FixedEvents(map)) device.SendEvent(e);
@@ -676,9 +729,10 @@ public static class ChannelMixer
         if (Mt32Mode && Mt32PartParams.ProgramChanged(channel) is int part and >= 0) foreach (var e in Mt32PartParams.FixedPatchEvents(part)) device.SendEvent(e);
     }
 
-    // Forces an instrument on a channel and sends it to module immediately.
+    // Forces an instrument on a channel for the passage being played and sends it to module immediately.
     public static void SetOverride(IOutputDevice device, int channel, int msb, int lsb, int program)
     {
+        lock (instruments) instruments[(channel, Passage[channel])] = (msb, lsb, program);
         OverrideMsb[channel] = msb;
         OverrideLsb[channel] = lsb;
         OverrideProgram[channel] = program;
@@ -687,9 +741,15 @@ public static class ChannelMixer
         SendInstrument(device, channel, msb, lsb, program);
     }
 
-    // Hands control back to file: resends last instrument requested by file.
-    public static void ClearOverride(IOutputDevice device, int channel)
+    // Hands control back to file for the passage being played (allPassages: for the whole track): resends last
+    // instrument requested by file.
+    public static void ClearOverride(IOutputDevice device, int channel, bool allPassages = false)
     {
+        lock (instruments)
+        {
+            if (allPassages) foreach (var key in instruments.Keys.Where(k => k.Channel == channel).ToList()) instruments.Remove(key);
+            else instruments.Remove((channel, Passage[channel]));
+        }
         Override[channel] = false;
         SendInstrument(device, channel, BankMsb[channel], BankLsb[channel], Program[channel]);
     }

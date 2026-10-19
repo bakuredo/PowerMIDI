@@ -274,6 +274,7 @@ public sealed class MixerViewModel : ObservableObject
         int c = ch.Channel;
         if (ch.ListShown) { ch.ListShown = false; force = true; }   // list closed since it was last opened
         var key = $"{Standard}/{ChannelMixer.VoiceMap}/{ChannelMixer.GsDefaultMap}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
+                  $"{ChannelMixer.Passage[c]}/{OtherPassages(c)}/" +
                   $"{ChannelMixer.RhythmPart[c]}/{ChannelMixer.RhythmOverride[c]}/{ChannelMixer.Override[c]}/" +
                   $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}/{ChannelMixer.SysExPatch[c]}/{Mt32Patches.Version}";
         if (!force && key == ch.InstrumentKey) return;
@@ -300,6 +301,10 @@ public sealed class MixerViewModel : ObservableObject
             (name, state, tooltip) = (currentInfo.Name, InstrumentState.Manual, $"{currentInfo.Detail}{partText}{sharedText} (file: {fileInfo.Name})");
         }
         else (name, state, tooltip) = (currentInfo.Name, InstrumentState.File, $"{currentInfo.Detail}{sharedText}");
+        // The choice applies to the passage being played (until the next Program Change of the file).
+        int others = OtherPassages(c);
+        if (ChannelMixer.Override[c]) tooltip += "\nChosen for this passage (until next Program Change of file)";
+        if (others > 0) tooltip += $"\nInstrument changed in {others} other passage{(others > 1 ? "s" : "")}";
 
         // Instrument set by the SysEx of the file, not the one chosen in the interface (shown in green):
         // XG, by a Multi Part message; MT-32, a program whose patch was redefined (ResolveSound names its timbre),
@@ -325,6 +330,9 @@ public sealed class MixerViewModel : ObservableObject
             ch.InstrumentToolTip = tooltip;
         });
     }
+
+    // Passages of a channel other than the one being played with an instrument chosen.
+    static int OtherPassages(int c) => ChannelMixer.Instruments().Count(x => x.Channel == c && x.Passage != ChannelMixer.Passage[c]);
 
     // Is a channel playing drums right now? (Same rules as the instrument names; called for each note by the
     // playback thread when the pitch is shifted: only reads the mixer state.)
@@ -408,7 +416,8 @@ public sealed class MixerViewModel : ObservableObject
         return (choices, index, program, fileInfo);
     }
 
-    // Opening the list: back to the file's instrument, in GS the normal part and the two drum parts (in XG the
+    // Opening the list: back to the file's instrument (in this passage; in all of them, when other passages of the
+    // channel have an instrument chosen), in GS the normal part and the two drum parts (in XG the
     // normal voices, drum kits and SFX kits; in GM2 the normal sounds and drum kits), then all the sounds (or kits)
     // of the current standard / map,
     // with the current one selected.
@@ -416,6 +425,9 @@ public sealed class MixerViewModel : ObservableObject
     {
         var (choices, index, _, fileInfo) = GetChannelChoices(ch.Channel);
         var items = new List<InstrumentChoice> { new() { Text = $"↺ File instrument ({fileInfo.Name})", IsReset = true } };
+        int others = OtherPassages(ch.Channel);
+        if (others > 0)
+            items.Add(new InstrumentChoice { Text = $"↺ File instrument in all passages ({others} other{(others > 1 ? "s" : "")} changed)", IsReset = true, AllPassages = true });
         if (HasGsMaps)
         {
             int rhythm = ChannelMixer.Rhythm(ch.Channel);
@@ -470,10 +482,10 @@ public sealed class MixerViewModel : ObservableObject
         if (item == null || item.IsDisplay) return;
         if (item.IsReset)
         {
-            // Back to the file: its instrument and its drum part.
-            ChannelMixer.ClearOverride(output(), c);
+            // Back to the file: its instrument (in this passage, or in all of them) and its drum part.
+            ChannelMixer.ClearOverride(output(), c, item.AllPassages);
             if (ChannelMixer.RhythmOverride[c] >= 0) ChannelMixer.ClearRhythmOverride(output(), c);
-            setStatus($"Channel {c + 1}: file instrument");
+            setStatus(item.AllPassages ? $"Channel {c + 1}: file instruments in all passages" : $"Channel {c + 1}: file instrument");
         }
         else if (item.AssignPart is int part)
         {
@@ -772,7 +784,7 @@ public sealed class MixerViewModel : ObservableObject
             if (ChannelMixer.Muted[ch.Channel]) SetMute(ch.Channel, false);
         foreach (var ch in Channels)
         {
-            if (ChannelMixer.Override[ch.Channel]) ChannelMixer.ClearOverride(device, ch.Channel);
+            if (ChannelMixer.HasInstruments(ch.Channel)) ChannelMixer.ClearOverride(device, ch.Channel, true);
             if (ChannelMixer.RhythmOverride[ch.Channel] >= 0) ChannelMixer.ClearRhythmOverride(device, ch.Channel);
         }
         Refresh();
@@ -786,7 +798,7 @@ public sealed class MixerViewModel : ObservableObject
         foreach (var ch in Channels)
         {
             int c = ch.Channel;
-            if (ChannelMixer.Override[c]) { ChannelMixer.ClearOverride(null, c); had = true; }
+            if (ChannelMixer.HasInstruments(c)) { ChannelMixer.ClearOverride(null, c, true); had = true; }
             if (ChannelMixer.RhythmOverride[c] >= 0) { ChannelMixer.ClearRhythmOverride(null, c); had = true; }
             for (int k = 0; k < ControllerCount; k++)
                 if (ChannelMixer.IsFixed(k, c)) { ChannelMixer.ClearController(null, k, c); had = true; }

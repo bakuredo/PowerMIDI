@@ -5,11 +5,13 @@ using Melanchall.DryWetMidi.Interaction;
 namespace PowerMIDI.Core;
 
 // Writes the settings chosen in the interface into a MIDI file:
-// - instrument of a channel: all its bank selects (CC0, CC32) and Program Changes are removed;
+// - instrument of a passage of a channel (see InstrumentPassages): its bank selects (CC0, CC32) and Program Changes are
+//   replaced by the choice; the next passage, if it is not chosen, gets the file's bank again;
 // - fixed controller of a channel (volume, pan, sends…): all its events of that controller are removed;
 // - drum part of a channel (GS): its Use for Rhythm Part messages are removed;
 // - XG Multi Part SysEx that write one of these values: corrected in place (they may write other values too);
-// then the chosen value is inserted once, right after the reset at the start (ApplyChanges);
+// then the chosen value is inserted once, right after the reset at the start (ApplyChanges; an instrument: the one of
+// the first passage, when the channel has no Program Change before its first note);
 // - forced mode: the resets of the file are replaced by the reset of the mode (ForceReset);
 // - fixed effects: the effect SysEx of the file are removed or corrected, and the fixed values inserted after the
 //   reset (ApplyEffects for GS / XG, WriteMt32Reverb, WriteGm2Effects, WriteXgDrumSetup, WriteXgPartParams, WriteGsDrumMap, WriteGsPartParams, WriteGm2DrumParams, WriteGm2PartParams, WriteMt32PartParams, WriteMt32DrumParams).
@@ -28,13 +30,6 @@ public static class MidiFileEditor
         return false;
     }
 
-    static bool IsInstrumentEvent(MidiEvent e, bool[] apply)
-    {
-        var pc = e as ProgramChangeEvent;
-        if (pc != null) return apply[pc.Channel];
-        var cc = e as ControlChangeEvent;
-        return cc != null && apply[cc.Channel] && (cc.ControlNumber == 0 || cc.ControlNumber == 32);
-    }
 
     // Controller index (see ChannelMixer.ControllerNumbers) if event must be replaced, otherwise -1.
     static int ControllerToReplace(MidiEvent e, bool[][] apply)
@@ -54,12 +49,16 @@ public static class MidiFileEditor
         public int Index;      // original order
     }
 
+    // instruments: the instruments chosen, by channel and passage (see ChannelMixer.Instruments).
     // applyCc[k][channel] / ccValues[k][channel]: fixed values for each mixer controller k.
     // rhythm[channel]: drum part chosen in the interface (GS Use for Rhythm Part: 0 = normal, 1 / 2 = drum part),
     // -1 = the file's. The file's Use for Rhythm Part messages of such a channel are replaced too.
-    public static string ApplyChanges(MidiFile file, bool[] apply, int[] msb, int[] lsb, int[] program,
-                                      bool[][] applyCc, int[][] ccValues, int[] rhythm)
+    // followResets: false in a forced mode (see InstrumentPassages.Read).
+    public static string ApplyChanges(MidiFile file, IEnumerable<(int Channel, long Passage, int Msb, int Lsb, int Program)> instruments,
+                                      bool[][] applyCc, int[][] ccValues, int[] rhythm, bool followResets = true)
     {
+        var chosen = instruments.ToDictionary(x => (x.Channel, x.Passage), x => (x.Msb, x.Lsb, x.Program));
+        var passages = InstrumentPassages.Read(file, followResets);
         int controllers = ChannelMixer.ControllerNumbers.Length;
         int tpqn = 480;
         var division = file.TimeDivision as TicksPerQuarterNoteTimeDivision;
@@ -92,6 +91,23 @@ public static class MidiFileEditor
         }
         if (chunkIndexes.Count == 0) return "No track in file.";
 
+        // The instrument of the first passage is inserted after the reset if the channel plays a note before its first
+        // Program Change there (or has none); otherwise that Program Change is replaced.
+        var insertFirst = new bool[16];
+        long since = Math.Max(resetTime, 0);
+        for (int ch = 0; ch < 16; ch++)
+        {
+            if (!chosen.ContainsKey((ch, InstrumentPassages.First))) continue;
+            long pc = -1, note = -1;
+            foreach (var t in timedByChunk.SelectMany(l => l))
+            {
+                if (t.Time < since || t.Event is not ChannelEvent ce || ce.Channel != ch) continue;
+                if (t.Event is ProgramChangeEvent && (pc < 0 || t.Time < pc)) pc = t.Time;
+                if (t.Event is NoteOnEvent on && on.Velocity > 0 && (note < 0 || t.Time < note)) note = t.Time;
+            }
+            insertFirst[ch] = pc < 0 || (note >= 0 && note < pc);
+        }
+
         // 2. Rebuild each track.
         var removed = new int[16];
         var removedRhythm = new int[16];
@@ -100,12 +116,27 @@ public static class MidiFileEditor
         for (int k = 0; k < chunkIndexes.Count; k++)
         {
             var items = new List<Item>();
-            foreach (var t in timedByChunk[k])
+            void Add(MidiEvent e, long time) => items.Add(new Item { Event = new TimedEvent(e, time), Priority = 2, Index = items.Count });
+            for (int i = 0; i < timedByChunk[k].Count; i++)
             {
-                if (IsInstrumentEvent(t.Event, apply))
+                var t = timedByChunk[k][i];
+                // Instrument of a passage: its bank selects and Program Changes replaced by the choice; the next passage
+                // (not chosen) with the file's bank written again.
+                if ((t.Event is ProgramChangeEvent || t.Event is ControlChangeEvent bankCc && (int)bankCc.ControlNumber is 0 or 32) && passages.Of(k, i) is { } info)
                 {
-                    removed[((ChannelEvent)t.Event).Channel]++;
-                    continue;
+                    int c = info.Channel;
+                    bool replaced = chosen.TryGetValue((c, info.Passage), out var choice);
+                    bool rebank = !replaced && info.Before != info.Passage && chosen.ContainsKey((c, info.Before));
+                    if (replaced || rebank)
+                    {
+                        removed[c]++;
+                        if (t.Event is not ProgramChangeEvent pc) continue;
+                        var (bankMsb, bankLsb, number) = replaced ? choice : (info.Msb, info.Lsb, (int)pc.ProgramNumber);
+                        Add(new ControlChangeEvent((SevenBitNumber)0, (SevenBitNumber)(byte)bankMsb) { Channel = pc.Channel }, t.Time);
+                        Add(new ControlChangeEvent((SevenBitNumber)32, (SevenBitNumber)(byte)bankLsb) { Channel = pc.Channel }, t.Time);
+                        Add(new ProgramChangeEvent((SevenBitNumber)(byte)number) { Channel = pc.Channel }, t.Time);
+                        continue;
+                    }
                 }
                 int cck = ControllerToReplace(t.Event, applyCc);
                 if (cck >= 0)
@@ -125,8 +156,8 @@ public static class MidiFileEditor
                 if (part >= 0)
                 {
                     var d = sysEx.Data;
-                    var data = ChannelMixer.ReplaceMultiPart(d, apply[part] ? (msb[part], lsb[part], program[part]) : null,
-                                                             c => applyCc[c][part] ? ccValues[c][part] : -1);
+                    (int, int, int)? instrument = passages.Of(k, i) is { } partInfo && chosen.TryGetValue((part, partInfo.Passage), out var x) ? x : null;
+                    var data = ChannelMixer.ReplaceMultiPart(d, instrument, c => applyCc[c][part] ? ccValues[c][part] : -1);
                     if (data != null)
                     {
                         for (int pos = 6; pos < d.Length - 1; pos++)
@@ -146,18 +177,19 @@ public static class MidiFileEditor
             {
                 bool anyCc = false;
                 for (int c = 0; c < controllers; c++) anyCc |= applyCc[c][ch];
-                if ((!apply[ch] && !anyCc && rhythm[ch] < 0) || Math.Max(host[ch], 0) != k) continue;
+                if ((!insertFirst[ch] && !anyCc && rhythm[ch] < 0) || Math.Max(host[ch], 0) != k) continue;
                 // Right after reset (1/8 of a quarter note later), but never after first note.
                 long time = resetTime < 0 ? 0 : resetTime + tpqn / 8;
                 if (firstNote[ch] >= 0 && time > firstNote[ch]) time = Math.Max(firstNote[ch], Math.Max(resetTime, 0));
                 var events = new List<MidiEvent>();
                 // Drum part first: the module then reads the program as a drum kit (or as a sound).
                 if (rhythm[ch] >= 0) events.Add(ChannelMixer.RhythmPartEvent(ch, rhythm[ch]));
-                if (apply[ch])
+                if (insertFirst[ch])
                 {
-                    events.Add(new ControlChangeEvent((SevenBitNumber)(byte)0, (SevenBitNumber)(byte)msb[ch]) { Channel = (FourBitNumber)(byte)ch });
-                    events.Add(new ControlChangeEvent((SevenBitNumber)(byte)32, (SevenBitNumber)(byte)lsb[ch]) { Channel = (FourBitNumber)(byte)ch });
-                    events.Add(new ProgramChangeEvent((SevenBitNumber)(byte)program[ch]) { Channel = (FourBitNumber)(byte)ch });
+                    var (msb, lsb, program) = chosen[(ch, InstrumentPassages.First)];
+                    events.Add(new ControlChangeEvent((SevenBitNumber)(byte)0, (SevenBitNumber)(byte)msb) { Channel = (FourBitNumber)(byte)ch });
+                    events.Add(new ControlChangeEvent((SevenBitNumber)(byte)32, (SevenBitNumber)(byte)lsb) { Channel = (FourBitNumber)(byte)ch });
+                    events.Add(new ProgramChangeEvent((SevenBitNumber)(byte)program) { Channel = (FourBitNumber)(byte)ch });
                 }
                 for (int c = 0; c < controllers; c++)
                     if (applyCc[c][ch])
@@ -198,7 +230,9 @@ public static class MidiFileEditor
             if (rhythm[ch] >= 0)
                 parts.Add(string.Format("{0} ({1} Use for Rhythm Part replaced)",
                                         rhythm[ch] == 0 ? "normal part" : "drum part " + rhythm[ch], removedRhythm[ch]));
-            if (apply[ch]) parts.Add(string.Format("instrument ({0} bank/program event(s) or SysEx value(s) replaced)", removed[ch]));
+            int count = chosen.Keys.Count(x => x.Channel == ch);
+            if (count > 0) parts.Add(string.Format("instrument{0} ({1} bank/program event(s) or SysEx value(s) replaced)",
+                                                   count > 1 ? $" in {count} passages" : "", removed[ch]));
             for (int c = 0; c < controllers; c++)
                 if (applyCc[c][ch])
                     parts.Add(string.Format("{0} {1} ({2} CC{3} or SysEx value(s) replaced)", ChannelMixer.ControllerNames[c],

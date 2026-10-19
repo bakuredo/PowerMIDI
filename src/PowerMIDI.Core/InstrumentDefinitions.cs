@@ -37,6 +37,7 @@ public sealed class InstrumentChoice
     public int Lsb { get; init; }
     public int Program { get; init; }
     public bool IsReset { get; init; }
+    public bool AllPassages { get; init; }   // reset: in all passages of the channel (see InstrumentPassages)
     public bool IsDisplay { get; init; }
     public int? AssignPart { get; init; }
     public int? AssignXgBank { get; init; }

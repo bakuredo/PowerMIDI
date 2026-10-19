@@ -723,6 +723,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var pb = midi.GetPlayback(output);
         playedFile = midi;
+        ChannelMixer.Passages = InstrumentPassages.Read(midi, !ChannelMixer.ForceMode);   // the instruments chosen per passage
         SetLyrics(KaraokeLyrics.Read(midi));   // a karaoke file: its lyrics on the screen
         pb.InterruptNotesOnStop = true;
         // Every Note On and Note Off of the file is played, as the file has them. By default the playback library keeps

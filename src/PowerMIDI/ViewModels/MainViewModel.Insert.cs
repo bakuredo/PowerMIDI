@@ -87,7 +87,8 @@ public sealed partial class MainViewModel
         for (int c = 0; c < 16; c++)
         {
             if (ChannelMixer.RhythmOverride[c] >= 0) ChannelMixer.ClearRhythmOverride(output, c);
-            if (ChannelMixer.Override[c]) ChannelMixer.ClearOverride(output, c);
+            // All passages: the first click wrote the earlier choices in the track (the passages may have moved since).
+            if (ChannelMixer.HasInstruments(c)) ChannelMixer.ClearOverride(output, c, true);
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
                 if (ChannelMixer.IsFixed(k, c)) ChannelMixer.ClearController(output, k, c);
         }

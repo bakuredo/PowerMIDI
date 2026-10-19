@@ -8,9 +8,11 @@ namespace PowerMIDI.Core;
 // Tick: position in the file; Track: track number (1-based); Channel: 0-15, -1 for an event without channel (SysEx,
 // meta); Kind: group used by the filters; Type, Data and Description: the texts of the row; Event: the event (the Note On
 // of a note); Index: its place in its track (for the changes, see MidiEventEdits); OffIndex / Length: the Note Off of a
-// note (-1 / 0 otherwise); Entry: for a data entry (CC6, CC38), the RPN / NRPN it writes.
+// note (-1 / 0 otherwise); Entry: for a data entry (CC6, CC38), the RPN / NRPN it writes; Passage: for a bank select, a
+// Program Change or an XG Multi Part SysEx, the passage of the instrument of its channel it belongs to (see InstrumentPassages).
 public sealed record MidiEventRow(long Tick, int Track, int Channel, EventKind Kind, string Type, string Data, string Description,
-                                  MidiEvent Event = null, int Index = -1, int OffIndex = -1, long Length = 0, DataEntry? Entry = null);
+                                  MidiEvent Event = null, int Index = -1, int OffIndex = -1, long Length = 0, DataEntry? Entry = null,
+                                  long? Passage = null);
 
 // Setting: not an event of the file, a value fixed in the Mixer or Effects tab, sent at the start (see EventEditorViewModel).
 public enum EventKind { Note, Controller, Program, PitchBend, Aftertouch, SysEx, Meta, Setting }
@@ -60,6 +62,8 @@ public static class MidiEventList
         rhythm[9] = 1;
         var nrpn = new NrpnState();   // as the player reads them (ChannelMixer)
         var names = new string[16];   // instrument of each channel, worked out again after a change
+        var passages = InstrumentPassages.Read(file, !ChannelMixer.ForceMode);
+        long? PassageOf(int t, int index) => passages.Of(t - 1, index)?.Passage;
         string Instrument(int c) => names[c] ??= instrumentName?.Invoke(c, program[c], msb[c], lsb[c], rhythm[c]) ?? "";
 
         var rows = new List<MidiEventRow>(objects.Count);
@@ -87,14 +91,14 @@ public static class MidiEventList
                     if (n == 32) (lsb[c], names[c]) = (v, null);
                     var entry = nrpn.Read(cc);
                     if (entry is { } p) text += $" · {ParameterName(p.Rpn, p.Msb, p.Lsb)}";
-                    rows.Add(Row(c, EventKind.Controller, "Control Change", $"{n} = {v}", text) with { Entry = entry });
+                    rows.Add(Row(c, EventKind.Controller, "Control Change", $"{n} = {v}", text) with { Entry = entry, Passage = PassageOf(t, index) });
                     break;
                 }
                 case ProgramChangeEvent pc:
                     program[pc.Channel] = pc.ProgramNumber;
                     names[pc.Channel] = null;
                     rows.Add(Row(pc.Channel, EventKind.Program, "Program Change", $"{pc.ProgramNumber + 1} · bank {msb[pc.Channel]} / {lsb[pc.Channel]}",
-                                 Instrument(pc.Channel)));
+                                 Instrument(pc.Channel)) with { Passage = PassageOf(t, index) });
                     break;
                 case PitchBendEvent pb:
                     rows.Add(Row(pb.Channel, EventKind.PitchBend, "Pitch Bend", MidiTools.FormatSigned(pb.PitchValue - 8192), ""));
@@ -110,7 +114,7 @@ public static class MidiEventList
                     var d = sx.Data;
                     int c = ChannelMixer.RhythmPartChannel(d);
                     if (c >= 0) (rhythm[c], names[c]) = (d[7], null);
-                    rows.Add(Row(-1, EventKind.SysEx, "SysEx", Hex(d), describeSysEx?.Invoke(d) ?? DescribeSysEx(d)));
+                    rows.Add(Row(-1, EventKind.SysEx, "SysEx", Hex(d), describeSysEx?.Invoke(d) ?? DescribeSysEx(d)) with { Passage = PassageOf(t, index) });
                     break;
                 }
                 default:
@@ -130,8 +134,8 @@ public static class MidiEventList
     public static string FixedText(MidiEventRow row, Func<int, int, int, int, int, string> instrumentName = null)
     {
         int c = row.Channel;
-        // The instrument chosen in the Mixer tab for a channel.
-        (int, int, int)? Chosen(int ch) => ChannelMixer.Override[ch] ? (ChannelMixer.OverrideMsb[ch], ChannelMixer.OverrideLsb[ch], ChannelMixer.OverrideProgram[ch]) : null;
+        // The instrument chosen in the Mixer tab for a channel, in the passage of the row.
+        (int, int, int)? Chosen(int ch) => row.Passage is long passage ? ChannelMixer.InstrumentOf(ch, passage) : null;
         string Instrument(int ch)
         {
             var (msb, lsb, program) = Chosen(ch).Value;
@@ -140,8 +144,8 @@ public static class MidiEventList
         }
         switch (row.Event)
         {
-            case ProgramChangeEvent when ChannelMixer.Override[c]:
-            case ControlChangeEvent bank when (int)bank.ControlNumber is 0 or 32 && ChannelMixer.Override[c]:
+            case ProgramChangeEvent when Chosen(c) != null:
+            case ControlChangeEvent bank when (int)bank.ControlNumber is 0 or 32 && Chosen(c) != null:
                 return Instrument(c);
             case ControlChangeEvent cc when ChannelMixer.ControllerIndex(cc.ControlNumber) is int k and >= 0 && ChannelMixer.IsFixed(k, c):
                 return $"Fixed in Mixer tab: {ChannelMixer.FixedValue(k, c)}";
