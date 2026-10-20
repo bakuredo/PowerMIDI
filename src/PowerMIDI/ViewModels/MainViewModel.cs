@@ -42,6 +42,8 @@ public sealed partial class MainViewModel : ObservableObject
         this.defs = defs;
         Mixer = new MixerViewModel(defs, () => output, s => Status = s, view.ShowError);
         Effects = new EffectsViewModel(defs, () => output, view.ShowError);
+        Library = new LibraryViewModel(view, Path.Combine(AppContext.BaseDirectory, "library"), s => Status = s,
+                                       (path, key) => Run(() => PlayFromLibrary(path, key)), paths => Run(() => AddFiles(paths)));
 
         AddFilesCommand = Command(AddFilesFromDialog);
         AddFolderCommand = Command(AddFolderFromDialog);
@@ -80,6 +82,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     public MixerViewModel Mixer { get; }
     public EffectsViewModel Effects { get; }
+    public LibraryViewModel Library { get; }
+
+    // Tab of the right panel: 0 = Mixer, 1 = Effects, 2 = Library, 3 = About.
+    int selectedTab;
+    public int SelectedTab { get => selectedTab; set => Set(ref selectedTab, value); }
     public ObservableCollection<PlaylistItem> Playlist { get; } = new();
 
     public ICommand AddFilesCommand { get; }
@@ -112,6 +119,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         timer.Start();
         ledTimer.Start();
+        try { Library.Load(); }
+        catch (Exception ex) { Status = $"Library: {ex.Message}"; }
     }
 
     // Closing: the timers stop, playback stops and the port is released.
@@ -137,6 +146,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (ini.GetInt("Playback", "MasterVolume") is int volume && volume is >= 0 and <= 127) MasterVolume = volume;
         Mixer.LoadVoiceMap(ini.Get("MIDI", "XgDefaultMap"));
         Mixer.LoadGsDefaultMap(ini.Get("MIDI", "GsDefaultMap"));
+        Library.LoadSettings(ini);
     }
 
     public void WriteSettings(IniFile ini)
@@ -146,6 +156,7 @@ public sealed partial class MainViewModel : ObservableObject
         ini.Set("Playback", "LastFolder", lastFolder ?? "");
         ini.Set("MIDI", "XgDefaultMap", Mixer.VoiceMapSetting);
         ini.Set("MIDI", "GsDefaultMap", Mixer.GsDefaultMapSetting);
+        Library.WriteSettings(ini);
     }
 
     // ---------- MIDI port ----------
@@ -308,7 +319,7 @@ public sealed partial class MainViewModel : ObservableObject
                     dur = MidiTools.FormatTime(MidiTools.GetDuration(midi));
                 }
                 catch { }
-                var item = new PlaylistItem { Name = Path.GetFileName(f), Path = Path.GetFullPath(f), Standard = std, Duration = dur };
+                var item = new PlaylistItem { Name = Path.GetFileName(f), Path = Path.GetFullPath(f), Standard = std, Duration = dur, Library = Library.KeyOf(f) };
                 Playlist.Add(item);
                 firstAdded ??= item;
                 added++;
@@ -320,6 +331,22 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Nothing in progress (no playback, no pause, no track loaded): play the first added file.
         if (firstAdded != null && output != null && (play || (state == "stopped" && current == null))) StartTrack(firstAdded);
+    }
+
+    // A file opened in the Library tab: played (added to the playlist first, unless it is there already), with the Mixer
+    // tab shown (the instruments it plays).
+    void PlayFromLibrary(string path, LibraryKey key)
+    {
+        var item = Playlist.FirstOrDefault(i => SamePath(i.Path, path));
+        if (item == null)
+        {
+            AddFiles(new[] { path });   // plays it if nothing else was in progress
+            item = Playlist.LastOrDefault(i => SamePath(i.Path, path));
+            if (item == null) return;
+        }
+        if (!(item == current && state == "playing" && playback?.IsRunning == true)) StartTrack(item);
+        SelectedTrack = item;
+        SelectedTab = 0;
     }
 
     void AddFilesFromDialog()
@@ -689,6 +716,7 @@ public sealed partial class MainViewModel : ObservableObject
         ShowTrackInfo(midi, item, std);
 
         current = item;
+        if (item.Library is { } key) Library.RecordPlay(key);   // a file of the Library tab: its plays are counted
         if (from > 0)
         {
             var at = TimeSpan.FromSeconds(from);

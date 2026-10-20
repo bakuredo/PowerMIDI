@@ -27,10 +27,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PowerMIDI.Core\PowerMIDI.Core.csproj" />
+    <ProjectReference Include="..\PowerMIDI.Library\PowerMIDI.Library.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="System.IO" />
+  </ItemGroup>
+
+  <!-- Library database (..\..\library\library.db, made by the Library Builder; not in the repository), copied next to the
+       program in its library folder (Library tab). The downloaded zips and the user's favorites go there too. -->
+  <ItemGroup>
+    <None Include="..\..\library\library.db" Link="library\library.db" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\library\library.db')" />
   </ItemGroup>
 
   <!-- Module definition files in the Domino format (..\..\instruments), copied next to the program. -->

@@ -12,6 +12,7 @@ public sealed class PlaylistItem : ObservableObject
     public string Path { get; init; }
     public string Standard { get; init; }
     public string Duration { get; init; }
+    public ViewModels.LibraryKey Library { get; init; }   // file of a collection of the Library tab (its plays are counted)
 
     // "▶" (playing), "❚❚" (paused) or empty.
     public string Playing { get => playing; set => Set(ref playing, value); }

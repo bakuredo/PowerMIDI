@@ -118,10 +118,11 @@
   <TextBlock DockPanel.Dock="Bottom" Margin="2,8,0,0" Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12"
              Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
 
-  <!-- Right panel: Mixer (16 channels), Effects (those of the current mode) and About tabs -->
+  <!-- Right panel: Mixer (16 channels), Effects (those of the current mode), Library and About tabs -->
   <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
           BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="6">
-    <TabControl Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}">
+    <TabControl Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}"
+                SelectedIndex="{Binding SelectedTab}">
     <TabItem Header="Mixer" DataContext="{Binding Mixer}" d:DataContext="{d:DesignInstance vm:MixerViewModel}">
     <DockPanel>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
@@ -556,6 +557,140 @@
       </ScrollViewer>
     </DockPanel>
     </TabItem>
+    <!-- Library: the collections of library\library.db, by folder or searched; their files come from their zip, downloaded
+         when asked for; double click or Enter plays a file (taken from the zip, added to the playlist), Backspace goes up,
+         ☆ marks a favorite, the files are dragged to the playlist (see MainWindow.xaml.cs). -->
+    <TabItem Header="Library" DataContext="{Binding Library}" d:DataContext="{d:DesignInstance vm:LibraryViewModel}">
+    <DockPanel>
+      <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <Button DockPanel.Dock="Right" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" Padding="7,4" Margin="6,0,0,0"
+                Command="{Binding DeleteDownloadedCommand}" IsEnabled="{Binding IsDownloaded}"
+                ToolTip="Delete downloaded files of collection (zip and files taken from it; downloaded again when needed)"/>
+        <TextBlock Text="Collection:" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Center"/>
+        <ComboBox ItemsSource="{Binding Collections}" SelectedItem="{Binding SelectedCollection}" DisplayMemberPath="Name" ToolTip="Collection shown"/>
+      </DockPanel>
+      <!-- Files of the collection not downloaded yet: Download (from its source), then its progress and Cancel. -->
+      <Border DockPanel.Dock="Top" Margin="0,0,0,6" Padding="8,5" CornerRadius="4" Background="{DynamicResource HeaderBrush}"
+              Visibility="{Binding ShowDownloadBar, Converter={StaticResource BoolToVisibility}}">
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Content="Download" Padding="10,2" Margin="8,0,0,0" Command="{Binding DownloadCommand}"
+                  Visibility="{Binding NeedsDownload, Converter={StaticResource BoolToVisibility}}" ToolTip="Download zip of collection"/>
+          <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,2" Margin="8,0,0,0" Command="{Binding CancelDownloadCommand}"
+                  Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="Stop download"/>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{Binding DownloadText}" TextTrimming="CharacterEllipsis"/>
+            <ProgressBar Height="4" Margin="0,4,0,0" Maximum="1" Value="{Binding DownloadProgress, Mode=OneWay}"
+                         Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+      <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6" IsEnabled="{Binding HasCollection}">
+        <ComboBox DockPanel.Dock="Right" Width="118" Margin="6,0,0,0" ItemsSource="{x:Static vm:LibraryViewModel.ShowNames}"
+                  SelectedIndex="{Binding ShowIndex}" ToolTip="Files shown: all, favorites, played ones…"/>
+        <ComboBox DockPanel.Dock="Right" Width="68" Margin="6,0,0,0" ItemsSource="{x:Static vm:LibraryViewModel.FormatNames}"
+                  SelectedIndex="{Binding FormatIndex}" ToolTip="Files of one standard"/>
+        <!-- Search box, with its hint while empty (over it, not hit by the mouse). -->
+        <Grid>
+          <TextBox Padding="2,1" VerticalContentAlignment="Center" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                   ToolTip="Search titles, folders and lyrics, in this folder and below (Esc: clear)">
+            <TextBox.InputBindings>
+              <KeyBinding Key="Escape" Command="{Binding ClearSearchCommand}"/>
+            </TextBox.InputBindings>
+          </TextBox>
+          <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" Foreground="#FF8A8A8A">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding SearchText}" Value="">
+                    <Setter Property="Visibility" Value="Visible"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+            <Run Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11"/><Run Text="  Search title, folder, lyrics…"/>
+          </TextBlock>
+        </Grid>
+      </DockPanel>
+      <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6" IsEnabled="{Binding HasCollection}">
+        <Button DockPanel.Dock="Left" Content="&#xE74A;" FontFamily="Segoe MDL2 Assets" Padding="6,3" Command="{Binding UpCommand}"
+                ToolTip="Parent folder (Backspace)"/>
+        <ItemsControl ItemsSource="{Binding Crumbs}" VerticalAlignment="Center" ClipToBounds="True">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock>
+                <Run Text="{Binding Prefix, Mode=OneWay}" Foreground="{DynamicResource TextMutedBrush}"/><Hyperlink
+                     Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                     CommandParameter="{Binding Path}" Foreground="{DynamicResource AccentBrush}" TextDecorations="{x:Null}"><Run Text="{Binding Text, Mode=OneWay}"/></Hyperlink>
+              </TextBlock>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </DockPanel>
+      <TextBlock DockPanel.Dock="Bottom" Margin="2,6,0,0" Text="{Binding CountText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12"/>
+      <TextBlock DockPanel.Dock="Top" Margin="2,12,2,0" TextWrapping="Wrap" Foreground="{DynamicResource TextSoftBrush}"
+                 Visibility="{Binding HasNoLibrary, Converter={StaticResource BoolToVisibility}}"
+                 Text="No library: library\library.db missing next to PowerMIDI.exe."/>
+      <ListView x:Name="LibraryView" Style="{StaticResource ThemedListView}" ItemsSource="{Binding Rows}" SelectionMode="Extended"
+                VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                GridViewColumnHeader.Click="OnLibraryHeaderClick" PreviewKeyDown="OnLibraryKeyDown"
+                PreviewMouseLeftButtonDown="OnLibraryMouseDown" PreviewMouseMove="OnLibraryMouseMove">
+        <ListView.ItemContainerStyle>
+          <Style TargetType="ListViewItem" BasedOn="{StaticResource ThemedListViewItem}">
+            <EventSetter Event="MouseDoubleClick" Handler="OnLibraryItemDoubleClick"/>
+            <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding Unreadable}" Value="True">
+                <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </ListView.ItemContainerStyle>
+        <ListView.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="Play" Command="{Binding PlayCommand}"
+                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+            <MenuItem Header="Add to playlist" Command="{Binding AddToPlaylistCommand}"
+                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+            <MenuItem Header="Favorite" Command="{Binding FavoriteCommand}"
+                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+          </ContextMenu>
+        </ListView.ContextMenu>
+        <ListView.View>
+          <GridView>
+            <GridViewColumn Header="" Width="26">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate><TextBlock Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource TextSoftBrush}"/></DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn x:Name="LibraryTitleColumn" Header="Title" Width="280">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn x:Name="LibraryFolderColumn" Header="Folder" Width="0">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate><TextBlock Text="{Binding FolderText}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSoftBrush}"/></DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="Format" Width="60" DisplayMemberBinding="{Binding Format}"/>
+            <GridViewColumn Header="Time" Width="50" DisplayMemberBinding="{Binding Time}"/>
+            <GridViewColumn Header="★" Width="28">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate>
+                  <TextBlock Text="{Binding Star}" Foreground="{DynamicResource AccentBrush}" Cursor="Hand"
+                             MouseLeftButtonDown="OnLibraryStarClick" ToolTip="Favorite"/>
+                </DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+          </GridView>
+        </ListView.View>
+      </ListView>
+    </DockPanel>
+    </TabItem>
     <!-- About: the logo (same drawing as Icon.svg / PowerMIDI.ico, as vectors), the name and the version
          (set in MainWindow.xaml.cs from the version of the program). -->
     <TabItem Header="About">
@@ -745,7 +880,7 @@
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0" VerticalAlignment="Center"/>
-            <Slider Width="110" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
+            <Slider Width="90" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
             <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>
           </StackPanel>

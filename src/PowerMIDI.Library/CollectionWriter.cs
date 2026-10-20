@@ -7,7 +7,8 @@ namespace PowerMIDI.Library;
 public sealed record BuildReport(int Files, int Folders, IReadOnlyDictionary<string, int> Standards, IReadOnlyList<(string Path, string Error)> Errors,
                                  IReadOnlyList<IReadOnlyList<string>> Duplicates);
 
-// Builds the database of a collection from the folder its files are in (see LibraryFormat).
+// Builds a collection of the library database from the folder its files are in (see LibraryFormat): added to the
+// database (created if missing), or in place of the one of the same id; the other collections are kept.
 public static class CollectionWriter
 {
     static readonly string[] Extensions = { ".mid", ".midi", ".kar" };
@@ -48,25 +49,33 @@ public static class CollectionWriter
         var folders = counts.Keys.OrderBy(p => p.Count(c => c == '/') + (p == "" ? 0 : 1)).ThenBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
         string DisplayName(string path) => folderNames != null && folderNames.TryGetValue(path, out var name) ? name : null;
 
-        // Written next to it first: the database already there is replaced only once the new one is complete.
+        // Written in a copy first: the database already there is replaced only once the new one is complete.
         var building = databasePath + ".building";
-        using (var connection = LibraryFormat.Create(building))
+        if (File.Exists(building)) File.Delete(building);
+        if (File.Exists(databasePath)) File.Copy(databasePath, building);
+        using (var connection = LibraryFormat.OpenOrCreate(building))
         {
             using var transaction = connection.BeginTransaction();
+            // The collection built before, if any: removed (its search rows first).
+            foreach (var sql in new[]
+            {
+                "DELETE FROM files_search WHERE rowid IN (SELECT f.id FROM files f JOIN folders fo ON fo.id = f.folder_id WHERE fo.collection_id = $id)",
+                "DELETE FROM files WHERE folder_id IN (SELECT id FROM folders WHERE collection_id = $id)",
+                "DELETE FROM folders WHERE collection_id = $id",
+                "DELETE FROM collection WHERE id = $id",
+            })
+                Insert(connection, sql, ("$id", info.Id));
             Insert(connection, "INSERT INTO collection VALUES ($id, $name, $description, $url, $size, $sha1, $root, $built, $version)",
                    ("$id", info.Id), ("$name", info.Name), ("$description", info.Description), ("$url", info.SourceUrl), ("$size", info.SourceSize),
                    ("$sha1", info.SourceSha1), ("$root", info.Root), ("$built", info.BuiltAt), ("$version", info.BuilderVersion));
 
             var folderIds = new Dictionary<string, long>();
-            using (var command = Command(connection, "INSERT INTO folders (id, parent_id, name, display_name, path, file_count) VALUES ($id, $parent, $name, $display, $path, $count)"))
+            using (var command = Command(connection, "INSERT INTO folders (collection_id, parent_id, name, display_name, path, file_count) " +
+                                                     "VALUES ($collection, $parent, $name, $display, $path, $count) RETURNING id"))
                 foreach (var path in folders)
-                {
-                    long id = folderIds.Count + 1;
-                    folderIds[path] = id;
-                    Run(command, ("$id", id), ("$parent", path == "" ? null : folderIds[FolderOf(path)]),
-                        ("$name", path == "" ? info.Name : path[(path.LastIndexOf('/') + 1)..]), ("$display", DisplayName(path)),
-                        ("$path", path), ("$count", counts[path]));
-                }
+                    folderIds[path] = Scalar(command, ("$collection", info.Id), ("$parent", path == "" ? null : folderIds[FolderOf(path)]),
+                                             ("$name", path == "" ? info.Name : path[(path.LastIndexOf('/') + 1)..]), ("$display", DisplayName(path)),
+                                             ("$path", path), ("$count", counts[path]));
 
             // The text searched in the path of a file: its folders by their names and their display names.
             string SearchPath(string path)
@@ -78,20 +87,18 @@ public static class CollectionWriter
             }
 
             using (var file = Command(connection, """
-                INSERT INTO files (id, folder_id, name, title, internal_title, copyright, size, sha1, standard, smf_format, tracks, channels,
+                INSERT INTO files (folder_id, name, title, internal_title, copyright, size, sha1, standard, smf_format, tracks, channels,
                                    duration_ms, has_lyrics, has_loop, error)
-                VALUES ($id, $folder, $name, $title, $internal, $copyright, $size, $sha1, $standard, $format, $tracks, $channels,
-                        $duration, $lyrics, $loop, $error)
+                VALUES ($folder, $name, $title, $internal, $copyright, $size, $sha1, $standard, $format, $tracks, $channels,
+                        $duration, $lyrics, $loop, $error) RETURNING id
                 """))
             using (var search = Command(connection, "INSERT INTO files_search (rowid, title, internal_title, path, lyrics) VALUES ($id, $title, $internal, $path, $lyrics)"))
-                for (int i = 0; i < entries.Length; i++)
+                foreach (var e in entries)
                 {
-                    var e = entries[i];
-                    long id = i + 1;
-                    Run(file, ("$id", id), ("$folder", folderIds[FolderOf(e.Path)]), ("$name", e.Name), ("$title", e.Title), ("$internal", e.InternalTitle),
-                        ("$copyright", e.Copyright), ("$size", e.Size), ("$sha1", e.Sha1), ("$standard", e.Standard), ("$format", e.SmfFormat),
-                        ("$tracks", e.Tracks), ("$channels", e.Channels), ("$duration", e.DurationMs), ("$lyrics", e.HasLyrics ? 1 : 0),
-                        ("$loop", e.HasLoop ? 1 : 0), ("$error", e.Error));
+                    long id = Scalar(file, ("$folder", folderIds[FolderOf(e.Path)]), ("$name", e.Name), ("$title", e.Title), ("$internal", e.InternalTitle),
+                                     ("$copyright", e.Copyright), ("$size", e.Size), ("$sha1", e.Sha1), ("$standard", e.Standard), ("$format", e.SmfFormat),
+                                     ("$tracks", e.Tracks), ("$channels", e.Channels), ("$duration", e.DurationMs), ("$lyrics", e.HasLyrics ? 1 : 0),
+                                     ("$loop", e.HasLoop ? 1 : 0), ("$error", e.Error));
                     Run(search, ("$id", id), ("$title", e.Title), ("$internal", e.InternalTitle), ("$path", SearchPath(e.Path)), ("$lyrics", e.Lyrics));
                 }
             transaction.Commit();
@@ -118,6 +125,14 @@ public static class CollectionWriter
         command.Parameters.Clear();
         foreach (var (name, value) in values) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
         command.ExecuteNonQuery();
+    }
+
+    // Runs an INSERT … RETURNING id: the id of the row.
+    static long Scalar(SqliteCommand command, params (string Name, object Value)[] values)
+    {
+        command.Parameters.Clear();
+        foreach (var (name, value) in values) command.Parameters.AddWithValue(name, value ?? DBNull.Value);
+        return Convert.ToInt64(command.ExecuteScalar());
     }
 
     static void Insert(SqliteConnection connection, string sql, params (string Name, object Value)[] values)

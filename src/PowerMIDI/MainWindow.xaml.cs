@@ -32,6 +32,7 @@ public partial class MainWindow : Window, IMainView
         var defs =InstrumentDefinitions.Load(Path.Combine(BaseDir, "instruments"));
         vm = new MainViewModel(this, defs);
         DataContext = vm;
+        vm.Library.PropertyChanged += OnLibraryChanged;
 
         Run(ImportSettings);
         Run(vm.UpdatePortList);
@@ -62,6 +63,68 @@ public partial class MainWindow : Window, IMainView
     void OnDrop(object sender, DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop)) Run(() => vm.AddFiles((string[])e.Data.GetData(DataFormats.FileDrop)));
+    }
+
+    // ---------- Library tab ----------
+
+    // Search and played lists: the Folder column shown, the Title one narrower (a GridViewColumn has no DataContext of
+    // its own to bind them).
+    void OnLibraryChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(LibraryViewModel.IsFlat)) return;
+        LibraryTitleColumn.Width = vm.Library.TitleColumnWidth;
+        LibraryFolderColumn.Width = vm.Library.FolderColumnWidth;
+    }
+
+    void OnLibraryItemDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.ListViewItem { DataContext: LibraryRow row }) return;
+        vm.Library.OpenCommand.Execute(row);
+        e.Handled = true;
+    }
+
+    // Enter: opens the selected row (folder entered, file played); Backspace: parent folder.
+    void OnLibraryKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && LibraryView.SelectedItem is LibraryRow row) vm.Library.OpenCommand.Execute(row);
+        else if (e.Key == Key.Back) vm.Library.UpCommand.Execute(null);
+        else return;
+        e.Handled = true;
+    }
+
+    void OnLibraryHeaderClick(object sender, RoutedEventArgs e)
+    {
+        if (e.OriginalSource is System.Windows.Controls.GridViewColumnHeader { Column.Header: string header }) Run(() => vm.Library.SortBy(header));
+    }
+
+    void OnLibraryStarClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: LibraryRow row } && !row.IsFolder)
+        {
+            vm.Library.FavoriteCommand.Execute(row);
+            e.Handled = true;
+        }
+    }
+
+    // Files dragged from the list to the playlist (taken from the zip at the start of the drag; dropped as files).
+    Point libraryDragStart;
+    bool libraryPressed;
+
+    void OnLibraryMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        libraryDragStart = e.GetPosition(LibraryView);
+        libraryPressed = System.Windows.Controls.ItemsControl.ContainerFromElement(LibraryView, e.OriginalSource as DependencyObject) is System.Windows.Controls.ListViewItem;
+    }
+
+    void OnLibraryMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!libraryPressed || e.LeftButton != MouseButtonState.Pressed) { libraryPressed = false; return; }
+        var moved = e.GetPosition(LibraryView) - libraryDragStart;
+        if (Math.Abs(moved.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(moved.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        libraryPressed = false;
+        var paths = vm.Library.FilesFor(LibraryView.SelectedItems);
+        if (paths == null) return;
+        DragDrop.DoDragDrop(LibraryView, new DataObject(DataFormats.FileDrop, paths.ToArray()), DragDropEffects.Copy);
     }
 
     // ---------- Playlist: moving tracks ----------
@@ -281,6 +344,13 @@ public partial class MainWindow : Window, IMainView
         var dlg = new Microsoft.Win32.OpenFolderDialog { Title = "Folder of MIDI files (subfolders included)" };
         if (initialFolder != null) dlg.InitialDirectory = initialFolder;
         return dlg.ShowDialog(this) == true ? dlg.FolderName : null;
+    }
+
+    public string PickFile(string title, string filter, string initialFolder)
+    {
+        var dlg = new Microsoft.Win32.OpenFileDialog { Title = title, Filter = filter + "|All files|*.*" };
+        if (initialFolder != null) dlg.InitialDirectory = initialFolder;
+        return dlg.ShowDialog(this) == true ? dlg.FileName : null;
     }
 
     public string PickSaveFile(string initialFolder, string fileName)

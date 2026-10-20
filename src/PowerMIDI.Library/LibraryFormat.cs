@@ -2,27 +2,32 @@ using Microsoft.Data.Sqlite;
 
 namespace PowerMIDI.Library;
 
-// What a collection is and where its files come from (table collection of its database). Root: the folder inside the
-// source zip the paths of the database start from ('/' separators).
+// What a collection is and where its files come from (a row of the table collection). Root: the folder inside the source
+// zip the paths of the collection start from ('/' separators).
 public sealed record CollectionInfo(string Id, string Name, string Description, string SourceUrl, long SourceSize, string SourceSha1,
-                                    string Root, string BuiltAt, string BuilderVersion);
+                                    string Root, string BuiltAt, string BuilderVersion)
+{
+    // Name of the source zip (the last part of its URL), as it is downloaded into the library folder.
+    public string ZipName => Uri.UnescapeDataString(new Uri(SourceUrl).Segments.Last());
+}
 
-// Format of the database of a collection (SQLite, one file per collection, read only for PowerMIDI): the collection,
-// its folder tree and its files, with a full-text index. The version is the user_version of the database: a reader
-// refuses another one.
+// Format of the library database (library\library.db, SQLite, read only for PowerMIDI): the collections, the folder
+// tree and the files of each one, with a full-text index. Made by the Library Builder, one collection at a time. The
+// version is the user_version of the database: a reader refuses another one.
 public static class LibraryFormat
 {
     public const int Version = 1;
 
-    // Paths: relative to the root of the collection, with '/' separators ('' for the root folder).
+    // Paths: relative to the root of their collection, with '/' separators ('' for the root folder).
     // Folders: file_count counts the files in the folder and below. Files: title is the name shown (cleaned file name,
     // see LibraryEntry.TitleOf), standard is null for a file that could not be read (error says why), channels is a bit
     // mask of the channels with notes (bit 0 = channel 1).
-    // Search: one row per file (rowid = files.id), contentless: title, internal title, path with the display names of
-    // its folders, lyrics. Accents are ignored; '_', '-' and the other punctuation separate words.
+    // Search: one row per file (rowid = files.id), contentless (rows deletable, for a collection built again): title,
+    // internal title, path with the display names of its folders, lyrics. Accents are ignored; '_', '-' and the other
+    // punctuation separate words.
     public const string Schema = """
         CREATE TABLE collection (
-          id              TEXT NOT NULL,
+          id              TEXT PRIMARY KEY,
           name            TEXT NOT NULL,
           description     TEXT,
           source_url      TEXT NOT NULL,
@@ -33,12 +38,14 @@ public static class LibraryFormat
           builder_version TEXT NOT NULL
         );
         CREATE TABLE folders (
-          id           INTEGER PRIMARY KEY,
-          parent_id    INTEGER REFERENCES folders(id),
-          name         TEXT NOT NULL,
-          display_name TEXT,
-          path         TEXT NOT NULL UNIQUE,
-          file_count   INTEGER NOT NULL
+          id            INTEGER PRIMARY KEY,
+          collection_id TEXT NOT NULL REFERENCES collection(id),
+          parent_id     INTEGER REFERENCES folders(id),
+          name          TEXT NOT NULL,
+          display_name  TEXT,
+          path          TEXT NOT NULL,
+          file_count    INTEGER NOT NULL,
+          UNIQUE (collection_id, path)
         );
         CREATE INDEX folders_parent ON folders(parent_id);
         CREATE TABLE files (
@@ -64,39 +71,54 @@ public static class LibraryFormat
         CREATE INDEX files_sha1     ON files(sha1);
         CREATE VIRTUAL TABLE files_search USING fts5(
           title, internal_title, path, lyrics,
-          content = '', tokenize = 'unicode61 remove_diacritics 2'
+          content = '', contentless_delete = 1, tokenize = 'unicode61 remove_diacritics 2'
         );
         """;
 
-    // A new database at a path (an existing file is replaced), with the schema and its version.
-    public static SqliteConnection Create(string path)
+    // A library database at a path: opened, or created with the schema and its version.
+    public static SqliteConnection OpenOrCreate(string path)
     {
-        if (File.Exists(path)) File.Delete(path);
+        bool exists = File.Exists(path);
         var connection = Open(path, SqliteOpenMode.ReadWriteCreate);
-        Execute(connection, Schema);
-        Execute(connection, $"PRAGMA user_version = {Version}");
+        if (!exists)
+        {
+            Execute(connection, Schema);
+            Execute(connection, $"PRAGMA user_version = {Version}");
+        }
+        else if (VersionOf(connection) != Version)
+        {
+            connection.Dispose();
+            throw new InvalidDataException($"{path}: not a library database of version {Version}");
+        }
         return connection;
     }
 
-    // An existing database, read only; null if it is not a collection database of this version.
-    public static SqliteConnection OpenCollection(string path)
+    // An existing library database, read only; null if it is not one of this version.
+    public static SqliteConnection OpenLibrary(string path)
     {
         var connection = Open(path, SqliteOpenMode.ReadOnly);
-        using var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA user_version";
-        if (Convert.ToInt32(command.ExecuteScalar()) == Version) return connection;
+        if (VersionOf(connection) == Version) return connection;
         connection.Dispose();
         return null;
     }
 
-    public static CollectionInfo ReadInfo(SqliteConnection connection)
+    static int VersionOf(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT id, name, description, source_url, source_size, source_sha1, root, built_at, builder_version FROM collection";
+        command.CommandText = "PRAGMA user_version";
+        return Convert.ToInt32(command.ExecuteScalar());
+    }
+
+    // The collections of a library database, in the order of their names.
+    public static List<CollectionInfo> ReadCollections(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT id, name, description, source_url, source_size, source_sha1, root, built_at, builder_version FROM collection ORDER BY name";
         using var reader = command.ExecuteReader();
-        if (!reader.Read()) return null;
+        var list = new List<CollectionInfo>();
         string Text(int i) => reader.IsDBNull(i) ? null : reader.GetString(i);
-        return new CollectionInfo(Text(0), Text(1), Text(2), Text(3), reader.GetInt64(4), Text(5), Text(6), Text(7), Text(8));
+        while (reader.Read()) list.Add(new CollectionInfo(Text(0), Text(1), Text(2), Text(3), reader.GetInt64(4), Text(5), Text(6), Text(7), Text(8)));
+        return list;
     }
 
     static SqliteConnection Open(string path, SqliteOpenMode mode)
