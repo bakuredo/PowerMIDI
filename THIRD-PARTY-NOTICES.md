@@ -1,6 +1,6 @@
 # Third-party notices
 
-PowerMIDI uses the following third-party work.
+PowerMIDI uses following third-party work.
 
 ## DryWetMIDI
 
@@ -24,7 +24,7 @@ PowerMIDI uses the following third-party work.
 
 ## Domino module definition files
 
-Some files of the `instruments` folder use the module definition format of the Domino sequencer by Takabo Soft
+Some files of `instruments` folder use module definition format of Domino sequencer by Takabo Soft
 (http://takabosoft.com/), from its English translation by Hans5958
 (https://github.com/Hans5958/Domino-English-Translation, MIT license).
 
