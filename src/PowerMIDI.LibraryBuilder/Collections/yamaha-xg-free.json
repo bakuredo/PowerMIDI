@@ -1,0 +1,30 @@
+{
+  "id": "yamaha-xg-free",
+  "name": "Yamaha XG Free Data Collection",
+  "source": {
+    "url": "https://archive.org/download/yamaha-xg-free-data/YAMAHA%20XG%20FREE%20DATA.zip",
+    "size": 4352099,
+    "sha1": "54b6c6bd44dff739f8fcccf8514fec9c13f31923",
+    "root": ""
+  },
+  "folders": {
+    "classic": "Classic",
+    "fanfare": "Fanfare",
+    "filter": "Filter",
+    "funky": "Funky",
+    "holyday": "Holiday",
+    "industrial": "Industrial",
+    "jazz": "Jazz",
+    "lite": "Lite",
+    "medium": "Medium",
+    "pop": "Pop",
+    "rock": "Rock",
+    "slow": "Slow",
+    "sound effect": "Sound effects",
+    "special": "Special",
+    "techno": "Techno",
+    "western": "Western",
+    "world": "World",
+    "xmas": "Xmas"
+  }
+}
