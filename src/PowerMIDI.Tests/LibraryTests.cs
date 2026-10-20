@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Net;
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
@@ -131,6 +132,7 @@ public class LibraryTests
         Assert.Equal("Zelda Title", Titles(catalog.Files("", true, new LibraryFilter(Show: LibraryShow.Favorites))));
         Assert.Equal("Mario World,Song", Titles(catalog.Files("", true, new LibraryFilter(Show: LibraryShow.MostPlayed))));
         Assert.Equal(4, catalog.Files("", true, new LibraryFilter(Show: LibraryShow.NotPlayed)).Count);
+        Assert.Equal("Song", Titles(catalog.Files("", true, new LibraryFilter(Show: LibraryShow.Lyrics))));
         var mario = catalog.Files("console/snes", false, new LibraryFilter(Search: "mario")).Single();
         Assert.Equal((2, false), (mario.PlayCount, mario.Favorite));
     }
@@ -289,6 +291,39 @@ public class LibraryTests
         Assert.Equal(bytes, File.ReadAllBytes(files.ZipPath));
         Assert.Equal(new[] { "Connecting to localhost…", "No answer from localhost: trying again (2/4)…" }, notices);
         lock (ranges) Assert.Equal(new[] { "", $"bytes={bytes.Length / 2}-" }, ranges);
+    }
+
+    [Fact]
+    public void Built_from_a_zip_with_names_Windows_refuses()
+    {
+        using var sample = new Sample();
+        // A zip made on demand (no SHA-1), whose folder ends with a space (as in the Sound Canvas collection), without root.
+        var song = Path.Combine(sample.Files, "console", "snes", "Mario_World.mid");
+        var zipPath = Path.Combine(sample.Folder, "odd.zip");
+        using (var zip = System.IO.Compression.ZipFile.Open(zipPath, System.IO.Compression.ZipArchiveMode.Create))
+        {
+            zip.CreateEntryFromFile(song, "Den Somaru n Desu /utsuru.MID");
+            zip.CreateEntryFromFile(song, "CON/Nul.mid");
+            zip.CreateEntry("readme.txt");
+        }
+        var info = sample.Info with { Id = "odd", Name = "Odd", SourceUrl = "http://localhost/odd.zip", SourceSize = new FileInfo(zipPath).Length, SourceSha1 = "", Root = "" };
+        var report = CollectionWriter.Write(sample.Database, info, zipPath);
+        Assert.Equal(2, report.Files);
+        Assert.Null(CollectionFiles.CheckZip(zipPath, info));                                     // size only
+        Assert.NotNull(CollectionFiles.CheckZip(zipPath, info with { SourceSize = 1 }));
+
+        using var catalog = sample.Catalog("odd");
+        Assert.Equal(new[] { "CON", "Den Somaru n Desu " }, catalog.Children("").Select(f => f.Name).OrderBy(n => n));
+        using var files = new CollectionFiles(sample.Folder, info);
+        foreach (var (path, onDisk) in new[] { ("Den Somaru n Desu /utsuru.MID", Path.Combine("Den Somaru n Desu", "utsuru.MID")),
+                                               ("CON/Nul.mid", Path.Combine("CON_", "Nul.mid_")) })
+        {
+            var file = catalog.Files("", true, new LibraryFilter()).Single(f => f.Path == path);
+            var local = files.Get(file);
+            Assert.Equal(Path.Combine(sample.Folder, "cache", "odd", onDisk), local);
+            Assert.Equal(File.ReadAllBytes(song), File.ReadAllBytes(local));
+            Assert.Equal(path, files.PathOf(local));   // the path of the collection, not the one on the disk
+        }
     }
 
     [Fact]

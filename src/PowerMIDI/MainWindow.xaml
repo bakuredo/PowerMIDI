@@ -579,7 +579,7 @@
                    Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding DownloadText}"/>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6" IsEnabled="{Binding HasCollection}">
         <ComboBox DockPanel.Dock="Right" Width="118" Margin="6,0,0,0" ItemsSource="{x:Static vm:LibraryViewModel.ShowNames}"
-                  SelectedIndex="{Binding ShowIndex}" ToolTip="Files shown: all, favorites, played ones…"/>
+                  SelectedIndex="{Binding ShowIndex}" ToolTip="Files shown: all, favorites, played ones, with lyrics…"/>
         <ComboBox DockPanel.Dock="Right" Width="68" Margin="6,0,0,0" ItemsSource="{x:Static vm:LibraryViewModel.FormatNames}"
                   SelectedIndex="{Binding FormatIndex}" ToolTip="Files of one standard"/>
         <!-- Search box, with its hint while empty (over it, not hit by the mouse). -->

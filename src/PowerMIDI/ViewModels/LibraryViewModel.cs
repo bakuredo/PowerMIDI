@@ -40,7 +40,7 @@ public sealed record LibraryCrumb(string Text, string Path, string Prefix);
 public sealed class LibraryViewModel : ObservableObject
 {
     public static readonly string[] FormatNames = { "All", "GS", "XG", "GM", "GM2", "MT-32" };
-    public static readonly string[] ShowNames = { "All", "Favorites", "Recently played", "Most played", "Not played yet" };
+    public static readonly string[] ShowNames = { "All", "Favorites", "Recently played", "Most played", "Not played yet", "Lyrics" };
     const int FlatLimit = 2000;   // files listed at most by a search or a played list
 
     // Downloads of the source zips (archive.org asks for a name it can tell).
@@ -497,7 +497,7 @@ public sealed class LibraryViewModel : ObservableObject
         try
         {
             UserDatabase().RecordPlay(key.CollectionId, key.Path);
-            if (selectedCollection?.Id == key.CollectionId && (LibraryShow)showIndex is not LibraryShow.All and not LibraryShow.Favorites) Refresh();
+            if (selectedCollection?.Id == key.CollectionId && (LibraryShow)showIndex is LibraryShow.RecentlyPlayed or LibraryShow.MostPlayed or LibraryShow.NotPlayed) Refresh();
         }
         catch { }   // the count is not worth an error
     }

@@ -12,10 +12,12 @@ public sealed record LibraryEntry(string Path, string Name, string Title, string
                                   bool HasLoop, string Lyrics, string Error)
 {
     // Reads a file of a collection: its bytes once (SHA-1, then the MIDI data from memory).
-    public static LibraryEntry Read(string root, string path)
+    public static LibraryEntry Read(string root, string path) =>
+        Read(path, File.ReadAllBytes(System.IO.Path.Combine(root, path.Replace('/', System.IO.Path.DirectorySeparatorChar))));
+
+    // From the bytes of the file (an entry of the source zip).
+    public static LibraryEntry Read(string path, byte[] bytes)
     {
-        var full = System.IO.Path.Combine(root, path.Replace('/', System.IO.Path.DirectorySeparatorChar));
-        var bytes = File.ReadAllBytes(full);
         var name = path[(path.LastIndexOf('/') + 1)..];
         var entry = new LibraryEntry(path, name, TitleOf(name), null, null, bytes.Length, Convert.ToHexStringLower(SHA1.HashData(bytes)),
                                      null, null, null, null, null, false, false, null, null);

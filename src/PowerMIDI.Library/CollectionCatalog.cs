@@ -17,8 +17,8 @@ public sealed record LibraryFile(string Path, string FolderPath, string Title, s
                                  bool Favorite, int PlayCount, string LastPlayed);
 
 // Which files are shown: all, the favorites, those played (the last ones first, or the most played first), those
-// never played.
-public enum LibraryShow { All, Favorites, RecentlyPlayed, MostPlayed, NotPlayed }
+// never played, those with lyrics (karaoke).
+public enum LibraryShow { All, Favorites, RecentlyPlayed, MostPlayed, NotPlayed, Lyrics }
 
 // Standard: GM, GS, XG, GM2 or MT-32 (null: any, the unreadable files included). Search: words of the title, the internal
 // title, the folders or the lyrics, each one the start of a word ("zel dun" finds "Zelda - Dungeon").
@@ -165,6 +165,7 @@ public sealed class CollectionCatalog : IDisposable
             LibraryShow.Favorites => "u.favorite = 1",
             LibraryShow.RecentlyPlayed or LibraryShow.MostPlayed => "u.play_count > 0",
             LibraryShow.NotPlayed => "coalesce(u.play_count, 0) = 0",
+            LibraryShow.Lyrics => "f.has_lyrics = 1",
             _ => "1",
         });
         if (LibraryFilter.SearchQuery(filter.Search) is { } query)

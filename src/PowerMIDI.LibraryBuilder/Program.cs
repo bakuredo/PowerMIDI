@@ -6,9 +6,9 @@ using PowerMIDI.Library;
 namespace PowerMIDI.LibraryBuilder;
 
 // Library Builder: builds a collection of MIDI files into the library database (see LibraryFormat; added, or in place of
-// the one of the same id) from the folder its files are extracted in, and the description of the collection
-// (Collections\<id>.json: source zip, names of the folders).
-//   PowerMIDI-LibraryBuilder <collection> <folder> [<database>]
+// the one of the same id) from its source zip (or the folder where its files are extracted), and the description of the
+// collection (Collections\<id>.json: source zip, names of the folders).
+//   PowerMIDI-LibraryBuilder <collection> <zip or folder> [<database>]
 // collection: the id of a known collection (vgmusic-2018) or the path of a description file; database: library.db in the
 // current folder by default.
 static class Program
@@ -21,9 +21,9 @@ static class Program
     {
         if (args.Length is < 2 or > 3)
         {
-            Console.WriteLine("Usage: PowerMIDI-LibraryBuilder <collection> <folder> [<database>]");
+            Console.WriteLine("Usage: PowerMIDI-LibraryBuilder <collection> <zip or folder> [<database>]");
             Console.WriteLine("  collection: id of known collection (" + string.Join(", ", KnownCollections()) + ") or path of description file (.json)");
-            Console.WriteLine("  folder: where files of collection are extracted (root of collection)");
+            Console.WriteLine("  zip or folder: source zip of collection, or folder where its files are extracted (root of collection)");
             Console.WriteLine("  database: library database to write it into (default: library.db in current folder)");
             return 1;
         }
@@ -31,7 +31,7 @@ static class Program
         {
             var description = ReadDescription(args[0]);
             var folder = args[1];
-            if (!Directory.Exists(folder)) throw new DirectoryNotFoundException($"Folder not found: {folder}");
+            if (!Directory.Exists(folder) && !File.Exists(folder)) throw new FileNotFoundException($"Zip or folder not found: {folder}");
             var output = args.Length == 3 ? args[2] : "library.db";
             var version = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "?";
             var info = new CollectionInfo(description.Id, description.Name, description.Description, description.Source.Url, description.Source.Size,

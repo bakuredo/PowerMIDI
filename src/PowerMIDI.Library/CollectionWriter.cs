@@ -13,26 +13,56 @@ public static class CollectionWriter
 {
     static readonly string[] Extensions = { ".mid", ".midi", ".kar" };
 
+    static bool IsMidi(string path) => Extensions.Contains(Path.GetExtension(path).ToLowerInvariant());
+
+    // source: the folder of the root of the collection (its files extracted), or its source zip (the files under its root,
+    // read from it: names that Windows cannot have as files, such as a folder ending with a space, are kept).
     // folderNames: display names by folder path ('/' separators; a folder without one keeps its name).
     // progress: files read so far, out of the total.
-    public static BuildReport Write(string databasePath, CollectionInfo info, string root, IReadOnlyDictionary<string, string> folderNames = null,
+    public static BuildReport Write(string databasePath, CollectionInfo info, string source, IReadOnlyDictionary<string, string> folderNames = null,
                                     IProgress<(int Done, int Total)> progress = null)
     {
-        root = Path.GetFullPath(root);
-        var paths = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
-            .Where(f => Extensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-            .Select(f => Path.GetRelativePath(root, f).Replace(Path.DirectorySeparatorChar, '/'))
-            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
-
-        // The files are read in parallel (the slow part); the database is then written in one transaction.
-        var entries = new LibraryEntry[paths.Count];
+        LibraryEntry[] entries;
+        List<string> paths;
         int done = 0;
-        Parallel.For(0, paths.Count, i =>
+        void Count(int total) { int n = Interlocked.Increment(ref done); if (n % 100 == 0 || n == total) progress?.Report((n, total)); }
+        if (File.Exists(source))
         {
-            entries[i] = LibraryEntry.Read(root, paths[i]);
-            int n = Interlocked.Increment(ref done);
-            if (n % 100 == 0 || n == paths.Count) progress?.Report((n, paths.Count));
-        });
+            // The zip: its files decompressed by batches (one at a time: a zip is read by one thread), each batch analysed
+            // in parallel.
+            using var zip = System.IO.Compression.ZipFile.OpenRead(source);
+            var prefix = info.Root.Trim('/');
+            if (prefix.Length > 0) prefix += "/";
+            var found = zip.Entries.Select(e => (Path: e.FullName.Replace('\\', '/'), Entry: e))
+                .Where(x => x.Path.StartsWith(prefix, StringComparison.Ordinal) && !x.Path.EndsWith('/') && IsMidi(x.Path))
+                .Select(x => (Path: x.Path[prefix.Length..], x.Entry))
+                .OrderBy(x => x.Path, StringComparer.OrdinalIgnoreCase).ToList();
+            paths = found.Select(x => x.Path).ToList();
+            entries = new LibraryEntry[found.Count];
+            for (int start = 0; start < found.Count; start += 2000)
+            {
+                var batch = found.Skip(start).Take(2000).Select(x =>
+                {
+                    using var stream = x.Entry.Open();
+                    using var memory = new MemoryStream();
+                    stream.CopyTo(memory);
+                    return memory.ToArray();
+                }).ToList();
+                int first = start;
+                Parallel.For(0, batch.Count, i => { entries[first + i] = LibraryEntry.Read(found[first + i].Path, batch[i]); Count(found.Count); });
+            }
+        }
+        else
+        {
+            var root = Path.GetFullPath(source);
+            paths = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Where(IsMidi)
+                .Select(f => Path.GetRelativePath(root, f).Replace(Path.DirectorySeparatorChar, '/'))
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
+            // The files are read in parallel (the slow part); the database is then written in one transaction.
+            entries = new LibraryEntry[paths.Count];
+            var all = paths;
+            Parallel.For(0, all.Count, i => { entries[i] = LibraryEntry.Read(root, all[i]); Count(all.Count); });
+        }
 
         // Folders: the root and every folder that holds files, with its parents.
         static string FolderOf(string path) => path.LastIndexOf('/') is int i and >= 0 ? path[..i] : "";

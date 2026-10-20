@@ -38,7 +38,7 @@ public sealed class CollectionFiles : IDisposable
     public string Get(LibraryFile file)
     {
         var local = OnDisk(file.Path);
-        if (File.Exists(local) && new FileInfo(local).Length == file.Size) return local;   // taken before
+        if (File.Exists(local) && new FileInfo(local).Length == file.Size) return Given(local, file.Path);   // taken before
         if (!IsDownloaded) throw new FileNotFoundException($"{info.Name}: files not downloaded yet");
 
         zip ??= ZipFile.OpenRead(ZipPath);
@@ -55,19 +55,42 @@ public sealed class CollectionFiles : IDisposable
             throw new InvalidDataException($"File of zip differs from the one of the library database: {file.Path}");
         Directory.CreateDirectory(Path.GetDirectoryName(local));
         File.WriteAllBytes(local, bytes);
+        return Given(local, file.Path);
+    }
+
+    string Given(string local, string path)
+    {
+        lock (given) given[Path.GetFullPath(local)] = path;
         return local;
     }
 
-    // Where a file of the collection goes once taken from the zip.
-    public string OnDisk(string path) => Path.Combine(CacheFolder, path.Replace('/', Path.DirectorySeparatorChar));
+    // Where a file of the collection goes once taken from the zip. Each part of its path as Windows accepts it: without
+    // the spaces and dots it cannot end with (a folder "Den Somaru n Desu " of the Sound Canvas collection), its
+    // forbidden characters as '_', a reserved name (CON, NUL, COM1…) followed by '_'.
+    public string OnDisk(string path) => Path.Combine(new[] { CacheFolder }.Concat(path.Split('/').Select(WindowsName)).ToArray());
 
-    // The path of a file of the collection from its place on the disk (a file of the playlist), or null.
+    static readonly char[] Forbidden = Path.GetInvalidFileNameChars();
+    static readonly System.Text.RegularExpressions.Regex Reserved = new(@"^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(\..*)?$",
+                                                                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    static string WindowsName(string part)
+    {
+        var name = new string(part.Select(c => Array.IndexOf(Forbidden, c) >= 0 ? '_' : c).ToArray()).TrimEnd(' ', '.');
+        if (name.Length == 0) name = "_";
+        return Reserved.IsMatch(name) ? name + "_" : name;
+    }
+
+    // The path of a file of the collection from its place on the disk (a file of the playlist), or null: one taken from
+    // the zip by Get, otherwise one of the cache whose name did not need changes.
     public string PathOf(string local)
     {
-        var folder = Path.GetFullPath(CacheFolder) + Path.DirectorySeparatorChar;
         var full = Path.GetFullPath(local);
+        lock (given) if (given.TryGetValue(full, out var path)) return path;
+        var folder = Path.GetFullPath(CacheFolder) + Path.DirectorySeparatorChar;
         return full.StartsWith(folder, StringComparison.OrdinalIgnoreCase) ? full[folder.Length..].Replace(Path.DirectorySeparatorChar, '/') : null;
     }
+
+    readonly Dictionary<string, string> given = new(StringComparer.OrdinalIgnoreCase);   // files given by Get: place → path
 
     const int Attempts = 4;
 
@@ -151,11 +174,14 @@ public sealed class CollectionFiles : IDisposable
         if (Directory.Exists(CacheFolder)) Directory.Delete(CacheFolder, true);
     }
 
-    // A zip is the source of a collection: same size and SHA-1 (null), or why not.
+    // A zip is the source of a collection: same size and SHA-1 (null), or why not. A collection without SHA-1 has a zip
+    // made on demand (archive.org /compress/: the files dated and ordered differently each time): its size only, each file
+    // being checked when taken from it.
     public static string CheckZip(string zipPath, CollectionInfo info)
     {
         var size = new FileInfo(zipPath).Length;
         if (size != info.SourceSize) return $"size {size} bytes instead of {info.SourceSize}";
+        if (string.IsNullOrEmpty(info.SourceSha1)) return null;
         using var stream = File.OpenRead(zipPath);
         var sha1 = Convert.ToHexStringLower(SHA1.HashData(stream));
         return sha1 == info.SourceSha1 ? null : $"SHA-1 {sha1} instead of {info.SourceSha1}";
