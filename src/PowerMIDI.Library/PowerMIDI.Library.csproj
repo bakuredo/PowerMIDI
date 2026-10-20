@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Libraries of MIDI files (Library tab): format of the collection databases and reading of their entries, shared by
+       the player and the Library Builder. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>PowerMIDI.Library</RootNamespace>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PowerMIDI.Core\PowerMIDI.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />
+  </ItemGroup>
+
+</Project>

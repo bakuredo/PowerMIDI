@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PowerMIDI.Core\PowerMIDI.Core.csproj" />
+    <ProjectReference Include="..\PowerMIDI.Library\PowerMIDI.Library.csproj" />
   </ItemGroup>
 
   <ItemGroup>

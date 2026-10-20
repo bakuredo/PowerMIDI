@@ -310,7 +310,24 @@ public static class MidiTools
     // character per byte), so that a saved file keeps them as they were, and decoded for display only (DecodeText).
     static readonly Encoding ByteEncoding = Encoding.Latin1;
 
-    public static MidiFile ReadFile(string path) => MidiFile.Read(path, new ReadingSettings { TextEncoding = ByteEncoding });
+    public static MidiFile ReadFile(string path) => MidiFile.Read(path, Reading());
+    public static MidiFile ReadFile(Stream stream) => MidiFile.Read(stream, Reading());
+
+    // Damaged files are read as far as possible, as most players do (about 1 % of the VGMusic archive): a value out of
+    // range is brought back into it (a controller at 128: 127), truncated data and a track whose size is not the one
+    // declared are taken as they are. A file without MIDI header is still refused (not a MIDI file).
+    static ReadingSettings Reading() => new()
+    {
+        TextEncoding = ByteEncoding,
+        InvalidChannelEventParameterValuePolicy = InvalidChannelEventParameterValuePolicy.SnapToLimits,
+        InvalidMetaEventParameterValuePolicy = InvalidMetaEventParameterValuePolicy.SnapToLimits,
+        InvalidSystemCommonEventParameterValuePolicy = InvalidSystemCommonEventParameterValuePolicy.SnapToLimits,
+        NotEnoughBytesPolicy = NotEnoughBytesPolicy.Ignore,
+        InvalidChunkSizePolicy = InvalidChunkSizePolicy.Ignore,
+        UnexpectedTrackChunksCountPolicy = UnexpectedTrackChunksCountPolicy.Ignore,
+        MissedEndOfTrackPolicy = MissedEndOfTrackPolicy.Ignore,
+        ExtraTrackChunkPolicy = ExtraTrackChunkPolicy.Read,
+    };
 
     public static void WriteFile(MidiFile file, string path) =>
         file.Write(path, true, settings: new WritingSettings { TextEncoding = ByteEncoding });

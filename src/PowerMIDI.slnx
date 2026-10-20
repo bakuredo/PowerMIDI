@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="PowerMIDI.Console/PowerMIDI.Console.csproj" />
   <Project Path="PowerMIDI.Core/PowerMIDI.Core.csproj" />
+  <Project Path="PowerMIDI.Library/PowerMIDI.Library.csproj" />
+  <Project Path="PowerMIDI.LibraryBuilder/PowerMIDI.LibraryBuilder.csproj" />
   <Project Path="PowerMIDI.Tests/PowerMIDI.Tests.csproj" />
   <Project Path="PowerMIDI/PowerMIDI.csproj" />
 </Solution>
