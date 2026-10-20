@@ -608,6 +608,8 @@
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6" IsEnabled="{Binding HasCollection}">
         <Button DockPanel.Dock="Left" Content="&#xE74A;" FontFamily="Segoe MDL2 Assets" Padding="6,3" Command="{Binding UpCommand}"
                 ToolTip="Parent folder (Backspace)"/>
+        <Button DockPanel.Dock="Left" Content="&#xE8B1;" FontFamily="Segoe MDL2 Assets" Padding="6,3" Command="{Binding RandomCommand}"
+                ToolTip="Play random file of this folder and below (filters applied)"/>
         <ItemsControl ItemsSource="{Binding Crumbs}" VerticalAlignment="Center" ClipToBounds="True">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -628,6 +630,7 @@
                  Visibility="{Binding HasNoLibrary, Converter={StaticResource BoolToVisibility}}"
                  Text="No library: library\library.db missing next to PowerMIDI.exe."/>
       <ListView x:Name="LibraryView" Style="{StaticResource ThemedListView}" ItemsSource="{Binding Rows}" SelectionMode="Extended"
+                SelectedItem="{Binding SelectedRow}" SelectionChanged="OnLibrarySelectionChanged"
                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                 GridViewColumnHeader.Click="OnLibraryHeaderClick" PreviewKeyDown="OnLibraryKeyDown"
                 PreviewMouseLeftButtonDown="OnLibraryMouseDown" PreviewMouseMove="OnLibraryMouseMove">

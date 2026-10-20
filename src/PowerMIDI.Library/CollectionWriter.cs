@@ -95,8 +95,8 @@ public static class CollectionWriter
                 "DELETE FROM collection WHERE id = $id",
             })
                 Insert(connection, sql, ("$id", info.Id));
-            Insert(connection, "INSERT INTO collection VALUES ($id, $name, $description, $url, $size, $sha1, $root, $built, $version)",
-                   ("$id", info.Id), ("$name", info.Name), ("$description", info.Description), ("$url", info.SourceUrl), ("$size", info.SourceSize),
+            Insert(connection, "INSERT INTO collection VALUES ($id, $name, $url, $size, $sha1, $root, $built, $version)",
+                   ("$id", info.Id), ("$name", info.Name), ("$url", info.SourceUrl), ("$size", info.SourceSize),
                    ("$sha1", info.SourceSha1), ("$root", info.Root), ("$built", info.BuiltAt), ("$version", info.BuilderVersion));
 
             var folderIds = new Dictionary<string, long>();

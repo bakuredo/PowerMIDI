@@ -4,7 +4,7 @@ namespace PowerMIDI.Library;
 
 // What a collection is and where its files come from (a row of the table collection). Root: the folder inside the source
 // zip the paths of the collection start from ('/' separators).
-public sealed record CollectionInfo(string Id, string Name, string Description, string SourceUrl, long SourceSize, string SourceSha1,
+public sealed record CollectionInfo(string Id, string Name, string SourceUrl, long SourceSize, string SourceSha1,
                                     string Root, string BuiltAt, string BuilderVersion)
 {
     // Name of the source zip (the last part of its URL), as it is downloaded into the library folder.
@@ -29,7 +29,6 @@ public static class LibraryFormat
         CREATE TABLE collection (
           id              TEXT PRIMARY KEY,
           name            TEXT NOT NULL,
-          description     TEXT,
           source_url      TEXT NOT NULL,
           source_size     INTEGER NOT NULL,
           source_sha1     TEXT NOT NULL,
@@ -110,11 +109,11 @@ public static class LibraryFormat
     public static List<CollectionInfo> ReadCollections(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
-        command.CommandText = "SELECT id, name, description, source_url, source_size, source_sha1, root, built_at, builder_version FROM collection ORDER BY name";
+        command.CommandText = "SELECT id, name, source_url, source_size, source_sha1, root, built_at, builder_version FROM collection ORDER BY name";
         using var reader = command.ExecuteReader();
         var list = new List<CollectionInfo>();
         string Text(int i) => reader.IsDBNull(i) ? null : reader.GetString(i);
-        while (reader.Read()) list.Add(new CollectionInfo(Text(0), Text(1), Text(2), Text(3), reader.GetInt64(4), Text(5), Text(6), Text(7), Text(8)));
+        while (reader.Read()) list.Add(new CollectionInfo(Text(0), Text(1), Text(2), reader.GetInt64(3), Text(4), Text(5), Text(6), Text(7)));
         return list;
     }
 

@@ -91,8 +91,8 @@ public sealed class CollectionCatalog : IDisposable
     }
 
     // Files in a folder (below: and in its subfolders) shown by a filter, at most limit: in alphabetical order of the
-    // titles, the last played or the most played first.
-    public List<LibraryFile> Files(string folder, bool below, LibraryFilter filter, int limit = int.MaxValue)
+    // titles, the last played or the most played first; random: in random order, the unreadable ones left out.
+    public List<LibraryFile> Files(string folder, bool below, LibraryFilter filter, int limit = int.MaxValue, bool random = false)
     {
         using var command = connection.CreateCommand();
         var where = Where(command, filter);
@@ -100,7 +100,8 @@ public sealed class CollectionCatalog : IDisposable
         where.Add("fo.collection_id = $collection");
         where.Add(below ? "($folder = '' OR fo.path = $folder OR fo.path LIKE $prefix ESCAPE '\\')" : "fo.path = $folder");
         if (below) command.Parameters.AddWithValue("$prefix", EscapeLike(folder) + "/%");
-        var order = filter.Show switch
+        if (random) where.Add("f.error IS NULL");
+        var order = random ? "random()" : filter.Show switch
         {
             LibraryShow.RecentlyPlayed => "u.last_played DESC",
             LibraryShow.MostPlayed => "u.play_count DESC, f.title COLLATE NOCASE",
@@ -127,6 +128,9 @@ public sealed class CollectionCatalog : IDisposable
                                       reader.GetInt32(12) != 0, Text(13), reader.GetInt32(14) != 0, reader.GetInt32(15), Text(16)));
         return files;
     }
+
+    // A file shown by a filter in a folder and its subfolders, chosen at random among the readable ones (null: none).
+    public LibraryFile RandomFile(string folder, LibraryFilter filter) => Files(folder, true, filter, 1, true).FirstOrDefault();
 
     // Number of files shown by a filter in each folder, its subfolders included (folders without any: left out).
     public Dictionary<string, int> Counts(LibraryFilter filter)

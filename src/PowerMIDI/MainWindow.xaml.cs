@@ -76,6 +76,12 @@ public partial class MainWindow : Window, IMainView
         LibraryFolderColumn.Width = vm.Library.FolderColumnWidth;
     }
 
+    // The row selected by the view model (a random file): kept visible.
+    void OnLibrarySelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (LibraryView.SelectedItem != null) LibraryView.ScrollIntoView(LibraryView.SelectedItem);
+    }
+
     void OnLibraryItemDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.ListViewItem { DataContext: LibraryRow row }) return;

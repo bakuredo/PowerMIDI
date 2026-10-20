@@ -57,7 +57,7 @@ public sealed class LibraryViewModel : ObservableObject
 
     readonly IMainView view;
     readonly Action<string> setStatus;
-    readonly Action<string, LibraryKey> play;              // plays a file of a collection (added to the playlist if needed)
+    readonly Action<string, LibraryKey, bool> play;        // plays a file of a collection (added to the playlist if needed; true: Mixer tab shown)
     readonly Action<IReadOnlyList<string>> addToPlaylist;
     readonly string libraryFolder;
     readonly DispatcherTimer searchDelay = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -67,7 +67,7 @@ public sealed class LibraryViewModel : ObservableObject
     string folder = "";
     string savedCollection;   // PowerMIDI.ini, until the collections are read
 
-    public LibraryViewModel(IMainView view, string libraryFolder, Action<string> setStatus, Action<string, LibraryKey> play,
+    public LibraryViewModel(IMainView view, string libraryFolder, Action<string> setStatus, Action<string, LibraryKey, bool> play,
                             Action<IReadOnlyList<string>> addToPlaylist)
     {
         this.view = view;
@@ -80,6 +80,7 @@ public sealed class LibraryViewModel : ObservableObject
         CancelDownloadCommand = new RelayCommand(() => downloadCancel?.Cancel());
         DeleteDownloadedCommand = new RelayCommand(() => Run(DeleteDownloaded));
         UpCommand = new RelayCommand(() => Run(Up));
+        RandomCommand = new RelayCommand(() => Run(PlayRandom));
         NavigateCommand = new RelayCommand(p => Run(() => { if (p is string path) Navigate(path); }));
         OpenCommand = new RelayCommand(p => Run(() => Open(p as LibraryRow)));
         PlayCommand = new RelayCommand(p => Run(() => Open(Selected(p).FirstOrDefault(r => !r.IsFolder))));
@@ -92,6 +93,7 @@ public sealed class LibraryViewModel : ObservableObject
     public ICommand CancelDownloadCommand { get; }
     public ICommand DeleteDownloadedCommand { get; }
     public ICommand UpCommand { get; }
+    public ICommand RandomCommand { get; }       // a random file of the folder and below, played
     public ICommand NavigateCommand { get; }        // parameter: folder path (breadcrumb)
     public ICommand OpenCommand { get; }            // parameter: row (double click, Enter): folder entered, file played
     public ICommand PlayCommand { get; }            // parameters: selected rows
@@ -129,12 +131,10 @@ public sealed class LibraryViewModel : ObservableObject
     public bool HasCollection => catalog != null;
     public bool HasNoLibrary => Collections.Count == 0;
 
-    // Tooltip of the list of collections: what the collection shown is, where its files come from, when its database was built.
-    public string CollectionToolTip => selectedCollection is not { } c ? "Collection shown" : string.Join("\n", new[]
-    {
-        c.Description, $"Files: zip of {Megabytes(c.SourceSize)} from {new Uri(c.SourceUrl).Host}",
-        $"Database built {(DateTime.TryParse(c.BuiltAt, out var built) ? built.ToString("d") : c.BuiltAt)} (Library Builder {c.BuilderVersion})",
-    }.Where(s => !string.IsNullOrEmpty(s)));
+    // Tooltip of the list of collections: where the files of the collection shown come from, when its database was built.
+    public string CollectionToolTip => selectedCollection is not { } c ? "Collection shown"
+        : $"Files: zip of {Megabytes(c.SourceSize)} from {new Uri(c.SourceUrl).Host}\n" +
+          $"Database built {(DateTime.TryParse(c.BuiltAt, out var built) ? built.ToString("d") : c.BuiltAt)} (Library Builder {c.BuilderVersion})";
 
     // At startup: the collections of the library database, the one of the last time selected.
     public void Load()
@@ -205,7 +205,7 @@ public sealed class LibraryViewModel : ObservableObject
     }
 
     // Downloads the zip of the collection shown (with its progress; Cancel stops it), then plays the file asked for, if any.
-    async void Download(LibraryRow then)
+    async void Download(LibraryRow then, bool showMixer = true)
     {
         if (files == null || downloading || files.IsDownloaded) return;
         var collection = selectedCollection;
@@ -227,7 +227,7 @@ public sealed class LibraryViewModel : ObservableObject
             await target.DownloadAsync(http, progress, downloadCancel.Token, message => { DownloadText = message; setStatus(message); });
             setStatus($"{collection.Name}: files downloaded ({collection.ZipName})");
             IsDownloading = false;
-            if (then != null && files == target) Open(then);
+            if (then != null && files == target) Open(then, showMixer);
         }
         catch (OperationCanceledException) { setStatus($"{collection.Name}: download cancelled"); }
         catch (Exception ex) { view.ShowError(new IOException($"Download of {collection.Name} failed: {ex.Message}", ex)); }
@@ -271,6 +271,7 @@ public sealed class LibraryViewModel : ObservableObject
     {
         if (catalog == null || !catalog.Folders.ContainsKey(path)) return;
         folder = path;
+        randomFrom = null;   // the next random file: from this folder
         Refresh();
     }
 
@@ -280,6 +281,35 @@ public sealed class LibraryViewModel : ObservableObject
         int slash = folder.LastIndexOf('/');
         Navigate(slash >= 0 ? folder[..slash] : "");
     }
+
+    // Folder the random files are chosen from, while the list shows the folder of the last one (randomTo); null: the
+    // folder shown.
+    string randomFrom, randomTo;
+
+    // A file of the folder and of its subfolders, shown by the filters, chosen at random, shown in the list (its folder
+    // opened, the file selected; in a search or a played list: selected there) and played (as a double click). Again
+    // from the folder of that file: chosen again from the folder where it started.
+    void PlayRandom()
+    {
+        if (catalog == null) return;
+        var from = randomFrom != null && folder == randomTo ? randomFrom : folder;
+        var file = catalog.RandomFile(from, Filter);
+        if (file == null) { setStatus("No readable file here with these filters"); return; }
+        if (!IsFlat)
+        {
+            folder = file.FolderPath;
+            Refresh();
+        }
+        (randomFrom, randomTo) = (from, folder);
+        var row = rows.FirstOrDefault(r => r.File?.Path == file.Path) ?? FileRow(file);
+        SelectedRow = row;
+        setStatus($"Random: {file.Title}");
+        Open(row, false);
+    }
+
+    // Row selected in the list (the random file; the view keeps it visible).
+    LibraryRow selectedRow;
+    public LibraryRow SelectedRow { get => selectedRow; set => Set(ref selectedRow, value); }
 
     // ---------- Filters ----------
 
@@ -442,26 +472,27 @@ public sealed class LibraryViewModel : ObservableObject
 
     // ---------- Actions ----------
 
-    // Double click or Enter: a folder is entered; a file is taken from the zip, added to the playlist and played.
-    void Open(LibraryRow row)
+    // Double click or Enter: a folder is entered; a file is taken from the zip, added to the playlist and played, the Mixer
+    // tab shown (showMixer false: the Library tab stays, the random file selected in it).
+    void Open(LibraryRow row, bool showMixer = true)
     {
         if (row == null) return;
         if (row.IsFolder) { searchText = ""; OnPropertyChanged(nameof(SearchText)); Navigate(row.Folder.Path); return; }
         if (row.Unreadable) { setStatus($"Unreadable file: {row.File.Error}"); return; }
-        if (!IsAvailable(row)) { OfferDownload(row); return; }
+        if (!IsAvailable(row)) { OfferDownload(row, showMixer); return; }
         var local = files.Get(row.File);
-        play(local, new LibraryKey(selectedCollection.Id, row.File.Path));
+        play(local, new LibraryKey(selectedCollection.Id, row.File.Path), showMixer);
     }
 
     // A file can be played: taken from the zip before, or the zip is downloaded.
     bool IsAvailable(LibraryRow row) => files.IsDownloaded || File.Exists(files.OnDisk(row.File.Path));
 
     // Its zip is missing: downloaded if the user wants (the file played then).
-    void OfferDownload(LibraryRow then)
+    void OfferDownload(LibraryRow then, bool showMixer = true)
     {
         if (downloading) { setStatus("Download in progress: file playable once it ends"); return; }
         if (view.AskYesNoCancel($"Download files of {selectedCollection.Name} ({Megabytes(selectedCollection.SourceSize)}) from {new Uri(selectedCollection.SourceUrl).Host}?") == true)
-            Download(then);
+            Download(then, showMixer);
     }
 
     void AddToPlaylist(IReadOnlyList<LibraryRow> selected)

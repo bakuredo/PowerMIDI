@@ -15,7 +15,7 @@ static class Program
 {
     // A description file (Collections\<id>.json).
     sealed record Source(string Url, long Size, string Sha1, string Root);
-    sealed record CollectionFile(string Id, string Name, string Description, Source Source, Dictionary<string, string> Folders);
+    sealed record CollectionFile(string Id, string Name, Source Source, Dictionary<string, string> Folders);
 
     static int Main(string[] args)
     {
@@ -34,7 +34,7 @@ static class Program
             if (!Directory.Exists(folder) && !File.Exists(folder)) throw new FileNotFoundException($"Zip or folder not found: {folder}");
             var output = args.Length == 3 ? args[2] : "library.db";
             var version = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "?";
-            var info = new CollectionInfo(description.Id, description.Name, description.Description, description.Source.Url, description.Source.Size,
+            var info = new CollectionInfo(description.Id, description.Name, description.Source.Url, description.Source.Size,
                                           description.Source.Sha1, description.Source.Root, DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"), version);
 
             Console.WriteLine($"PowerMIDI Library Builder {version}");

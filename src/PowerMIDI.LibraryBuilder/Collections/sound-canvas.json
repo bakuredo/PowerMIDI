@@ -1,7 +1,6 @@
 {
   "id": "sound-canvas",
   "name": "Sound Canvas MIDI Collection",
-  "description": "MIDI files made for the Roland SC-55 and SC-88Pro (archive.org)",
   "source": {
     "url": "https://archive.org/compress/sound_canvas_midi_collection/formats=MIDI&file=/sound_canvas_midi_collection.zip",
     "size": 88846337,

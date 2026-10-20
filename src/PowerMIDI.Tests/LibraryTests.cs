@@ -63,7 +63,7 @@ public class LibraryTests
             File.WriteAllText(Path.Combine(Files, "other", "readme.txt"), "not listed");
             System.IO.Compression.ZipFile.CreateFromDirectory(Files, Zip, System.IO.Compression.CompressionLevel.Optimal, true);
             using (var stream = File.OpenRead(Zip))
-                Info = new CollectionInfo("sample", "Sample", null, "http://localhost/files/source.zip", new FileInfo(Zip).Length,
+                Info = new CollectionInfo("sample", "Sample", "http://localhost/files/source.zip", new FileInfo(Zip).Length,
                                           Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData(stream)), "music", "2026-10-20T00:00:00Z", "1.0.0");
             Report = CollectionWriter.Write(Database, Info, Files, new Dictionary<string, string> { ["console/snes"] = "Super Nintendo" });
             LibraryUserData.Open(User).Dispose();
@@ -119,6 +119,11 @@ public class LibraryTests
         Assert.Equal("Zelda Dungeon", Titles(catalog.Files("", true, new LibraryFilter(Search: "super zelda"))));
         Assert.Equal("Zelda Title", Titles(catalog.Files("console/nes", true, new LibraryFilter(Search: "zelda"))));
         Assert.Equal("Song", Titles(catalog.Files("", true, new LibraryFilter(Search: "hello"))));
+        // Random file: in the folder and below, shown by the filter, never an unreadable one.
+        Assert.Equal("Zelda Title", catalog.RandomFile("console/nes", new LibraryFilter())?.Title);
+        for (int i = 0; i < 10; i++) Assert.Contains(catalog.RandomFile("", new LibraryFilter("GS")).Title, new[] { "Copy", "Zelda Dungeon" });
+        for (int i = 0; i < 10; i++) Assert.Equal("Song", catalog.RandomFile("other", new LibraryFilter())?.Title);   // not Broken.mid
+        Assert.Null(catalog.RandomFile("console/nes", new LibraryFilter("XG")));
         var counts = catalog.Counts(new LibraryFilter("GS"));
         Assert.Equal(2, counts["console"]);
         Assert.False(counts.ContainsKey("console/nes"));
