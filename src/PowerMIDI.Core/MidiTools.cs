@@ -310,8 +310,52 @@ public static class MidiTools
     // character per byte), so that a saved file keeps them as they were, and decoded for display only (DecodeText).
     static readonly Encoding ByteEncoding = Encoding.Latin1;
 
-    public static MidiFile ReadFile(string path) => MidiFile.Read(path, Reading());
-    public static MidiFile ReadFile(Stream stream) => MidiFile.Read(stream, Reading());
+    public static MidiFile ReadFile(string path) => ReadBytes(File.ReadAllBytes(path));
+
+    public static MidiFile ReadFile(Stream stream)
+    {
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return ReadBytes(memory.ToArray());
+    }
+
+    // A MIDI file preceded by other bytes (a RIFF MIDI file, .rmi: its "data" chunk; a header added by some tool) is read
+    // from its MThd header. Then RepairSysEx.
+    static MidiFile ReadBytes(byte[] bytes)
+    {
+        MidiFile file;
+        try { file = MidiFile.Read(new MemoryStream(bytes, false), Reading()); }
+        catch (Exception) when (HeaderAt(bytes) is int start and > 0)
+        {
+            file = MidiFile.Read(new MemoryStream(bytes, start, bytes.Length - start, false), Reading());
+        }
+        RepairSysEx(file);
+        return file;
+    }
+
+    // Place of the MThd header in the first 4 KB, or -1.
+    static int HeaderAt(byte[] bytes)
+    {
+        for (int i = 0; i + 4 <= Math.Min(bytes.Length, 4096); i++)
+            if (bytes[i] == 'M' && bytes[i + 1] == 'T' && bytes[i + 2] == 'h' && bytes[i + 3] == 'd') return i;
+        return -1;
+    }
+
+    // SysEx written with their F0 status again at the start of their data (F0 <length> F0 41 10 42 …: some sequencers;
+    // 13 files of the Sound Canvas collection): read as they are, they would be sent to the module as F0 F0 41 …, which it
+    // ignores (the GS Reset of the file lost), and the playback library refuses to copy them. Replaced by the message
+    // without the extra F0.
+    static void RepairSysEx(MidiFile file)
+    {
+        foreach (var chunk in file.GetTrackChunks())
+            for (int i = 0; i < chunk.Events.Count; i++)
+                if (chunk.Events[i] is NormalSysExEvent sx && sx.Data is { Length: > 1 } d && d[0] == 0xF0)
+                {
+                    int start = 0;
+                    while (start < d.Length - 1 && d[start] == 0xF0) start++;
+                    chunk.Events[i] = new NormalSysExEvent(d[start..]) { DeltaTime = sx.DeltaTime };
+                }
+    }
 
     // Damaged files are read as far as possible, as most players do (about 1 % of the VGMusic archive): a value out of
     // range is brought back into it (a controller at 128: 127), truncated data and a track whose size is not the one
