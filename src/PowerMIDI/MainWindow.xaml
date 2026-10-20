@@ -573,7 +573,7 @@
         <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,2" Margin="6,0,0,0" Command="{Binding CancelDownloadCommand}"
                 Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="Stop download"/>
         <TextBlock Text="Collection:" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Center"/>
-        <ComboBox ItemsSource="{Binding Collections}" SelectedItem="{Binding SelectedCollection}" DisplayMemberPath="Name" ToolTip="Collection shown"/>
+        <ComboBox ItemsSource="{Binding Collections}" SelectedItem="{Binding SelectedCollection}" DisplayMemberPath="Name" ToolTip="{Binding CollectionToolTip}"/>
       </DockPanel>
       <ProgressBar DockPanel.Dock="Top" Height="4" Margin="0,-2,0,6" Maximum="1" Value="{Binding DownloadProgress, Mode=OneWay}"
                    Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding DownloadText}"/>

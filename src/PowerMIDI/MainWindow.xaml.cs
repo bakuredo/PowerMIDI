@@ -346,13 +346,6 @@ public partial class MainWindow : Window, IMainView
         return dlg.ShowDialog(this) == true ? dlg.FolderName : null;
     }
 
-    public string PickFile(string title, string filter, string initialFolder)
-    {
-        var dlg = new Microsoft.Win32.OpenFileDialog { Title = title, Filter = filter + "|All files|*.*" };
-        if (initialFolder != null) dlg.InitialDirectory = initialFolder;
-        return dlg.ShowDialog(this) == true ? dlg.FileName : null;
-    }
-
     public string PickSaveFile(string initialFolder, string fileName)
     {
         var dlg = new Microsoft.Win32.SaveFileDialog

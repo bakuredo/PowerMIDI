@@ -47,7 +47,6 @@ public static class LibraryFormat
           file_count    INTEGER NOT NULL,
           UNIQUE (collection_id, path)
         );
-        CREATE INDEX folders_parent ON folders(parent_id);
         CREATE TABLE files (
           id             INTEGER PRIMARY KEY,
           folder_id      INTEGER NOT NULL REFERENCES folders(id),
@@ -58,7 +57,6 @@ public static class LibraryFormat
           size           INTEGER NOT NULL,
           sha1           TEXT NOT NULL,
           standard       TEXT,
-          smf_format     INTEGER,
           tracks         INTEGER,
           channels       INTEGER,
           duration_ms    INTEGER,
@@ -68,7 +66,6 @@ public static class LibraryFormat
         );
         CREATE INDEX files_folder   ON files(folder_id);
         CREATE INDEX files_standard ON files(standard);
-        CREATE INDEX files_sha1     ON files(sha1);
         CREATE VIRTUAL TABLE files_search USING fts5(
           title, internal_title, path, lyrics,
           content = '', contentless_delete = 1, tokenize = 'unicode61 remove_diacritics 2'

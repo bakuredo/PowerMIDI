@@ -117,16 +117,16 @@ public static class CollectionWriter
             }
 
             using (var file = Command(connection, """
-                INSERT INTO files (folder_id, name, title, internal_title, copyright, size, sha1, standard, smf_format, tracks, channels,
+                INSERT INTO files (folder_id, name, title, internal_title, copyright, size, sha1, standard, tracks, channels,
                                    duration_ms, has_lyrics, has_loop, error)
-                VALUES ($folder, $name, $title, $internal, $copyright, $size, $sha1, $standard, $format, $tracks, $channels,
+                VALUES ($folder, $name, $title, $internal, $copyright, $size, $sha1, $standard, $tracks, $channels,
                         $duration, $lyrics, $loop, $error) RETURNING id
                 """))
             using (var search = Command(connection, "INSERT INTO files_search (rowid, title, internal_title, path, lyrics) VALUES ($id, $title, $internal, $path, $lyrics)"))
                 foreach (var e in entries)
                 {
                     long id = Scalar(file, ("$folder", folderIds[FolderOf(e.Path)]), ("$name", e.Name), ("$title", e.Title), ("$internal", e.InternalTitle),
-                                     ("$copyright", e.Copyright), ("$size", e.Size), ("$sha1", e.Sha1), ("$standard", e.Standard), ("$format", e.SmfFormat),
+                                     ("$copyright", e.Copyright), ("$size", e.Size), ("$sha1", e.Sha1), ("$standard", e.Standard),
                                      ("$tracks", e.Tracks), ("$channels", e.Channels), ("$duration", e.DurationMs), ("$lyrics", e.HasLyrics ? 1 : 0),
                                      ("$loop", e.HasLoop ? 1 : 0), ("$error", e.Error));
                     Run(search, ("$id", id), ("$title", e.Title), ("$internal", e.InternalTitle), ("$path", SearchPath(e.Path)), ("$lyrics", e.Lyrics));

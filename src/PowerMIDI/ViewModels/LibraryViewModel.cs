@@ -129,6 +129,13 @@ public sealed class LibraryViewModel : ObservableObject
     public bool HasCollection => catalog != null;
     public bool HasNoLibrary => Collections.Count == 0;
 
+    // Tooltip of the list of collections: what the collection shown is, where its files come from, when its database was built.
+    public string CollectionToolTip => selectedCollection is not { } c ? "Collection shown" : string.Join("\n", new[]
+    {
+        c.Description, $"Files: zip of {Megabytes(c.SourceSize)} from {new Uri(c.SourceUrl).Host}",
+        $"Database built {(DateTime.TryParse(c.BuiltAt, out var built) ? built.ToString("d") : c.BuiltAt)} (Library Builder {c.BuilderVersion})",
+    }.Where(s => !string.IsNullOrEmpty(s)));
+
     // At startup: the collections of the library database, the one of the last time selected.
     public void Load()
     {
@@ -161,6 +168,7 @@ public sealed class LibraryViewModel : ObservableObject
             files = new CollectionFiles(libraryFolder, collection);
         }
         OnPropertyChanged(nameof(HasCollection));
+        OnPropertyChanged(nameof(CollectionToolTip));
         UpdateDownload();
         folder = catalog != null && startFolder != null && catalog.Folders.ContainsKey(startFolder) ? startFolder : "";
         Refresh();

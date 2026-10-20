@@ -8,7 +8,7 @@ namespace PowerMIDI.Library;
 // the collection, with '/' separators. Standard: null if the file could not be read (Error says why; the other values
 // read from the file are then null too). Lyrics: the text of the karaoke lyrics, for the search only.
 public sealed record LibraryEntry(string Path, string Name, string Title, string InternalTitle, string Copyright, long Size, string Sha1,
-                                  string Standard, int? SmfFormat, int? Tracks, int? Channels, long? DurationMs, bool HasLyrics,
+                                  string Standard, int? Tracks, int? Channels, long? DurationMs, bool HasLyrics,
                                   bool HasLoop, string Lyrics, string Error)
 {
     // Reads a file of a collection: its bytes once (SHA-1, then the MIDI data from memory).
@@ -20,7 +20,7 @@ public sealed record LibraryEntry(string Path, string Name, string Title, string
     {
         var name = path[(path.LastIndexOf('/') + 1)..];
         var entry = new LibraryEntry(path, name, TitleOf(name), null, null, bytes.Length, Convert.ToHexStringLower(SHA1.HashData(bytes)),
-                                     null, null, null, null, null, false, false, null, null);
+                                     null, null, null, null, false, false, null, null);
         try
         {
             var midi = MidiTools.ReadFile(new MemoryStream(bytes));
@@ -32,7 +32,6 @@ public sealed record LibraryEntry(string Path, string Name, string Title, string
             return entry with
             {
                 InternalTitle = Clean(title), Copyright = Clean(copyright), Standard = MidiTools.GetStandard(midi),
-                SmfFormat = midi.OriginalFormat switch { MidiFileFormat.SingleTrack => 0, MidiFileFormat.MultiTrack => 1, _ => 2 },
                 Tracks = midi.GetTrackChunks().Count(), Channels = channels,
                 DurationMs = (long)MidiTools.GetDuration(midi).TotalMilliseconds,
                 HasLyrics = lyrics != null, HasLoop = MidiTools.GetLoop(midi) != null,

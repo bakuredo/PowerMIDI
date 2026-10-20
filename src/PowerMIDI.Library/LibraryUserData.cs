@@ -20,13 +20,8 @@ public sealed class LibraryUserData : IDisposable
         """;
 
     readonly SqliteConnection connection;
-    public string Path { get; }
 
-    LibraryUserData(string path, SqliteConnection connection)
-    {
-        Path = path;
-        this.connection = connection;
-    }
+    LibraryUserData(SqliteConnection connection) => this.connection = connection;
 
     // Opens the file, created if missing.
     public static LibraryUserData Open(string path)
@@ -35,7 +30,7 @@ public sealed class LibraryUserData : IDisposable
         connection.Open();
         LibraryFormat.Execute(connection, Schema);
         LibraryFormat.Execute(connection, $"PRAGMA user_version = {Version}");
-        return new LibraryUserData(path, connection);
+        return new LibraryUserData(connection);
     }
 
     public void Dispose() => connection.Dispose();

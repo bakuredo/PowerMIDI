@@ -10,9 +10,6 @@ public interface IMainView
     // Folder chosen in a folder dialog, or null if cancelled.
     string PickFolder(string initialFolder);
 
-    // File chosen in an open dialog (filter: as for the Windows dialog), or null if cancelled.
-    string PickFile(string title, string filter, string initialFolder) => null;
-
     // Path chosen in a save dialog, or null if cancelled.
     string PickSaveFile(string initialFolder, string fileName);
 
