@@ -12,6 +12,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 
 - **Player**: Playback speed, transposition, play a channel with keyboard ! (click on a channel number in Mixer page)
 - **Playlist**: Files and folders, drag and drop, shuffle, repeat modes...
+- **Library**: Browse and play MIDI collections downloaded from archive.org (see Credits) with folder navigation, filters, random function...
 - **Modes**: GM, GM2, GS, XG and MT-32, detected from file or forced with matching reset. Custom SysEx patches detected from XG and MT-32 modes.
 - **Mixer**: Mute/Solo, activity and controller slider per channel (modulation, volume, pan, reverb,
   chorus, delay/variation, filter and envelope settings) with full instrument names for each mode.
@@ -44,20 +45,10 @@ cd src
 dotnet publish -c Release
 ```
 
-## Source layout
-
-| Folder | Contents |
-| --- | --- |
-| `src/PowerMIDI` | Windows application |
-| `src/PowerMIDI.Core` | MIDI logic: modes, mixer state, effects, file editing, module definitions |
-| `src/PowerMIDI.Console` | Console player |
-| `src/PowerMIDI.Tests` | Unit tests used during development |
-| `instruments` | Module definition files |
-| `samples` | Sample MIDI files |
-
 ## Credits
 
 - MIDI playback and file handling: [DryWetMIDI](https://melanchall.github.io/drywetmidi/) by Maxim Dobroselsky.
 - Module definition files: based on XML files of [Domino](http://takabosoft.com/) by Takabo Soft.
+- Sources for archive.org : [VGMusic.com 2018 archive](https://archive.org/details/31581VideogameMusicMIDIFileswReplayGain8mbgmsfx.sf2), [Sound Canvas MIDI Collection] (https://archive.org/details/sound_canvas_midi_collection) and [Yamaha XG Free Data Collection] (https://archive.org/details/yamaha-xg-free-data)
 
 See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details.
