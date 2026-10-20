@@ -48,4 +48,27 @@ public class KaraokeLyricsTests
         Assert.Equal(("I kept the vibes of the good\ntimes", ""), lyrics.At(900, 32));
         Assert.Equal(("You and", ""), KaraokeLyrics.Read(File(new LyricEvent("You "), new LyricEvent("and"))).At(10, 32));   // short: one line
     }
+
+    // A file without line breaks (Aria di Mezzo Carattere: the whole song on one line): shown by pages that fit on the two
+    // lines of the screen, the one being sung; preferably cut before a capitalized word; '_' read as a space.
+    [Fact]
+    public void Song_without_line_breaks_shown_by_pages()
+    {
+        var words = "Oh my hero So_far away now Will I ever see your smile Love goes away Like night into day It's just a fading dream "
+                  + "I'm the Darkness You are the stars Our_love is brighter than the sun";
+        var lyrics = KaraokeLyrics.Read(File(words.Split(' ').Select(w => (MidiEvent)new LyricEvent(w + " ") { DeltaTime = 100 }).ToArray()));
+        Assert.Single(lyrics.Lines);
+        var shown = new List<string>();
+        for (long tick = 100; tick <= 100 * words.Split(' ').Length; tick += 100)
+        {
+            var (sung, coming) = lyrics.At(tick, 32);
+            var text = sung + coming;
+            Assert.True(text.Split('\n').All(row => row.Length <= 32), text);          // fits the screen
+            Assert.EndsWith(words.Split(' ')[tick / 100 - 1].Replace('_', ' '), sung.Replace('\n', ' ').TrimEnd());   // the syllable sung is on it
+            if (shown.Count == 0 || shown[^1] != text) shown.Add(text);
+        }
+        Assert.Equal("Oh my hero So far away now Will\nI ever see your smile", shown[0]);
+        Assert.StartsWith("Love goes away", shown[1]);                                  // a new page at a capital letter
+        Assert.Contains(shown, s => s.Contains("Our love"));
+    }
 }
