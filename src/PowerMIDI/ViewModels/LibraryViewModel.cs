@@ -48,7 +48,8 @@ public sealed class LibraryViewModel : ObservableObject
 
     static HttpClient CreateHttp()
     {
-        var client = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        // No overall timeout (a zip of 100 MB takes a while); a server that does not answer is left: see CollectionFiles.DownloadAsync.
+        var client = new HttpClient(new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(20) }) { Timeout = Timeout.InfiniteTimeSpan };
         var version = typeof(LibraryViewModel).Assembly.GetName().Version;
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"PowerMIDI/{version.Major}.{version.Minor}.{version.Build} (+https://github.com/bakuredo/PowerMIDI)");
         return client;
@@ -180,8 +181,8 @@ public sealed class LibraryViewModel : ObservableObject
     public double DownloadProgress { get => downloadProgress; private set => Set(ref downloadProgress, value); }
 
     string downloadText = "";
-    public string DownloadText { get => downloadText; private set { if (Set(ref downloadText, value)) OnPropertyChanged(nameof(ShowDownloadBar)); } }
-    public bool ShowDownloadBar => downloadText != "";
+    // Tooltip of Download (what it downloads), then of the progress (also in the status line).
+    public string DownloadText { get => downloadText; private set => Set(ref downloadText, value); }
 
     CancellationTokenSource downloadCancel;
 
@@ -190,7 +191,7 @@ public sealed class LibraryViewModel : ObservableObject
     void UpdateDownload()
     {
         if (files != null && !downloading)
-            DownloadText = files.IsDownloaded ? "" : $"Files not downloaded yet: {Megabytes(selectedCollection.SourceSize)} from {new Uri(selectedCollection.SourceUrl).Host}";
+            DownloadText = files.IsDownloaded ? "" : $"Download files of collection: {Megabytes(selectedCollection.SourceSize)} from {new Uri(selectedCollection.SourceUrl).Host}";
         OnPropertyChanged(nameof(IsDownloaded));
         OnPropertyChanged(nameof(NeedsDownload));
     }
@@ -208,11 +209,14 @@ public sealed class LibraryViewModel : ObservableObject
         var progress = new Progress<(long Done, long Total)>(p =>
         {
             DownloadProgress = p.Total > 0 ? (double)p.Done / p.Total : 0;
-            DownloadText = $"Downloading: {Megabytes(p.Done)} / {Megabytes(p.Total)}";
+            var text = $"Downloading {collection.Name}: {Megabytes(p.Done)} / {Megabytes(p.Total)}";
+            if (text == DownloadText) return;   // once per megabyte
+            DownloadText = text;
+            setStatus(text);
         });
         try
         {
-            await target.DownloadAsync(http, progress, downloadCancel.Token);
+            await target.DownloadAsync(http, progress, downloadCancel.Token, message => { DownloadText = message; setStatus(message); });
             setStatus($"{collection.Name}: files downloaded ({collection.ZipName})");
             IsDownloading = false;
             if (then != null && files == target) Open(then);

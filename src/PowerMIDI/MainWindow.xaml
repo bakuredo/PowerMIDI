@@ -562,28 +562,21 @@
          ☆ marks a favorite, the files are dragged to the playlist (see MainWindow.xaml.cs). -->
     <TabItem Header="Library" DataContext="{Binding Library}" d:DataContext="{d:DesignInstance vm:LibraryViewModel}">
     <DockPanel>
+      <!-- Collection, Download (files not downloaded yet; Cancel while downloading, with its progress under the row) and
+           Delete downloaded files. -->
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
         <Button DockPanel.Dock="Right" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" Padding="7,4" Margin="6,0,0,0"
                 Command="{Binding DeleteDownloadedCommand}" IsEnabled="{Binding IsDownloaded}"
                 ToolTip="Delete downloaded files of collection (zip and files taken from it; downloaded again when needed)"/>
+        <Button DockPanel.Dock="Right" Content="Download" Padding="10,2" Margin="6,0,0,0" Command="{Binding DownloadCommand}"
+                Visibility="{Binding NeedsDownload, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding DownloadText}"/>
+        <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,2" Margin="6,0,0,0" Command="{Binding CancelDownloadCommand}"
+                Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="Stop download"/>
         <TextBlock Text="Collection:" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Center"/>
         <ComboBox ItemsSource="{Binding Collections}" SelectedItem="{Binding SelectedCollection}" DisplayMemberPath="Name" ToolTip="Collection shown"/>
       </DockPanel>
-      <!-- Files of the collection not downloaded yet: Download (from its source), then its progress and Cancel. -->
-      <Border DockPanel.Dock="Top" Margin="0,0,0,6" Padding="8,5" CornerRadius="4" Background="{DynamicResource HeaderBrush}"
-              Visibility="{Binding ShowDownloadBar, Converter={StaticResource BoolToVisibility}}">
-        <DockPanel>
-          <Button DockPanel.Dock="Right" Content="Download" Padding="10,2" Margin="8,0,0,0" Command="{Binding DownloadCommand}"
-                  Visibility="{Binding NeedsDownload, Converter={StaticResource BoolToVisibility}}" ToolTip="Download zip of collection"/>
-          <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,2" Margin="8,0,0,0" Command="{Binding CancelDownloadCommand}"
-                  Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="Stop download"/>
-          <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="{Binding DownloadText}" TextTrimming="CharacterEllipsis"/>
-            <ProgressBar Height="4" Margin="0,4,0,0" Maximum="1" Value="{Binding DownloadProgress, Mode=OneWay}"
-                         Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}"/>
-          </StackPanel>
-        </DockPanel>
-      </Border>
+      <ProgressBar DockPanel.Dock="Top" Height="4" Margin="0,-2,0,6" Maximum="1" Value="{Binding DownloadProgress, Mode=OneWay}"
+                   Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding DownloadText}"/>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6" IsEnabled="{Binding HasCollection}">
         <ComboBox DockPanel.Dock="Right" Width="118" Margin="6,0,0,0" ItemsSource="{x:Static vm:LibraryViewModel.ShowNames}"
                   SelectedIndex="{Binding ShowIndex}" ToolTip="Files shown: all, favorites, played ones…"/>
@@ -608,7 +601,7 @@
                 </Style.Triggers>
               </Style>
             </TextBlock.Style>
-            <Run Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11"/><Run Text="  Search title, folder, lyrics…"/>
+            <Run Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11"/><Run Text="  Search title..."/>
           </TextBlock>
         </Grid>
       </DockPanel>

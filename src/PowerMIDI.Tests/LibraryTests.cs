@@ -234,6 +234,64 @@ public class LibraryTests
     }
 
     [Fact]
+    public async Task Stalled_download_goes_on_from_where_it_stopped()
+    {
+        using var sample = new Sample();
+        var bytes = File.ReadAllBytes(sample.Zip);
+        File.Delete(sample.Zip);
+        // The first request: half of the zip, then nothing (as a server of archive.org that stops answering); the next one
+        // asks for the rest (Range) and gets it.
+        int port = new Random().Next(20000, 60000);
+        using var listener = new HttpListener();
+        listener.Prefixes.Add($"http://localhost:{port}/files/");
+        listener.Start();
+        var ranges = new List<string>();
+        _ = Task.Run(async () =>
+        {
+            while (listener.IsListening)
+            {
+                HttpListenerContext context;
+                try { context = await listener.GetContextAsync(); } catch { return; }
+                var range = context.Request.Headers["Range"];
+                lock (ranges) ranges.Add(range ?? "");
+                _ = Task.Run(async () =>   // each request apart: the stalled one does not hold the next
+                {
+                    try
+                    {
+                        if (range == null)
+                        {
+                            context.Response.ContentLength64 = bytes.Length;
+                            await context.Response.OutputStream.WriteAsync(bytes.AsMemory(0, bytes.Length / 2));
+                            await context.Response.OutputStream.FlushAsync();
+                            await Task.Delay(TimeSpan.FromSeconds(10));   // stalled
+                        }
+                        else
+                        {
+                            long from = long.Parse(range["bytes=".Length..].TrimEnd('-'));
+                            context.Response.StatusCode = 206;
+                            context.Response.AddHeader("Content-Range", $"bytes {from}-{bytes.Length - 1}/{bytes.Length}");
+                            context.Response.ContentLength64 = bytes.Length - from;
+                            await context.Response.OutputStream.WriteAsync(bytes.AsMemory((int)from));
+                        }
+                        context.Response.Close();
+                    }
+                    catch { }   // the stalled one: cut on purpose
+                });
+            }
+        });
+
+        var info = sample.Info with { SourceUrl = $"http://localhost:{port}/files/source.zip" };
+        using var files = new CollectionFiles(sample.Folder, info);
+        using var http = new HttpClient();
+        var notices = new List<string>();
+        await files.DownloadAsync(http, null, CancellationToken.None, notices.Add, TimeSpan.FromSeconds(1));
+        Assert.True(files.IsDownloaded);
+        Assert.Equal(bytes, File.ReadAllBytes(files.ZipPath));
+        Assert.Equal(new[] { "Connecting to localhost…", "No answer from localhost: trying again (2/4)…" }, notices);
+        lock (ranges) Assert.Equal(new[] { "", $"bytes={bytes.Length / 2}-" }, ranges);
+    }
+
+    [Fact]
     public void Another_version_is_refused()
     {
         using var sample = new Sample();

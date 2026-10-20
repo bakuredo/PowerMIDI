@@ -69,33 +69,45 @@ public sealed class CollectionFiles : IDisposable
         return full.StartsWith(folder, StringComparison.OrdinalIgnoreCase) ? full[folder.Length..].Replace(Path.DirectorySeparatorChar, '/') : null;
     }
 
+    const int Attempts = 4;
+
     // Downloads the source zip (to <zip>.part, kept as the zip once its size and SHA-1 are the ones of the database).
-    // progress: bytes received so far, out of the size of the zip.
-    public async Task DownloadAsync(HttpClient http, IProgress<(long Done, long Total)> progress, CancellationToken cancel)
+    // A server that sends nothing for a while (stall: 30 s by default) is left, and the download goes on with a new
+    // request (from where it stopped; archive.org may then send it to another of its servers), up to 4 attempts.
+    // progress: bytes received so far, out of the size of the zip; notice: what is happening (connecting, trying again).
+    public async Task DownloadAsync(HttpClient http, IProgress<(long Done, long Total)> progress, CancellationToken cancel,
+                                    Action<string> notice = null, TimeSpan? stall = null)
     {
         var part = ZipPath + ".part";
+        var host = new Uri(info.SourceUrl).Host;
         Directory.CreateDirectory(Path.GetDirectoryName(ZipPath));
         try
         {
-            using (var response = await http.GetAsync(info.SourceUrl, HttpCompletionOption.ResponseHeadersRead, cancel))
+            if (File.Exists(part)) File.Delete(part);
+            notice?.Invoke($"Connecting to {host}…");
+            for (int attempt = 1; ; attempt++)
             {
-                response.EnsureSuccessStatusCode();
-                using var source = await response.Content.ReadAsStreamAsync(cancel);
-                using var target = File.Create(part);
-                var buffer = new byte[1 << 16];
-                long done = 0;
-                int n;
-                while ((n = await source.ReadAsync(buffer, cancel)) > 0)
+                try
                 {
-                    await target.WriteAsync(buffer.AsMemory(0, n), cancel);
-                    done += n;
-                    progress?.Report((done, info.SourceSize));
+                    await Attempt(http, part, progress, cancel, stall ?? TimeSpan.FromSeconds(30));
+                    break;
+                }
+                catch (Exception ex) when (!cancel.IsCancellationRequested && attempt < Attempts &&
+                                           ex is HttpRequestException or IOException or OperationCanceledException)
+                {
+                    notice?.Invoke($"No answer from {host}: trying again ({attempt + 1}/{Attempts})…");
+                    await Task.Delay(TimeSpan.FromSeconds(2), cancel);
                 }
             }
             var problem = await Task.Run(() => CheckZip(part, info), cancel);
             if (problem != null) throw new InvalidDataException($"Download of {info.ZipName} is not the expected file: {problem}");
             Close();
             File.Move(part, ZipPath, true);
+        }
+        catch (OperationCanceledException) when (!cancel.IsCancellationRequested)
+        {
+            try { File.Delete(part); } catch { }
+            throw new TimeoutException($"{host} does not answer: try again later");
         }
         catch
         {
@@ -104,6 +116,33 @@ public sealed class CollectionFiles : IDisposable
         }
     }
 
+    // One request: from the start, or from the end of the part already received (if the server sends ranges).
+    async Task Attempt(HttpClient http, string part, IProgress<(long Done, long Total)> progress, CancellationToken cancel, TimeSpan stall)
+    {
+        long have = File.Exists(part) ? new FileInfo(part).Length : 0;
+        using var request = new HttpRequestMessage(HttpMethod.Get, info.SourceUrl);
+        if (have > 0) request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(have, null);
+        using var watchdog = CancellationTokenSource.CreateLinkedTokenSource(cancel);   // cancelled when nothing comes for a while
+        watchdog.CancelAfter(stall);
+        using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, watchdog.Token);
+        response.EnsureSuccessStatusCode();
+        bool resumed = have > 0 && response.StatusCode == System.Net.HttpStatusCode.PartialContent;
+        using var source = await response.Content.ReadAsStreamAsync(watchdog.Token);
+        using var target = new FileStream(part, resumed ? FileMode.Append : FileMode.Create);
+        long done = resumed ? have : 0;
+        progress?.Report((done, info.SourceSize));
+        var buffer = new byte[1 << 16];
+        while (true)
+        {
+            watchdog.CancelAfter(stall);
+            int n = await source.ReadAsync(buffer, watchdog.Token);
+            if (n == 0) break;
+            await target.WriteAsync(buffer.AsMemory(0, n), cancel);
+            done += n;
+            progress?.Report((done, info.SourceSize));
+        }
+        if (done < info.SourceSize) throw new IOException($"Download stopped at {done} of {info.SourceSize} bytes");
+    }
     // Deletes the zip and the files taken from it (downloaded again when needed).
     public void DeleteDownloaded()
     {
