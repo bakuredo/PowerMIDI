@@ -49,6 +49,6 @@ dotnet publish -c Release
 
 - MIDI playback and file handling: [DryWetMIDI](https://melanchall.github.io/drywetmidi/) by Maxim Dobroselsky.
 - Module definition files: based on XML files of [Domino](http://takabosoft.com/) by Takabo Soft.
-- Sources for archive.org : [VGMusic.com 2018 archive](https://archive.org/details/31581VideogameMusicMIDIFileswReplayGain8mbgmsfx.sf2), [Sound Canvas MIDI Collection] (https://archive.org/details/sound_canvas_midi_collection) and [Yamaha XG Free Data Collection] (https://archive.org/details/yamaha-xg-free-data)
+- Sources for archive.org: [VGMusic Archive (2018)](https://archive.org/details/31581VideogameMusicMIDIFileswReplayGain8mbgmsfx.sf2) of [VGMusic.com](https://www.vgmusic.com/), [Sound Canvas MIDI Collection](https://archive.org/details/sound_canvas_midi_collection) and [Yamaha XG Free Data Collection](https://archive.org/details/yamaha-xg-free-data)
 
 See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details.
