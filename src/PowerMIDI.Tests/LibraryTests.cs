@@ -65,7 +65,7 @@ public class LibraryTests
             using (var stream = File.OpenRead(Zip))
                 Info = new CollectionInfo("sample", "Sample", "http://localhost/files/source.zip", new FileInfo(Zip).Length,
                                           Convert.ToHexStringLower(System.Security.Cryptography.SHA1.HashData(stream)), "music", "2026-10-20T00:00:00Z", "1.0.0");
-            Report = CollectionWriter.Write(Database, Info, Files, new Dictionary<string, string> { ["console/snes"] = "Super Nintendo" });
+            Report = CollectionWriter.Write(Database, Info, Files, new Dictionary<string, string> { ["console/snes"] = "Super Nintendo", ["console/gba"] = "Game Boy Advance" });
             LibraryUserData.Open(User).Dispose();
         }
 
@@ -83,6 +83,7 @@ public class LibraryTests
         Assert.Equal(new[] { "other/Broken.mid" }, report.Errors.Select(e => e.Path));
         Assert.Equal(2, report.Standards["GS"]);
         Assert.Equal(2, report.Duplicates.Count);   // Copy.mid = Zelda_Dungeon.mid, Mario_World.mid = Zelda_Title.mid (same notes)
+        Assert.Equal(new[] { "console/gba" }, report.UnknownFolders);   // a name given for a folder the collection does not have
 
         using var connection = LibraryFormat.OpenLibrary(sample.Database);
         Assert.Equal(new[] { sample.Info }, LibraryFormat.ReadCollections(connection));
@@ -151,7 +152,7 @@ public class LibraryTests
         Song(Path.Combine(other, "Zelda_Other.mid"));
         var info = sample.Info with { Id = "second", Name = "Second" };
         CollectionWriter.Write(sample.Database, info, other);
-        CollectionWriter.Write(sample.Database, sample.Info, sample.Files, new Dictionary<string, string> { ["console/snes"] = "Super Nintendo" });
+        CollectionWriter.Write(sample.Database, sample.Info, sample.Files, new Dictionary<string, string> { ["console/snes"] = "Super Nintendo", ["console/gba"] = "Game Boy Advance" });
 
         using (var connection = LibraryFormat.OpenLibrary(sample.Database))
         {
@@ -296,6 +297,55 @@ public class LibraryTests
         Assert.Equal(bytes, File.ReadAllBytes(files.ZipPath));
         Assert.Equal(new[] { "Connecting to localhost…", "No answer from localhost: trying again (2/4)…" }, notices);
         lock (ranges) Assert.Equal(new[] { "", $"bytes={bytes.Length / 2}-" }, ranges);
+    }
+
+    [Fact]
+    public async Task Download_received_whole_then_stalled_is_kept()
+    {
+        using var sample = new Sample();
+        var bytes = File.ReadAllBytes(sample.Zip);
+        File.Delete(sample.Zip);
+        // The whole zip sent without its size (chunked), then nothing instead of the end of the stream: complete, so no
+        // request for the rest (which a server refuses: 416).
+        int port = new Random().Next(20000, 60000);
+        using var listener = new HttpListener();
+        listener.Prefixes.Add($"http://localhost:{port}/files/");
+        listener.Start();
+        var ranges = new List<string>();
+        _ = Task.Run(async () =>
+        {
+            while (listener.IsListening)
+            {
+                HttpListenerContext context;
+                try { context = await listener.GetContextAsync(); } catch { return; }
+                var range = context.Request.Headers["Range"];
+                lock (ranges) ranges.Add(range ?? "");
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        if (range != null) context.Response.StatusCode = 416;
+                        else
+                        {
+                            context.Response.SendChunked = true;
+                            await context.Response.OutputStream.WriteAsync(bytes);
+                            await context.Response.OutputStream.FlushAsync();
+                            await Task.Delay(TimeSpan.FromSeconds(10));   // stalled before the end
+                        }
+                        context.Response.Close();
+                    }
+                    catch { }
+                });
+            }
+        });
+
+        var info = sample.Info with { SourceUrl = $"http://localhost:{port}/files/source.zip" };
+        using var files = new CollectionFiles(sample.Folder, info);
+        using var http = new HttpClient();
+        await files.DownloadAsync(http, null, CancellationToken.None, null, TimeSpan.FromSeconds(1));
+        Assert.True(files.IsDownloaded);
+        Assert.Equal(bytes, File.ReadAllBytes(files.ZipPath));
+        lock (ranges) Assert.Equal(new[] { "" }, ranges);
     }
 
     [Fact]

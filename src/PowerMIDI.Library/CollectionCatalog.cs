@@ -24,7 +24,8 @@ public enum LibraryShow { All, Favorites, RecentlyPlayed, MostPlayed, NotPlayed,
 // title, the folders or the lyrics, each one the start of a word ("zel dun" finds "Zelda - Dungeon").
 public sealed record LibraryFilter(string Standard = null, LibraryShow Show = LibraryShow.All, string Search = null)
 {
-    public bool IsEmpty => Standard == null && Show == LibraryShow.All && SearchQuery(Search) == null;
+    public bool HasSearch => SearchQuery(Search) != null;
+    public bool IsEmpty => Standard == null && Show == LibraryShow.All && !HasSearch;
 
     // FTS5 query of a search: each word as a quoted prefix; null if it has no word.
     internal static string SearchQuery(string text)

@@ -3,9 +3,10 @@ using Microsoft.Data.Sqlite;
 namespace PowerMIDI.Library;
 
 // What a build found: the files by standard (null: unreadable), the unreadable ones with their error, the groups of
-// identical files (same SHA-1).
+// identical files (same SHA-1), the display names given for folders that the collection does not have (a mistake in the
+// description of the collection).
 public sealed record BuildReport(int Files, int Folders, IReadOnlyDictionary<string, int> Standards, IReadOnlyList<(string Path, string Error)> Errors,
-                                 IReadOnlyList<IReadOnlyList<string>> Duplicates);
+                                 IReadOnlyList<IReadOnlyList<string>> Duplicates, IReadOnlyList<string> UnknownFolders);
 
 // Builds a collection of the library database from the folder its files are in (see LibraryFormat): added to the
 // database (created if missing), or in place of the one of the same id; the other collections are kept.
@@ -140,7 +141,8 @@ public static class CollectionWriter
         return new BuildReport(entries.Length, folders.Count,
             entries.GroupBy(e => e.Standard ?? "").ToDictionary(g => g.Key, g => g.Count()),
             entries.Where(e => e.Error != null).Select(e => (e.Path, e.Error)).ToList(),
-            entries.GroupBy(e => e.Sha1).Where(g => g.Count() > 1).Select(g => (IReadOnlyList<string>)g.Select(e => e.Path).ToList()).ToList());
+            entries.GroupBy(e => e.Sha1).Where(g => g.Count() > 1).Select(g => (IReadOnlyList<string>)g.Select(e => e.Path).ToList()).ToList(),
+            (folderNames?.Keys ?? []).Where(path => !counts.ContainsKey(path)).Order(StringComparer.OrdinalIgnoreCase).ToList());
     }
 
     static SqliteCommand Command(SqliteConnection connection, string sql)

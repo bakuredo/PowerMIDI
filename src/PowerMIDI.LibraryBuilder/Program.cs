@@ -53,6 +53,11 @@ static class Program
             Console.WriteLine($"Identical files: {report.Duplicates.Count} groups ({report.Duplicates.Sum(d => d.Count - 1)} extra copies)");
             foreach (var group in report.Duplicates.Take(5)) Console.WriteLine("  " + string.Join("  =  ", group));
             if (report.Duplicates.Count > 5) Console.WriteLine($"  … {report.Duplicates.Count - 5} more");
+            if (report.UnknownFolders.Count > 0)
+            {
+                Console.WriteLine($"Warning: {report.UnknownFolders.Count} folder name(s) of description for folders not in collection:");
+                foreach (var path in report.UnknownFolders) Console.WriteLine($"  {path}");
+            }
             return 0;
         }
         catch (Exception ex)

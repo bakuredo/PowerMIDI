@@ -139,10 +139,13 @@ public sealed class CollectionFiles : IDisposable
         }
     }
 
-    // One request: from the start, or from the end of the part already received (if the server sends ranges).
+    // One request: from the start, or from the end of the part already received (if the server sends ranges). None if the
+    // part is complete already (an attempt that received it all, then stalled before the end of its stream): a request
+    // from its end would be refused (416).
     async Task Attempt(HttpClient http, string part, IProgress<(long Done, long Total)> progress, CancellationToken cancel, TimeSpan stall)
     {
         long have = File.Exists(part) ? new FileInfo(part).Length : 0;
+        if (have >= info.SourceSize) return;
         using var request = new HttpRequestMessage(HttpMethod.Get, info.SourceUrl);
         if (have > 0) request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(have, null);
         using var watchdog = CancellationTokenSource.CreateLinkedTokenSource(cancel);   // cancelled when nothing comes for a while

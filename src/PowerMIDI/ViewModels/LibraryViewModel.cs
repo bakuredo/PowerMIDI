@@ -57,7 +57,7 @@ public sealed class LibraryViewModel : ObservableObject
 
     readonly IMainView view;
     readonly Action<string> setStatus;
-    readonly Action<string, LibraryKey, bool> play;        // plays a file of a collection (added to the playlist if needed; true: Mixer tab shown)
+    readonly Action<string, bool> play;        // plays a file of a collection (added to the playlist if needed; true: Mixer tab shown)
     readonly Action<IReadOnlyList<string>> addToPlaylist;
     readonly string libraryFolder;
     readonly DispatcherTimer searchDelay = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -67,7 +67,7 @@ public sealed class LibraryViewModel : ObservableObject
     string folder = "";
     string savedCollection;   // PowerMIDI.ini, until the collections are read
 
-    public LibraryViewModel(IMainView view, string libraryFolder, Action<string> setStatus, Action<string, LibraryKey, bool> play,
+    public LibraryViewModel(IMainView view, string libraryFolder, Action<string> setStatus, Action<string, bool> play,
                             Action<IReadOnlyList<string>> addToPlaylist)
     {
         this.view = view;
@@ -222,12 +222,12 @@ public sealed class LibraryViewModel : ObservableObject
             DownloadText = text;
             setStatus(text);
         });
+        bool downloaded = false;
         try
         {
             await target.DownloadAsync(http, progress, downloadCancel.Token, message => { DownloadText = message; setStatus(message); });
             setStatus($"{collection.Name}: files downloaded ({collection.ZipName})");
-            IsDownloading = false;
-            if (then != null && files == target) Open(then, showMixer);
+            downloaded = true;
         }
         catch (OperationCanceledException) { setStatus($"{collection.Name}: download cancelled"); }
         catch (Exception ex) { view.ShowError(new IOException($"Download of {collection.Name} failed: {ex.Message}", ex)); }
@@ -237,6 +237,8 @@ public sealed class LibraryViewModel : ObservableObject
             IsDownloading = false;
             UpdateDownload();
         }
+        // Out of the download: an error of the file itself (taken from the zip) is not one of the download.
+        if (downloaded && then != null && files == target) Run(() => Open(then, showMixer));
     }
 
     // Deletes the downloaded zip of the collection shown and the files taken from it (the playlist keeps them only once
@@ -402,7 +404,7 @@ public sealed class LibraryViewModel : ObservableObject
         }
         Crumbs = crumbList;
 
-        IsFlat = filter.Show != LibraryShow.All || LibraryFilterHasSearch(filter);
+        IsFlat = filter.Show != LibraryShow.All || filter.HasSearch;
         var list = new List<LibraryRow>();
         int folderCount = 0;
         List<LibraryFile> found;
@@ -433,8 +435,6 @@ public sealed class LibraryViewModel : ObservableObject
         CountText = IsFlat ? (more ? $"First {FlatLimit} files shown" : $"{fileCount} file{(fileCount != 1 ? "s" : "")}")
                            : $"{folderCount} folder{(folderCount != 1 ? "s" : "")} · {fileCount} file{(fileCount != 1 ? "s" : "")}";
     }
-
-    static bool LibraryFilterHasSearch(LibraryFilter filter) => !string.IsNullOrWhiteSpace(filter.Search) && filter.Search.Any(char.IsLetterOrDigit);
 
     LibraryRow FileRow(LibraryFile f)
     {
@@ -481,7 +481,7 @@ public sealed class LibraryViewModel : ObservableObject
         if (row.Unreadable) { setStatus($"Unreadable file: {row.File.Error}"); return; }
         if (!IsAvailable(row)) { OfferDownload(row, showMixer); return; }
         var local = files.Get(row.File);
-        play(local, new LibraryKey(selectedCollection.Id, row.File.Path), showMixer);
+        play(local, showMixer);
     }
 
     // A file can be played: taken from the zip before, or the zip is downloaded.

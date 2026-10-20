@@ -43,7 +43,7 @@ public sealed partial class MainViewModel : ObservableObject
         Mixer = new MixerViewModel(defs, () => output, s => Status = s, view.ShowError);
         Effects = new EffectsViewModel(defs, () => output, view.ShowError);
         Library = new LibraryViewModel(view, Path.Combine(AppContext.BaseDirectory, "library"), s => Status = s,
-                                       (path, key, showMixer) => Run(() => PlayFromLibrary(path, key, showMixer)), paths => Run(() => AddFiles(paths)));
+                                       (path, showMixer) => Run(() => PlayFromLibrary(path, showMixer)), paths => Run(() => AddFiles(paths)));
 
         AddFilesCommand = Command(AddFilesFromDialog);
         AddFolderCommand = Command(AddFolderFromDialog);
@@ -335,7 +335,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // A file opened in the Library tab: played (added to the playlist first, unless it is there already), with the Mixer
     // tab shown (the instruments it plays), unless showMixer is false (a random file: the Library tab shows it).
-    void PlayFromLibrary(string path, LibraryKey key, bool showMixer = true)
+    void PlayFromLibrary(string path, bool showMixer = true)
     {
         var item = Playlist.FirstOrDefault(i => SamePath(i.Path, path));
         if (item == null)
