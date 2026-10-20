@@ -1,6 +1,6 @@
 {
   "id": "vgmusic-2018",
-  "name": "VGMusic.com 2018 archive",
+  "name": "VGMusic Archive (2018)",
   "source": {
     "url": "https://archive.org/download/31581VideogameMusicMIDIFileswReplayGain8mbgmsfx.sf2/31%2C581%20Videogame%20Music%20MIDI%20Files%20%28w%20Replay%20Gain%20-%208mbgmsfx.sf2%29.zip",
     "size": 123036337,
@@ -50,7 +50,6 @@
     "music/console/microsoft": "Microsoft",
     "music/console/microsoft/xbox": "Xbox",
     "music/console/microsoft/xbox360": "Xbox 360",
-    "music/console/microsoft/xboxone": "Xbox One",
     "music/console/nec": "NEC",
     "music/console/nec/pcfx": "PC-FX",
     "music/console/nec/sgx": "SuperGrafx",

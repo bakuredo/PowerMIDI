@@ -7,6 +7,21 @@ PowerMIDI uses the following third-party work.
 - Project: https://github.com/melanchall/drywetmidi
 - License: MIT, Copyright (c) 2018 Maxim Dobroselsky
 
+## Microsoft.Data.Sqlite
+
+- Project: https://github.com/dotnet/efcore
+- License: MIT, Copyright (c) .NET Foundation and Contributors
+
+## SQLitePCLRaw
+
+- Project: https://github.com/ericsink/SQLitePCL.raw
+- License: Apache License 2.0, Copyright 2014-2024 SourceGear, LLC
+
+## SQLite
+
+- Project: https://sqlite.org/
+- License: public domain
+
 ## Domino module definition files
 
 Some files of the `instruments` folder use the module definition format of the Domino sequencer by Takabo Soft
