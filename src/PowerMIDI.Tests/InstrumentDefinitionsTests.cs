@@ -9,11 +9,13 @@ public class InstrumentDefinitionsTests
     static readonly InstrumentDefinitions Defs = InstrumentDefinitions.Load(Path.Combine(AppContext.BaseDirectory, "instruments"));
 
     [Fact]
-    public void Gm_has_128_sounds_and_one_drum_kit()
+    public void Gm_has_128_sounds_and_the_gm2_drum_kits()
     {
         Assert.Equal(128, Defs.GmVoices.Count);
         Assert.Equal("Acoustic Grand Piano", Defs.GmVoices[0]);
-        Assert.Equal("Standard Kit", Assert.Single(Defs.GmDrums).Value);
+        // The kits of GM2 (programs 1, 9, 17, 25, 26, 33, 41, 49, 57), used by many GM files.
+        Assert.Equal(new[] { 0, 8, 16, 24, 25, 32, 40, 48, 56 }, Defs.GmDrums.Keys.OrderBy(p => p));
+        Assert.Equal("Standard Kit", Defs.GmDrums[0]);
     }
 
     [Fact]
@@ -93,7 +95,7 @@ public class InstrumentDefinitionsTests
 
         Assert.False(Defs.Resolve("GM", 0, 40, 0, 0, 0).Missing);
         Assert.False(Defs.Resolve("GM", 9, 0, 0, 0, 0).Missing);
-        Assert.True(Defs.Resolve("GM", 9, 16, 0, 0, 0).Missing);      // a kit of a larger standard on the GM drum channel
+        Assert.True(Defs.Resolve("GM", 9, 127, 0, 0, 0).Missing);     // a kit of a larger standard (GS CM-64/32L) on the GM drum channel
 
         Assert.False(Defs.Resolve("MT-32", 0, 127, 0, 0, 0).Missing);
     }
@@ -204,11 +206,12 @@ public class InstrumentDefinitionsTests
         Assert.Equal("22Hz", Defs.XgReverbTypes[1 * 128].Params[0x05].Labels[1]);
     }
 
-    // In GM, the drum channel only offers the GM kit, not those of the GS maps.
+    // In GM, the drum channel offers the GM kits (those of GM2), not those of the GS maps.
     [Fact]
     public void Choices_of_a_gm_drum_channel_are_the_gm_kits()
     {
-        Assert.Equal("001 Standard Kit", Assert.Single(Defs.GetChoices("GM", true, 0)).Text);
+        Assert.Equal("001 Standard Kit", Defs.GetChoices("GM", true, 0)[0].Text);
+        Assert.Equal(9, Defs.GetChoices("GM", true, 0).Count);
         Assert.Equal(128, Defs.GetChoices("GM", false, 0).Count);
         Assert.Equal(256, Defs.GetChoices("GM2", false, 0).Count);
         Assert.Equal(9, Defs.GetChoices("GM2", true, 0).Count);
