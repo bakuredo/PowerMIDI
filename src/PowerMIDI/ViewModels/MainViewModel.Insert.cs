@@ -28,8 +28,9 @@ public sealed partial class MainViewModel
     public string WriteFixed(int track, int index, long tick, IReadOnlyList<(int Track, int Index)> replaced)
     {
         if (EditBlocked != null) return null;
-        var (events, description) = BuildInsertion();
-        if (events.Count == 0) return null;
+        var (tagged, description) = BuildInsertion();
+        if (tagged.Count == 0) return null;
+        var events = tagged.Select(e => e.Event).ToList();
         long position = CurrentTick();
         bool wasPlaying = state == "playing";
         Edit(file =>
@@ -187,10 +188,10 @@ public sealed partial class MainViewModel
 
     // Events of the settings in blue, with their description. Order: per channel the drum part, the instrument, the
     // controllers; then the effects, module by module (effect types before their parameters, part modes before drum
-    // setups), those of the mode of the track.
-    (List<MidiEvent> Events, string Description) BuildInsertion()
+    // setups), those of the mode of the track. Channel: the one of the event (-1: an effect, not one of a channel).
+    (List<(int Channel, MidiEvent Event)> Events, string Description) BuildInsertion()
     {
-        var events = new List<MidiEvent>();
+        var events = new List<(int Channel, MidiEvent Event)>();
         var texts = new List<string>();
         for (int c = 0; c < 16; c++)
         {
@@ -198,7 +199,7 @@ public sealed partial class MainViewModel
             int rhythm = ChannelMixer.RhythmOverride[c];
             if (rhythm >= 0)
             {
-                events.Add(ChannelMixer.RhythmPartEvent(c, rhythm));
+                events.Add((c, ChannelMixer.RhythmPartEvent(c, rhythm)));
                 parts.Add(rhythm == 0 ? "normal part" : $"drum part {rhythm}");
             }
             if (rhythm >= 0 || ChannelMixer.Override[c])
@@ -207,18 +208,18 @@ public sealed partial class MainViewModel
                 var (msb, lsb, program) = ChannelMixer.Override[c]
                     ? (ChannelMixer.OverrideMsb[c], ChannelMixer.OverrideLsb[c], ChannelMixer.OverrideProgram[c])
                     : (ChannelMixer.BankMsb[c], ChannelMixer.BankLsb[c], ChannelMixer.Program[c]);
-                events.Add(new ControlChangeEvent((SevenBitNumber)0, (SevenBitNumber)msb) { Channel = (FourBitNumber)c });
-                events.Add(new ControlChangeEvent((SevenBitNumber)32, (SevenBitNumber)lsb) { Channel = (FourBitNumber)c });
-                events.Add(new ProgramChangeEvent((SevenBitNumber)program) { Channel = (FourBitNumber)c });
+                events.Add((c, new ControlChangeEvent((SevenBitNumber)0, (SevenBitNumber)msb) { Channel = (FourBitNumber)c }));
+                events.Add((c, new ControlChangeEvent((SevenBitNumber)32, (SevenBitNumber)lsb) { Channel = (FourBitNumber)c }));
+                events.Add((c, new ProgramChangeEvent((SevenBitNumber)program) { Channel = (FourBitNumber)c }));
                 if (ChannelMixer.Override[c]) parts.Add(Mixer.InstrumentName(c, msb, lsb, program));
             }
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
             {
                 if (!ChannelMixer.IsFixed(k, c)) continue;
                 int v = ChannelMixer.FixedValue(k, c);
-                events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.ControllerNumbers[k], (SevenBitNumber)v) { Channel = (FourBitNumber)c });
+                events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.ControllerNumbers[k], (SevenBitNumber)v) { Channel = (FourBitNumber)c }));
                 if (k == ChannelMixer.PortamentoTime)   // heard only with the portamento on (off at 0)
-                    events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(v)) { Channel = (FourBitNumber)c });
+                    events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(v)) { Channel = (FourBitNumber)c }));
                 parts.Add($"{MixerViewModel.ControllerNames[k]} {MixerViewModel.FormatControllerValue(k, v)}");
             }
             if (parts.Count > 0) texts.Add($"ch {c + 1}: {string.Join(", ", parts)}");
@@ -226,7 +227,7 @@ public sealed partial class MainViewModel
         foreach (var m in ModuleSettings.All.Where(m => m.Standard == null || m.Standard == Mixer.Standard))   // as the save
             foreach (var (key, v) in m.Fixed())
             {
-                events.AddRange(m.Events(key, v));
+                events.AddRange(m.Events(key, v).Select(e => (-1, e)));
                 texts.Add(m.Describe(key, v));
             }
         return (events, string.Join(" · ", texts));

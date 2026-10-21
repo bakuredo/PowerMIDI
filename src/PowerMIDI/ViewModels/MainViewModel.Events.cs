@@ -28,7 +28,7 @@ public sealed partial class MainViewModel : IEventEditing
             eventsPending = true;
         }
         LoadEvents();
-        view.ShowEventEditor(eventEditor, () => eventEditor = null);
+        view.ShowEventEditor(eventEditor, () => { eventEditor = null; EditorPending = null; });   // its Append / Replace: over
     }
 
     // The track as listed and played: the copy with the changes, otherwise the file.

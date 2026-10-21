@@ -127,7 +127,17 @@
     <DockPanel>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
-                Padding="8,2" FontSize="12" ToolTip="Back to the file's settings"/>
+                Padding="8,2" FontSize="12" ToolTip="Back to the file's settings"/>        <!-- Append (MainViewModel.MixerAppend.cs): two clicks, the settings changed in between written as events at the
+             playback position; same state as the Append of the Event Editor. -->
+        <ToggleButton DockPanel.Dock="Right" Content="Append" Margin="0,0,6,0" Padding="8,2" FontSize="12"
+                      Command="{Binding DataContext.MixerAppendCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                      IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
+                      IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
+                      ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
+        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0,0,6,0" Padding="8,2" FontSize="12"
+                Command="{Binding DataContext.CancelInsertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                Visibility="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
+                ToolTip="Drops settings changed since Append was clicked"/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
         <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}" b:Wheel.ComboStep="True"
                   ToolTip="Controller set by the sliders">
@@ -524,7 +534,17 @@
     <DockPanel>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
-                Padding="8,2" FontSize="12" ToolTip="Back to the file's effects"/>
+                Padding="8,2" FontSize="12" ToolTip="Back to the file's effects"/>        <!-- Append (MainViewModel.MixerAppend.cs): two clicks, the effects changed in between written as events at the
+             playback position; same state as the Append of the Event Editor. -->
+        <ToggleButton DockPanel.Dock="Right" Content="Append" Margin="0,0,6,0" Padding="8,2" FontSize="12"
+                      Command="{Binding DataContext.MixerAppendCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                      IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
+                      IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
+                      ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
+        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0,0,6,0" Padding="8,2" FontSize="12"
+                Command="{Binding DataContext.CancelInsertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                Visibility="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
+                ToolTip="Drops settings changed since Append was clicked"/>
         <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
       </DockPanel>
       <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">

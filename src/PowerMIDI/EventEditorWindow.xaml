@@ -4,7 +4,7 @@
         xmlns:vm="clr-namespace:PowerMIDI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
-        Title="{Binding Title}" Icon="PowerMIDI.ico" Width="1100" Height="720" MinWidth="820" MinHeight="420"
+        Title="{Binding Title}" Icon="PowerMIDI.ico" Width="1100" Height="720" MinWidth="900" MinHeight="420"
         Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource WindowTextBrush}" FontFamily="Segoe UI" FontSize="13"
         WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance vm:EventEditorViewModel}">
@@ -54,20 +54,38 @@
   </Window.Resources>
 
   <DockPanel Margin="12">
-    <!-- Filters -->
-    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8" LastChildFill="False">
+    <!-- Filters; the search box takes the space left (200 at most), so that the buttons stay whole in a narrow window. -->
+    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
       <ComboBox Width="190" ItemsSource="{Binding Tracks}" SelectedIndex="{Binding TrackFilter}" ToolTip="Show events of one track"/>
       <ComboBox Width="120" Margin="8,0,0,0" ItemsSource="{Binding Channels}" SelectedIndex="{Binding ChannelFilter}"
                 ToolTip="Show events of one channel (No channel: SysEx and meta events)"/>
       <ComboBox Width="140" Margin="8,0,0,0" ItemsSource="{Binding Kinds}" SelectedIndex="{Binding KindFilter}" ToolTip="Show one kind of events"/>
-      <TextBox Width="200" Margin="8,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
-               Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search in type, data and description"/>
       <ToggleButton DockPanel.Dock="Right" Content="Follow" Padding="10,3" IsChecked="{Binding Follow}"
                     ToolTip="Select event being played"/>
       <ToggleButton DockPanel.Dock="Right" Content="Audition" Padding="10,3" Margin="0,0,6,0" IsChecked="{Binding Audition}"
                     ToolTip="Plays note selected"/>
       <TextBlock DockPanel.Dock="Right" Text="{Binding CountText}" Foreground="{DynamicResource WindowTextMutedBrush}"
-                 VerticalAlignment="Center" Margin="0,0,12,0"/>
+                 VerticalAlignment="Center" Margin="12,0,12,0"/>
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="208"/></Grid.ColumnDefinitions>
+        <TextBox Margin="8,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
+                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search in type, data and description"/>
+        <!-- Hint while empty (over the box, not hit by the mouse), as in the Library tab. -->
+        <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" Foreground="#FF8A8A8A"
+                   TextTrimming="CharacterEllipsis">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock">
+              <Setter Property="Visibility" Value="Collapsed"/>
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding SearchText}" Value="">
+                  <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+          <Run Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11"/><Run Text="  Search events..."/>
+        </TextBlock>
+      </Grid>
     </DockPanel>
 
     <!-- Edit panel: addition, deletion, Append / Replace, undo / redo, then the selected event (Apply or Enter, shown with a

@@ -64,6 +64,8 @@ public sealed partial class MainViewModel : ObservableObject
         PreviousCommand = Command(Previous);
         RepeatCommand = Command(() => RepeatMode = (RepeatMode + 1) % 3);
         EventsCommand = Command(OpenEventEditor);
+        MixerAppendCommand = Command(MixerAppend);
+        CancelInsertCommand = Command(CancelInsert);
 
         Mixer.KeyboardToggle = c => Run(() => ToggleKeyboardChannel(c));
 
@@ -108,6 +110,8 @@ public sealed partial class MainViewModel : ObservableObject
     public ICommand PreviousCommand { get; }
     public ICommand RepeatCommand { get; }
     public ICommand EventsCommand { get; }       // Event Editor window
+    public ICommand MixerAppendCommand { get; }  // Append of the Mixer / Effects tabs (MainViewModel.MixerAppend.cs)
+    public ICommand CancelInsertCommand { get; }
 
     string status = "Drop MIDI files or a folder onto the window.";
     public string Status { get => status; set => Set(ref status, value); }
@@ -680,6 +684,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (settingsFile != null && settingsFile != item.Path && !ConfirmLeaveSettings()) return;
         StopTrack();
         if (output == null) throw new InvalidOperationException("No MIDI port selected.");
+        if (mixerAppendTick != null) { mixerAppendTick = null; NotifyInsert(); }   // Append of the Mixer: over (its position is the old playback's)
 
         // Another file: the manual settings of the previous track (instruments, volume, pan, effects,
         // muted channels, forced mode) are cleared. They are kept if the same track is played again.

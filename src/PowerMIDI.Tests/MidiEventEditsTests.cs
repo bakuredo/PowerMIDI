@@ -113,4 +113,33 @@ public class MidiEventEditsTests
         Assert.Equal(1, MidiEventEdits.Insert(f, 1, 1, 240, new MidiEvent[] { Cc(11, 9) }, new[] { (1, 1), (1, 3), (1, 4) }));
         Assert.Equal("0:on60/90 240:cc11=9 480:off60", Track1(f));
     }
+
+    [Fact]
+    public void Settings_inserted_before_notes_of_their_position()
+    {
+        // Append of the Mixer: at 480, after the Note Off there (and the volume at 240), before E3 starting there; at 0,
+        // before C3; at the end, last.
+        var f = File();
+        Assert.Equal(3, MidiEventEdits.InsertBeforeNotes(f, 1, 480, new MidiEvent[] { Cc(7, 50), Cc(10, 0) }));
+        Assert.Equal("0:on60/90 240:cc7=100 480:off60 480:cc7=50 480:cc10=0 480:on64/90 960:off64", Track1(f));
+        f = File();
+        MidiEventEdits.InsertBeforeNotes(f, 1, 0, new MidiEvent[] { Cc(7, 50) });
+        Assert.StartsWith("0:cc7=50 0:on60/90", Track1(f));
+        f = File();
+        Assert.Equal(5, MidiEventEdits.InsertBeforeNotes(f, 1, 2000, new MidiEvent[] { Cc(7, 50) }));
+        Assert.EndsWith("960:off64 2000:cc7=50", Track1(f));
+    }
+
+    [Fact]
+    public void Track_of_channel_events()
+    {
+        // Track 1: tempo; track 2: the volume of ch 3 only; track 3: notes of ch 3; ch 5 nowhere.
+        var f = new MidiFile(new TrackChunk(new SetTempoEvent(500000)),
+                             new TrackChunk(new ControlChangeEvent((SevenBitNumber)7, (SevenBitNumber)90) { Channel = (FourBitNumber)2 }),
+                             new TrackChunk(new NoteOnEvent((SevenBitNumber)60, (SevenBitNumber)90) { Channel = (FourBitNumber)2 }));
+        Assert.Equal(3, MidiEventEdits.TrackOfChannel(f, 2));   // its notes first
+        Assert.Equal(1, MidiEventEdits.TrackOfChannel(f, 4));
+        f.Chunks.RemoveAt(2);
+        Assert.Equal(2, MidiEventEdits.TrackOfChannel(f, 2));   // no note: its other events
+    }
 }

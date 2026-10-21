@@ -86,6 +86,31 @@ public static class MidiEventEdits
         return i;
     }
 
+    // Inserts events at a position of a track, as settings for what follows: after the other events already there (they
+    // do not override the new ones), before the notes starting there (played with them). Returns the place of the first one.
+    public static int InsertBeforeNotes(MidiFile file, int track, long time, IReadOnlyList<MidiEvent> events)
+    {
+        var chunk = Track(file, track);
+        var list = Timed(chunk);
+        int place = list.FindIndex(x => x.Time > time || x.Time == time && x.Event is NoteOnEvent);
+        if (place < 0) place = list.Count;
+        list.InsertRange(place, events.Select(e => (time, e)));
+        Write(chunk, list);
+        return place;
+    }
+
+    // The track (from 1) of the events of a channel: the first one with notes on it, otherwise with other events of it,
+    // otherwise the first track.
+    public static int TrackOfChannel(MidiFile file, int channel)
+    {
+        var chunks = file.GetTrackChunks().ToList();
+        int Find(Func<ChannelEvent, bool> kind) =>
+            chunks.FindIndex(c => c.Events.OfType<ChannelEvent>().Any(e => e.Channel == channel && kind(e))) + 1;
+        int track = Find(e => e is NoteOnEvent);
+        if (track == 0) track = Find(_ => true);
+        return track > 0 ? track : 1;
+    }
+
     // Inserts events at a position of a track: right after the event at index (-1: before the events already there).
     // With delete (a note: its Note On and its Note Off), those events are deleted first; the event at index may be one
     // of them: the new ones then take its place. Returns the place of the first one.

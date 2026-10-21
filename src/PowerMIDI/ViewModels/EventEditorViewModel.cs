@@ -71,6 +71,12 @@ public interface IEventEditing
     // Writes the settings in blue (Mixer / Effects tabs) as events: after the event at index of a track (-1: before the
     // events at tick), or instead of the events replaced; returns what was written (null: nothing in blue).
     string WriteFixed(int track, int index, long tick, IReadOnlyList<(int Track, int Index)> replaced);
+    // Append / Replace of the Event Editor in progress ("Append", "Replace" or null), and the Append of the Mixer / Effects
+    // tabs (MainViewModel.MixerAppend.cs): one at a time, finished or cancelled from either place.
+    string EditorPending { set; }
+    bool MixerAppendPending { get; }
+    void FinishMixerAppend();
+    void CancelMixerAppend();
     // Audition: plays a note on its own (Note Off after length).
     void PlayNote(int channel, int note, int velocity, TimeSpan length);
     // Append / Replace cancelled: the settings in blue go back to the file's values.
@@ -518,7 +524,7 @@ public sealed class EventEditorViewModel : ObservableObject
     bool Change(Action action, string done)
     {
         if (editing.EditBlocked is { } blocked) { Error = blocked; return false; }
-        if (pending != null) { Error = $"{pending}: click {pending} again or Cancel first"; return false; }
+        if (Pending is { } busy) { Error = $"{busy}: click {busy} again or Cancel first"; return false; }
         Follow = false;
         action();
         UpdateUndo();
@@ -567,19 +573,33 @@ public sealed class EventEditorViewModel : ObservableObject
     string pending;
     List<(int Track, long Tick, string Type, int Rank)> targets = new();
 
+    // The one in progress: this window's, or the Append of the Mixer / Effects tabs.
+    string Pending => pending ?? (editing.MixerAppendPending ? "Append" : null);
+
     // Pressed while pending (the click itself changes nothing: the commands do, then the state is shown again).
-    public bool IsAppending { get => pending == "Append"; set => OnPropertyChanged(); }
-    public bool IsReplacing { get => pending == "Replace"; set => OnPropertyChanged(); }
-    public bool CanAppend => pending != "Replace";
-    public bool CanReplace => pending != "Append";
-    public bool IsPending => pending != null;
+    public bool IsAppending { get => Pending == "Append"; set => OnPropertyChanged(); }
+    public bool IsReplacing { get => Pending == "Replace"; set => OnPropertyChanged(); }
+    public bool CanAppend => Pending != "Replace";
+    public bool CanReplace => Pending != "Append";
+    public bool IsPending => Pending != null;
 
     void SetPending(string value)
     {
         pending = value;
+        editing.EditorPending = value;
+        PendingChanged();
+    }
+
+    // The buttons show the state again (also when the Append of the Mixer / Effects tabs starts or ends).
+    public void PendingChanged()
+    {
         foreach (var name in new[] { nameof(IsAppending), nameof(IsReplacing), nameof(CanAppend), nameof(CanReplace), nameof(IsPending) })
             OnPropertyChanged(name);
     }
+
+    // From the Mixer / Effects tabs: this window's Append finished (as a second click here), or cancelled.
+    public void FinishPending() { if (pending == "Append") Write(pending, null); }
+    public void CancelPending() => Cancel();
 
     (int Track, long Tick, string Type, int Rank) Target(EventRowViewModel row) =>
         (row.Row.Track, row.Row.Tick, row.Row.Type, rows.Count(r => Same(r.Row, row.Row) && r.Row.Index < row.Row.Index));
@@ -600,6 +620,7 @@ public sealed class EventEditorViewModel : ObservableObject
 
     void Start(string kind, List<EventRowViewModel> selected)
     {
+        if (editing.MixerAppendPending) { if (kind == "Append") editing.FinishMixerAppend(); return; }   // started in the Mixer
         if (pending == kind) { Confirm(); return; }
         if (pending != null) return;
         if (editing.EditBlocked is { } blocked) { Error = blocked; return; }
@@ -643,7 +664,7 @@ public sealed class EventEditorViewModel : ObservableObject
 
     void Cancel()
     {
-        if (pending == null) return;
+        if (pending == null) { editing.CancelMixerAppend(); return; }   // the Append of the Mixer, if any
         string kind = pending;
         SetPending(null);
         editing.DropFixed();
