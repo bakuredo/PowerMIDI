@@ -453,11 +453,32 @@ public sealed class EventEditorViewModel : ObservableObject
     public bool HasText => textLabel != null;
     public string Text { get => text; set => Set(ref text, value); }
     // Why the selected event cannot be changed (null: it can), or why nothing can be changed now.
-    public string NotEditable { get => notEditable; private set { if (Set(ref notEditable, value)) OnPropertyChanged(nameof(CanApply)); } }
+    public string NotEditable { get => notEditable; private set { if (Set(ref notEditable, value)) { OnPropertyChanged(nameof(CanApply)); OnPropertyChanged(nameof(MessagesToolTip)); } } }
     public bool CanApply => form != null && notEditable == null;
     public bool HasForm => form != null;   // an event is selected: its fields and Apply are shown
-    public string Error { get => error; private set => Set(ref error, value); }
-    public string Status { get => status; private set => Set(ref status, value); }
+    public string Error { get => error; private set { if (Set(ref error, value)) OnPropertyChanged(nameof(MessagesToolTip)); } }
+    // Status: short (on the line of the buttons, cut if too long); its tooltip shows it whole, with the details of what was
+    // written (Append / Replace).
+    public string Status { get => status; private set { Set(ref status, value); SetStatusDetail(null); } }
+    string statusDetail;
+    public string StatusToolTip => string.IsNullOrEmpty(status) ? null : statusDetail != null ? $"{status}\n{statusDetail}" : status;
+
+    void SetStatusDetail(string detail)
+    {
+        statusDetail = detail;
+        OnPropertyChanged(nameof(StatusToolTip));
+        OnPropertyChanged(nameof(MessagesToolTip));
+    }
+
+    // Tooltip of the messages of the line of the buttons (error, why the event cannot be changed, status): whole.
+    public string MessagesToolTip
+    {
+        get
+        {
+            var all = new[] { error, notEditable, StatusToolTip }.Where(m => !string.IsNullOrEmpty(m)).ToList();
+            return all.Count > 0 ? string.Join("\n", all) : null;
+        }
+    }
 
     public IReadOnlyList<string> NewKinds => MidiEventForm.NewKinds;
     string addKind;
@@ -497,7 +518,7 @@ public sealed class EventEditorViewModel : ObservableObject
     bool Change(Action action, string done)
     {
         if (editing.EditBlocked is { } blocked) { Error = blocked; return false; }
-        if (pending != null) { Error = $"{pending}: click {pending} again to write the settings, or Cancel"; return false; }
+        if (pending != null) { Error = $"{pending}: click {pending} again or Cancel first"; return false; }
         Follow = false;
         action();
         UpdateUndo();
@@ -592,7 +613,7 @@ public sealed class EventEditorViewModel : ObservableObject
         editing.WriteSettingsInTrack();
         UpdateUndo();
         SetPending(kind);
-        Status = $"{kind}: change settings in Mixer / Effects tabs, then click {kind} again (Cancel: drop them)";
+        Status = $"{kind}: change settings, then click {kind} again";
     }
 
     void Confirm()
@@ -615,8 +636,9 @@ public sealed class EventEditorViewModel : ObservableObject
         string written = null;
         Change(() => written = editing.WriteFixed(track, index, tick, replaced), "");
         if (editing.EditBlocked != null) return;
-        if (written == null) { Status = "Nothing changed in Mixer / Effects tabs: nothing written"; return; }
-        Status = $"{(kind == "Append" ? "Appended" : $"Replaced {found.Count} event(s)")} at {position}: {written} (Ctrl+Z: undo)";
+        if (written == null) { Status = "No setting changed: nothing written"; return; }
+        Status = $"{(kind == "Append" ? "Appended" : $"Replaced {found.Count} event(s)")} at {position} (Ctrl+Z: undo)";
+        SetStatusDetail(written);   // in the tooltip: the line would be too long
     }
 
     void Cancel()
@@ -625,7 +647,7 @@ public sealed class EventEditorViewModel : ObservableObject
         string kind = pending;
         SetPending(null);
         editing.DropFixed();
-        Status = $"{kind} cancelled: settings back to file's";
+        Status = $"{kind} cancelled";
     }
 
     // Adds an event of the chosen kind at the position of the selected row (its track and channel), with default

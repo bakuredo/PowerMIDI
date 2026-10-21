@@ -31,6 +31,7 @@ public sealed partial class MainViewModel
         pb.RepeatStarted += (_, _) => { loopsDone++; RestoreLoopStart(); };
         loopRestore = null;
         loopEndNotes = null;
+        loopLeft = false;
         if (loop is { } l)
         {
             loopRestore = MidiTools.GetLoopRestore(midi, l.Start, l.End);
@@ -143,13 +144,24 @@ public sealed partial class MainViewModel
 
     bool IsLoopSeam(long rawTime) => loopActive && rawTime == loopEnd;
 
-    // Loop on or off for the current playback, from the repeat mode and the passes already done.
+    // A jump in the track, before the playback moves there: past the loop end (or at it), the loop is left: the rest of
+    // the track plays, then its end (repeat track: the track again from its start); back before the loop end, the loop
+    // again. Otherwise the playback, which ends at the loop end while looping, would go back to the loop start.
+    bool loopLeft;
+
+    void PlaceInLoop(long tick)
+    {
+        loopLeft = loop is { } l && tick >= l.End;
+        ApplyLoopMode();
+    }
+
+    // Loop on or off for the current playback, from the repeat mode, the passes already done and a jump past its end.
     // The playback ends one tick after the loop end: ending exactly there, the Note Off events at the loop end would
     // not be played before looping (notes left held, e.g. the strings of FF7's Victory Fanfare).
     void ApplyLoopMode()
     {
         if (playback == null) return;
-        bool active = loop != null && (repeatMode == 2 || loopsDone < LoopsWithoutRepeat);
+        bool active = loop != null && !loopLeft && (repeatMode == 2 || loopsDone < LoopsWithoutRepeat);
         loopEnd = loop?.End ?? -1;
         loopActive = active;
         playback.Loop = active;

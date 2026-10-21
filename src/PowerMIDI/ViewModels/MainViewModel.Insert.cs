@@ -135,6 +135,7 @@ public sealed partial class MainViewModel
 
         CreatePlayback(midi);
         var at = TickToTime(tick);
+        PlaceInLoop(tick);
         playback.MoveToTime(new MetricTimeSpan(at));
         ApplyMixerState();   // e.g. the volume of channels that were muted
         SetPosition(at.TotalSeconds);
@@ -172,6 +173,7 @@ public sealed partial class MainViewModel
         if (playback != null) { playback.Stop(); ReleaseNotes(); playback.Dispose(); playback = null; }
         CreatePlayback(ReadTrackFile(current.Path));
         var at = TickToTime(tick);
+        PlaceInLoop(tick);
         playback.MoveToTime(new MetricTimeSpan(at));
         ChaseState(tick);   // the channels as the changed track has them there
         SetPosition(at.TotalSeconds);

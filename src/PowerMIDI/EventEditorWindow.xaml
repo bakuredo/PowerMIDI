@@ -78,7 +78,7 @@
         <KeyBinding Key="Return" Command="{Binding ApplyCommand}"/>
       </Border.InputBindings>
       <StackPanel>
-        <DockPanel LastChildFill="False">
+        <DockPanel>
           <TextBlock Text="Add" VerticalAlignment="Center" MinWidth="110" Foreground="{DynamicResource TextSoftBrush}"/>
           <ComboBox Width="150" ItemsSource="{Binding NewKinds}" SelectedItem="{Binding AddKind}" ToolTip="Kind of event to add"/>
           <Button Content="Add" Margin="8,0,6,0" Command="{Binding AddCommand}"
@@ -98,13 +98,17 @@
           <Button Content="Cancel" Margin="6,0,0,0" Command="{Binding CancelCommand}"
                   Visibility="{Binding IsPending, Converter={StaticResource BoolToVisibility}}"
                   ToolTip="Drops settings changed since Append / Replace was clicked"/>
-          <TextBlock Text="{Binding Error}" Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/>
-          <TextBlock Text="{Binding NotEditable}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/>
           <Button DockPanel.Dock="Right" Content="Redo" Margin="0" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}"
                   ToolTip="Redo (Ctrl+Y)"/>
           <Button DockPanel.Dock="Right" Content="Undo" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}"
                   ToolTip="Undo (Ctrl+Z)"/>
-          <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" Margin="12,0,12,0"/>
+          <!-- Messages (error, why the event cannot be changed, status): in the space left between the buttons, cut with
+               an ellipsis if too long; whole in the tooltip. -->
+          <TextBlock VerticalAlignment="Center" Margin="12,0,12,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding MessagesToolTip}">
+            <Run Text="{Binding Error, Mode=OneWay}" Foreground="{DynamicResource WarningBrush}"/>
+            <Run Text="{Binding NotEditable, Mode=OneWay}" Foreground="{DynamicResource TextMutedBrush}"/>
+            <Run Text="{Binding Status, Mode=OneWay}" Foreground="{DynamicResource TextMutedBrush}"/>
+          </TextBlock>
         </DockPanel>
         <DockPanel Margin="0,8,0,0">
           <TextBlock Text="{Binding EditKind}" FontWeight="SemiBold" MinWidth="110" VerticalAlignment="Center"/>

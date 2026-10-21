@@ -720,6 +720,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (from > 0)
         {
             var at = TimeSpan.FromSeconds(from);
+            PlaceInLoop(TimeConverter.ConvertFrom(new MetricTimeSpan(at), tempoMap));
             pb.MoveToTime(new MetricTimeSpan(at));
             ChaseState(CurrentTick());   // the channels as the file has them there
             SetPosition(from);

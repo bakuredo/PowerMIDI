@@ -20,6 +20,7 @@ public sealed partial class MainViewModel
         bool running = playback.IsRunning;
         if (running) playback.Stop();   // the state is read and sent again first (no event of the track meanwhile)
         long from = CurrentTick();
+        PlaceInLoop(TimeConverter.ConvertFrom(time, tempoMap));   // past the loop end: out of the loop (MainViewModel.Loop.cs)
         playback.MoveToTime(time);
         ChaseState(CurrentTick(), from);
         if (running) playback.Start();
