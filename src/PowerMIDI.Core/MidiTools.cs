@@ -437,6 +437,13 @@ public static class MidiTools
 
     public static string FormatTime(TimeSpan t) => t.ToString(@"mm\:ss");
 
+    // Position in the music: bar:beat:tick ("12:3:000"), from 1, with the time signatures of the track.
+    public static string FormatPosition(long tick, TempoMap tempoMap)
+    {
+        var at = TimeConverter.ConvertTo<BarBeatTicksTimeSpan>(tick, tempoMap);
+        return $"{at.Bars + 1}:{at.Beats + 1}:{at.Ticks:000}";
+    }
+
     // Signed number: "+5", "0", "-5".
     public static string FormatSigned(int value) => value > 0 ? $"+{value}" : value.ToString();
 }

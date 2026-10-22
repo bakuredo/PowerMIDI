@@ -316,14 +316,16 @@ public sealed partial class MainViewModel : ObservableObject
             foreach (var f in files)
             {
                 string std = "?", dur = "unreadable";
+                bool read = false;
                 try
                 {
                     var midi = MidiTools.ReadFile(f);
                     std = MidiTools.GetStandard(midi);
                     dur = MidiTools.FormatTime(MidiTools.GetDuration(midi));
+                    read = true;
                 }
                 catch { }
-                var item = new PlaylistItem { Name = Path.GetFileName(f), Path = Path.GetFullPath(f), Standard = std, Duration = dur, Library = Library.KeyOf(f) };
+                var item = new PlaylistItem { Name = Path.GetFileName(f), Path = Path.GetFullPath(f), Standard = std, Duration = dur, Unreadable = !read, Library = Library.KeyOf(f) };
                 Playlist.Add(item);
                 firstAdded ??= item;
                 added++;
@@ -807,27 +809,44 @@ public sealed partial class MainViewModel : ObservableObject
         return had;
     }
 
-    void MoveTrack(int direction)
+    // auto: the playlist goes on by itself (end of a track): the files that could not be read are skipped.
+    void MoveTrack(int direction, bool auto = false)
     {
         int count = Playlist.Count;
         if (count == 0) return;
         int index = current != null ? Playlist.IndexOf(current) : -1;
+        bool Playable(int i) => !auto || !Playlist[i].Unreadable;
         int next;
         if (shuffle && count > 1)
         {
-            do { next = random.Next(count); } while (next == index);
+            var choices = Enumerable.Range(0, count).Where(i => i != index && Playable(i)).ToList();
+            if (choices.Count == 0) { EndOfPlaylist(); return; }
+            next = choices[random.Next(choices.Count)];
         }
         else
         {
-            next = index + direction;
-            if (next >= count)
+            next = index;
+            for (int tries = 0; ; tries++)
             {
-                if (repeatMode >= 1) next = 0;
-                else { StopTrack(); UpdateNumbers(); Status = "End of playlist."; return; }
+                next += direction;
+                if (next >= count)
+                {
+                    if (repeatMode >= 1) next = 0;
+                    else { EndOfPlaylist(); return; }
+                }
+                if (next < 0) next = 0;
+                if (Playable(next)) break;
+                if (tries >= count) { EndOfPlaylist(); return; }   // none readable
             }
-            if (next < 0) next = 0;
         }
         StartTrack(Playlist[next]);
+    }
+
+    void EndOfPlaylist()
+    {
+        StopTrack();
+        UpdateNumbers();
+        Status = "End of playlist.";
     }
 
     void TogglePlayPause()
@@ -875,7 +894,7 @@ public sealed partial class MainViewModel : ObservableObject
         UpdateLoop();
         if (!playback.IsRunning)   // end of track
         {
-            if (repeatMode == 2) StartTrack(current); else MoveTrack(1);
+            if (repeatMode == 2) StartTrack(current); else MoveTrack(1, auto: true);
             return;
         }
         if (IsSeeking) return;

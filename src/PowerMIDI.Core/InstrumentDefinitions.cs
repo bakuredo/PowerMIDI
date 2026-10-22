@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
@@ -114,6 +115,10 @@ public sealed class InstrumentDefinitions
     }
 
     static string Attr(XmlNode node, string name) => node?.Attributes?[name]?.Value;
+
+    // Numbers of the files, written as "-64" whatever the language of Windows (some write the minus sign otherwise).
+    static int Int(string text) => int.Parse(text, NumberStyles.Integer, CultureInfo.InvariantCulture);
+    static bool TryInt(string text, out int value) => int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
     static IEnumerable<XmlElement> Children(XmlNode node, string name) =>
         node == null ? Enumerable.Empty<XmlElement>() : node.ChildNodes.OfType<XmlElement>().Where(e => e.Name == name);
 
@@ -126,9 +131,9 @@ public sealed class InstrumentDefinitions
         {
             var x = LoadXml(gmFile);
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/InstrumentList/Map/PC"))
-                defs.GmVoices[int.Parse(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
+                defs.GmVoices[Int(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/DrumSetList/Map/PC"))
-                defs.GmDrums[int.Parse(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
+                defs.GmDrums[Int(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
         }
 
         var gm2File = Path.Combine(dir, "GM2.xml");
@@ -137,13 +142,13 @@ public sealed class InstrumentDefinitions
             var x = LoadXml(gm2File);
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/InstrumentList/Map/PC"))
                 foreach (var bank in Children(pc, "Bank"))
-                    defs.Gm2Voices[(int.Parse(Attr(bank, "LSB")), int.Parse(Attr(pc, "PC")) - 1)] = Attr(bank, "Name");
+                    defs.Gm2Voices[(Int(Attr(bank, "LSB")), Int(Attr(pc, "PC")) - 1)] = Attr(bank, "Name");
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/DrumSetList/Map/PC"))
             {
-                int program = int.Parse(Attr(pc, "PC")) - 1;
+                int program = Int(Attr(pc, "PC")) - 1;
                 defs.Gm2Drums[program] = Attr(pc, "Name");
                 var tones = defs.Gm2DrumTones[program] = new();
-                foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) tones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
+                foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) tones[Int(Attr(tone, "Key"))] = Attr(tone, "Name");
             }
         }
 
@@ -152,11 +157,11 @@ public sealed class InstrumentDefinitions
         {
             var x = LoadXml(mt32File);
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/InstrumentList/Map/PC"))
-                defs.Mt32Voices[int.Parse(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
+                defs.Mt32Voices[Int(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
             foreach (XmlElement pc in x.SelectNodes("/ModuleData/DrumSetList/Map/PC"))
             {
-                defs.Mt32Drums[int.Parse(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
-                foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) defs.Mt32DrumTones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
+                defs.Mt32Drums[Int(Attr(pc, "PC")) - 1] = Attr(pc, "Name");
+                foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) defs.Mt32DrumTones[Int(Attr(tone, "Key"))] = Attr(tone, "Name");
             }
         }
 
@@ -170,17 +175,17 @@ public sealed class InstrumentDefinitions
                 if (!mapIndex.TryGetValue(Attr(map, "Name") ?? "", out int m)) continue;
                 foreach (var pc in Children(map, "PC"))
                     foreach (var bank in Children(pc, "Bank"))
-                        defs.GsVoices[(m, int.Parse(Attr(bank, "MSB")), int.Parse(Attr(pc, "PC")) - 1)] = Attr(bank, "Name");
+                        defs.GsVoices[(m, Int(Attr(bank, "MSB")), Int(Attr(pc, "PC")) - 1)] = Attr(bank, "Name");
             }
             foreach (XmlElement map in x.SelectNodes("/ModuleData/DrumSetList/Map"))
             {
                 if (!mapIndex.TryGetValue(Attr(map, "Name") ?? "", out int m)) continue;
                 foreach (var pc in Children(map, "PC"))
                 {
-                    var key = (m, int.Parse(Attr(pc, "PC")) - 1);
+                    var key = (m, Int(Attr(pc, "PC")) - 1);
                     defs.GsDrums[key] = Attr(pc, "Name");
                     var tones = defs.GsDrumTones[key] = new();
-                    foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) tones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
+                    foreach (var tone in Children(pc, "Bank").SelectMany(b => Children(b, "Tone"))) tones[Int(Attr(tone, "Key"))] = Attr(tone, "Name");
                 }
             }
             defs.EfxTypes = ReadEfxDefinitions(x);
@@ -195,8 +200,8 @@ public sealed class InstrumentDefinitions
                 foreach (var pc in Children(map, "PC"))
                     foreach (var bank in Children(pc, "Bank"))
                     {
-                        if (!int.TryParse(Attr(bank, "MSB"), out int msb) || msb > 127) continue;
-                        var key = (msb, int.Parse(Attr(bank, "LSB")), int.Parse(Attr(pc, "PC")) - 1);
+                        if (!TryInt(Attr(bank, "MSB"), out int msb) || msb > 127) continue;
+                        var key = (msb, Int(Attr(bank, "LSB")), Int(Attr(pc, "PC")) - 1);
                         defs.XgVoices[key] = Attr(bank, "Name");
                         if (Attr(bank, "MU50") == "1") defs.XgMu50Voices.Add(key);
                     }
@@ -206,11 +211,11 @@ public sealed class InstrumentDefinitions
                     foreach (var bank in Children(pc, "Bank"))
                         if (Attr(bank, "MSB") is "126" or "127")
                         {
-                            var key = (int.Parse(Attr(bank, "MSB")), int.Parse(Attr(pc, "PC")) - 1);
+                            var key = (Int(Attr(bank, "MSB")), Int(Attr(pc, "PC")) - 1);
                             defs.XgDrums[key] = Attr(pc, "Name");
                             if (Attr(bank, "MU50") == "1") defs.XgMu50Drums.Add(key);
                             var tones = defs.XgDrumTones[key] = new();
-                            foreach (var tone in Children(bank, "Tone")) tones[int.Parse(Attr(tone, "Key"))] = Attr(tone, "Name");
+                            foreach (var tone in Children(bank, "Tone")) tones[Int(Attr(tone, "Key"))] = Attr(tone, "Name");
                         }
             defs.XgReverbTypes = ReadXgEffectDefinitions(x, "00", "Reverb Parameter");
             defs.XgChorusTypes = ReadXgEffectDefinitions(x, "20", "Chorus Parameter");
@@ -230,15 +235,15 @@ public sealed class InstrumentDefinitions
         var m = dataPattern.Match(DataOf(ccm));
         if (!m.Success) return null;
         var v = ccm["Value"];
-        int offset = int.TryParse(Attr(v, "Offset"), out var o) ? o : 0;
+        int offset = TryInt(Attr(v, "Offset"), out var o) ? o : 0;
         var labels = new Dictionary<int, string>();
         var tableId = Attr(v, "TableID");
         if (tableId != null && tables.TryGetValue(tableId, out var table)) labels = table;
-        else foreach (var entry in Children(v, "Entry")) labels[int.Parse(Attr(entry, "Value")) + offset] = Attr(entry, "Label");
-        int min = Attr(v, "Min") is { } mn ? int.Parse(mn) + offset : labels.Count > 0 ? labels.Keys.Min() : 0;
-        int max = Attr(v, "Max") is { } mx ? int.Parse(mx) + offset : labels.Count > 0 ? labels.Keys.Max() : 127;
-        int def = !string.IsNullOrEmpty(linkDefault) ? int.Parse(linkDefault) + offset
-                : Attr(v, "Default") is { } d ? int.Parse(d) + offset : offset;   // no default: 0 displayed (Domino convention)
+        else foreach (var entry in Children(v, "Entry")) labels[Int(Attr(entry, "Value")) + offset] = Attr(entry, "Label");
+        int min = Attr(v, "Min") is { } mn ? Int(mn) + offset : labels.Count > 0 ? labels.Keys.Min() : 0;
+        int max = Attr(v, "Max") is { } mx ? Int(mx) + offset : labels.Count > 0 ? labels.Keys.Max() : 127;
+        int def = !string.IsNullOrEmpty(linkDefault) ? Int(linkDefault) + offset
+                : Attr(v, "Default") is { } d ? Int(d) + offset : offset;   // no default: 0 displayed (Domino convention)
         var unit = withUnit && Attr(v, "Name") is { } u && u != "Value" ? u : "";
         return new EffectParamDef
         {
@@ -275,7 +280,7 @@ public sealed class InstrumentDefinitions
 
         var tables = new Dictionary<string, Dictionary<int, string>>();
         foreach (var table in Children(folder, "Table"))
-            tables[Attr(table, "ID")] = Children(table, "Entry").GroupBy(e => int.Parse(Attr(e, "Value")))
+            tables[Attr(table, "ID")] = Children(table, "Entry").GroupBy(e => Int(Attr(e, "Value")))
                                          .ToDictionary(g => g.Key, g => Attr(g.Last(), "Label"));
         var byId = new Dictionary<string, XmlElement>();
         foreach (XmlElement ccm in folder.SelectNodes(".//CCM")) byId[Attr(ccm, "ID")] = ccm;
@@ -319,7 +324,7 @@ public sealed class InstrumentDefinitions
         foreach (var entry in Children(typeMacro["Value"], "Entry"))
         {
             var m = Regex.Match(Attr(entry, "Label") ?? "", @"^\s*(\d{3})\s");
-            if (m.Success) codeByNumber[m.Groups[1].Value] = int.Parse(Attr(entry, "Value"));
+            if (m.Success) codeByNumber[m.Groups[1].Value] = Int(Attr(entry, "Value"));
         }
         // XG table labels: often prefixed with the MIDI value ("52  -12", "1  Wet -63"): strip it.
         var tables = new Dictionary<string, Dictionary<int, string>>();
@@ -328,7 +333,7 @@ public sealed class InstrumentDefinitions
             var labels = new Dictionary<int, string>();
             foreach (var entry in Children(table, "Entry"))
             {
-                int value = int.Parse(Attr(entry, "Value"));
+                int value = Int(Attr(entry, "Value"));
                 var label = (Attr(entry, "Label") ?? "").Trim();
                 var m = Regex.Match(label, $@"^{value}\s+(.+)$");
                 if (m.Success) label = m.Groups[1].Value.Trim();

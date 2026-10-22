@@ -19,11 +19,10 @@ public sealed class EventRowViewModel : ObservableObject
     public Func<MidiEventRow, string> FixedOf { get; init; }   // what replaces an event (EventEditorViewModel.FixedOf)
     string position, time;
 
-    public string Position => position ??= BarBeat(TimeConverter.ConvertTo<BarBeatTicksTimeSpan>(Row.Tick, TempoMap));
+    public string Position => position ??= MidiTools.FormatPosition(Row.Tick, TempoMap);
     public string Time => time ??= TimeSpan.FromSeconds(Seconds).ToString(@"mm\:ss\.fff", CultureInfo.InvariantCulture);
     public double Seconds => ((TimeSpan)TimeConverter.ConvertTo<MetricTimeSpan>(Row.Tick, TempoMap)).TotalSeconds;
 
-    static string BarBeat(BarBeatTicksTimeSpan bbt) => $"{bbt.Bars + 1}:{bbt.Beats + 1}:{bbt.Ticks:000}";
     public string Track => Row.Track > 0 ? Row.Track.ToString() : "";   // a setting: none
     public string Channel => Row.Channel >= 0 ? (Row.Channel + 1).ToString() : "";
     public string Type => Row.Type;

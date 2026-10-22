@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Net.Http;
 using System.Security.Cryptography;
 
 namespace PowerMIDI.Library;

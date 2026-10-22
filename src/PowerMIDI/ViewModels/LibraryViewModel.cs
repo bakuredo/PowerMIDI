@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Net.Http;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -134,7 +135,7 @@ public sealed class LibraryViewModel : ObservableObject
     // Tooltip of the list of collections: where the files of the collection shown come from, when its database was built.
     public string CollectionToolTip => selectedCollection is not { } c ? "Collection shown"
         : $"Files: zip of {Megabytes(c.SourceSize)} from {new Uri(c.SourceUrl).Host}\n" +
-          $"Database built {(DateTime.TryParse(c.BuiltAt, out var built) ? built.ToString("d") : c.BuiltAt)} (Library Builder {c.BuilderVersion})";
+          $"Database built {(DateTime.TryParse(c.BuiltAt, CultureInfo.InvariantCulture, DateTimeStyles.None, out var built) ? built.ToString("d") : c.BuiltAt)} (Library Builder {c.BuilderVersion})";
 
     // At startup: the collections of the library database, the one of the last time selected.
     public void Load()
@@ -233,6 +234,7 @@ public sealed class LibraryViewModel : ObservableObject
         catch (Exception ex) { view.ShowError(new IOException($"Download of {collection.Name} failed: {ex.Message}", ex)); }
         finally
         {
+            downloadCancel.Dispose();
             downloadCancel = null;
             IsDownloading = false;
             UpdateDownload();
@@ -467,7 +469,7 @@ public sealed class LibraryViewModel : ObservableObject
     }
 
     static string LocalTime(string utc) =>
-        DateTime.TryParse(utc, null, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var t)
+        DateTime.TryParse(utc, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t)
             ? t.ToLocalTime().ToString("g") : utc;
 
     // ---------- Actions ----------

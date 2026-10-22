@@ -1,3 +1,4 @@
+using System.Globalization;
 using Melanchall.DryWetMidi.Interaction;
 using PowerMIDI.Core;
 
@@ -101,10 +102,5 @@ public sealed partial class MainViewModel
         return TimeConverter.ConvertFrom(new BarBeatTicksTimeSpan(at.Bars, at.Beats, 0), tempoMap);
     }
 
-    string BarBeat(long tick)
-    {
-        if (tempoMap == null) return tick.ToString();
-        var at = TimeConverter.ConvertTo<BarBeatTicksTimeSpan>(tick, tempoMap);
-        return $"{at.Bars + 1}:{at.Beats + 1}:{at.Ticks:000}";
-    }
+    string BarBeat(long tick) => tempoMap != null ? MidiTools.FormatPosition(tick, tempoMap) : tick.ToString(CultureInfo.InvariantCulture);
 }

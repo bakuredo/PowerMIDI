@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace PowerMIDI.Core;
@@ -35,12 +36,15 @@ public sealed class IniFile
         return values;
     }
 
-    public void Set(string section, string key, object value) => Section(section, true)[key] = Convert.ToString(value) ?? "";
+    // Numbers written as "-5" whatever the language of Windows (some write the minus sign otherwise).
+    public void Set(string section, string key, object value) => Section(section, true)[key] = Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
 
     public string Get(string section, string key, string defaultValue = null) =>
         Section(section, false) is { } s && s.TryGetValue(key, out var v) ? v : defaultValue;
 
-    public int? GetInt(string section, string key) => int.TryParse(Get(section, key), out var n) ? n : null;
+    // Also a number written by an earlier version in the language of Windows.
+    public int? GetInt(string section, string key) =>
+        int.TryParse(Get(section, key), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) || int.TryParse(Get(section, key), out n) ? n : null;
 
     // Written in UTF-8 with BOM.
     public void Write(string path, string header = null)

@@ -27,7 +27,6 @@ public sealed class SettingsModule
     public Func<SettingKey, int, string> Describe { get; set; }
 
     public bool HasFixed => Fixed().Any();
-    public Dictionary<SettingKey, int> FixedValues() => Fixed().ToDictionary(x => x.Key, x => x.Value);
 }
 
 // The settings modules, in the order they are handled: the effects first (as the module resets its parts after an
