@@ -70,7 +70,7 @@ public sealed partial class MainViewModel : ObservableObject
         Mixer.KeyboardToggle = c => Run(() => ToggleKeyboardChannel(c));
 
         timer.Tick += (_, _) => Run(OnTimer);
-        ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); UpdateLyrics(); } catch { } };
+        ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); UpdateLyrics(); UpdatePositionBar(); } catch { } };
     }
 
     RelayCommand Command(Action action) => new(() => Run(action));
@@ -880,8 +880,15 @@ public sealed partial class MainViewModel : ObservableObject
         }
         if (IsSeeking) return;
         TimeSpan now = playback.GetCurrentTime<MetricTimeSpan>();
-        SetPosition(now.TotalSeconds);
+        SetPosition(now.TotalSeconds);   // also every 30 ms (UpdatePositionBar)
         TimeText = $"{MidiTools.FormatTime(now)} / {durationText}";
         eventEditor?.UpdatePosition(now.TotalSeconds);
+    }
+
+    // Position bar while playing, with the LEDs (30 ms) so that it moves smoothly; not while the user drags it.
+    void UpdatePositionBar()
+    {
+        if (playback == null || state != "playing" || IsSeeking || prompting || !playback.IsRunning) return;
+        SetPosition(((TimeSpan)playback.GetCurrentTime<MetricTimeSpan>()).TotalSeconds);
     }
 }
