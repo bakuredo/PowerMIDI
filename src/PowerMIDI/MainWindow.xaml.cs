@@ -16,6 +16,7 @@ public partial class MainWindow : Window, IMainView
     static readonly string SettingsPath = Path.Combine(BaseDir, "PowerMIDI.ini");
 
     readonly MainViewModel vm;
+    MediaKeys mediaKeys;   // media keys of the keyboard, also when the window is in the background
 
     public MainWindow(string[] paths)
     {
@@ -40,6 +41,7 @@ public partial class MainWindow : Window, IMainView
         if (!File.Exists(SettingsPath))
             ContentRendered += (_, _) => Run(() => { if (!File.Exists(SettingsPath)) SaveSettings(); });
         if (paths.Length > 0) Loaded += (_, _) => Run(() => vm.AddFiles(paths));
+        SourceInitialized += (_, _) => Run(() => mediaKeys = new MediaKeys(this, key => Run(() => MediaCommand(key)?.Execute(null))));
         vm.Start();
     }
 
@@ -218,18 +220,21 @@ public partial class MainWindow : Window, IMainView
             Run(() => used = vm.KeyboardKeyDown(PhysicalKeys.ScanCode(e.Key), e.IsRepeat));
             if (used) { e.Handled = true; return; }
         }
-        var command = e.Key switch
-        {
-            Key.Space or Key.MediaPlayPause => vm.PlayPauseCommand,
-            Key.MediaNextTrack => vm.NextCommand,
-            Key.MediaPreviousTrack => vm.PreviousCommand,
-            Key.MediaStop => vm.StopCommand,
-            _ => null,
-        };
+        var command = e.Key == Key.Space ? vm.PlayPauseCommand : MediaCommand(e.Key);
         if (command == null) return;
         command.Execute(null);
         e.Handled = true;
     }
+
+    // Media keys: in the window, and from anywhere (MediaKeys).
+    ICommand MediaCommand(Key key) => key switch
+    {
+        Key.MediaPlayPause => vm.PlayPauseCommand,
+        Key.MediaNextTrack => vm.NextCommand,
+        Key.MediaPreviousTrack => vm.PreviousCommand,
+        Key.MediaStop => vm.StopCommand,
+        _ => null,
+    };
 
     bool themeReady;   // false while the theme list is filled at startup
 
@@ -329,6 +334,7 @@ public partial class MainWindow : Window, IMainView
         if (keepOpen) { e.Cancel = true; return; }
         try { SaveSettings(); } catch { }
         CloseEventEditor();
+        mediaKeys?.Dispose();   // the media keys back to the other programs
         vm.Shutdown();
     }
 
