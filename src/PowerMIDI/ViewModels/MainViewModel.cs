@@ -62,7 +62,7 @@ public sealed partial class MainViewModel : ObservableObject
         StopCommand = Command(Stop);
         NextCommand = Command(() => MoveTrack(1));
         PreviousCommand = Command(Previous);
-        RepeatCommand = Command(() => RepeatMode = (RepeatMode + 1) % 3);
+        RepeatCommand = Command(() => RepeatMode = RepeatMode switch { 0 => 2, 2 => 1, _ => 0 });   // off → track → playlist → off
         EventsCommand = Command(OpenEventEditor);
         MixerAppendCommand = Command(MixerAppend);
         CancelInsertCommand = Command(CancelInsert);
@@ -627,7 +627,7 @@ public sealed partial class MainViewModel : ObservableObject
     bool shuffle;
     public bool Shuffle { get => shuffle; set => Set(ref shuffle, value); }
 
-    // Three-state repeat button: off → playlist → track → off.
+    // Three-state repeat button: off → track → playlist → off (1: playlist, 2: track).
     int repeatMode;
     public int RepeatMode
     {

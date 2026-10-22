@@ -74,13 +74,44 @@
       <Setter Property="Width" Value="44"/>
       <Setter Property="Height" Value="36"/>
     </Style>
-    <!-- Transport bar toggle buttons (shuffle, repeat): pressed = option enabled. -->
+    <!-- Transport bar toggle buttons (shuffle, repeat, module display): option enabled = blue icon, the button itself drawn
+         as the others (not pressed); hovered as the other buttons. The blue of the theme for text (FixedBrush), the dark
+         one on the light background of a hovered button. -->
     <Style x:Key="TransportToggle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
       <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
       <Setter Property="FontSize" Value="16"/>
       <Setter Property="Width" Value="44"/>
       <Setter Property="Height" Value="36"/>
       <Setter Property="Margin" Value="0,0,6,0"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="1" SnapsToDevicePixels="True">
+              <ContentPresenter x:Name="Cp" HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="#BEE6FD"/>
+                <Setter TargetName="Bd" Property="BorderBrush" Value="#3C7FB1"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource FixedBrush}"/>
+              </Trigger>
+              <MultiTrigger>
+                <MultiTrigger.Conditions>
+                  <Condition Property="IsChecked" Value="True"/>
+                  <Condition Property="IsMouseOver" Value="True"/>
+                </MultiTrigger.Conditions>
+                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource OnLightFixedBrush}"/>
+              </MultiTrigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style TargetType="TextBlock">
       <Setter Property="VerticalAlignment" Value="Center"/>
@@ -126,18 +157,30 @@
     <TabItem Header="Mixer" DataContext="{Binding Mixer}" d:DataContext="{d:DesignInstance vm:MixerViewModel}">
     <DockPanel>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <!-- Reset, or Cancel in its place while an Append is in progress (Append, MainViewModel.MixerAppend.cs: two clicks,
+             the settings changed in between written as events at the playback position; same state as the Append of the
+             Event Editor). -->
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
-                Padding="8,2" FontSize="12" ToolTip="Back to the file's settings"/>        <!-- Append (MainViewModel.MixerAppend.cs): two clicks, the settings changed in between written as events at the
-             playback position; same state as the Append of the Event Editor. -->
+                Padding="8,2" FontSize="12" ToolTip="Back to the file's settings">
+          <Button.Style>
+            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Button.Style>
+        </Button>
+        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0" Padding="8,2" FontSize="12"
+                Command="{Binding DataContext.CancelInsertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                Visibility="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
+                ToolTip="Drops settings changed since Append was clicked"/>
         <ToggleButton DockPanel.Dock="Right" Content="Append" Margin="0,0,6,0" Padding="8,2" FontSize="12"
                       Command="{Binding DataContext.MixerAppendCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
-        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0,0,6,0" Padding="8,2" FontSize="12"
-                Command="{Binding DataContext.CancelInsertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                Visibility="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
-                ToolTip="Drops settings changed since Append was clicked"/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
         <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}" b:Wheel.ComboStep="True"
                   ToolTip="Controller set by the sliders">
@@ -540,18 +583,30 @@
     </TabItem.Resources>
     <DockPanel>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <!-- Reset, or Cancel in its place while an Append is in progress (Append, MainViewModel.MixerAppend.cs: two clicks,
+             the effects changed in between written as events at the playback position; same state as the Append of the
+             Event Editor). -->
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
-                Padding="8,2" FontSize="12" ToolTip="Back to the file's effects"/>        <!-- Append (MainViewModel.MixerAppend.cs): two clicks, the effects changed in between written as events at the
-             playback position; same state as the Append of the Event Editor. -->
+                Padding="8,2" FontSize="12" ToolTip="Back to the file's effects">
+          <Button.Style>
+            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                  <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Button.Style>
+        </Button>
+        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0" Padding="8,2" FontSize="12"
+                Command="{Binding DataContext.CancelInsertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                Visibility="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
+                ToolTip="Drops settings changed since Append was clicked"/>
         <ToggleButton DockPanel.Dock="Right" Content="Append" Margin="0,0,6,0" Padding="8,2" FontSize="12"
                       Command="{Binding DataContext.MixerAppendCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
-        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0,0,6,0" Padding="8,2" FontSize="12"
-                Command="{Binding DataContext.CancelInsertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                Visibility="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
-                ToolTip="Drops settings changed since Append was clicked"/>
         <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
       </DockPanel>
       <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">
