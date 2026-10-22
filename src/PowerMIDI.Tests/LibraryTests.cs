@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Net;
+using System.Net.Sockets;
 using Melanchall.DryWetMidi.Common;
 using Melanchall.DryWetMidi.Core;
 using PowerMIDI.Core;
@@ -170,18 +171,33 @@ public class LibraryTests
         Assert.Null(sample.Catalog("missing"));
     }
 
+    // An HTTP server of the tests on localhost (…/files/), on a port free at that moment: a port taken at random may be
+    // in use by another process (the start then fails); another one is tried.
+    static (HttpListener Listener, int Port) StartListener()
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            var probe = new TcpListener(IPAddress.Loopback, 0);
+            probe.Start();
+            int port = ((IPEndPoint)probe.LocalEndpoint).Port;
+            probe.Stop();
+            var listener = new HttpListener();
+            listener.Prefixes.Add($"http://localhost:{port}/files/");
+            try { listener.Start(); return (listener, port); }
+            catch (HttpListenerException) when (attempt < 10) { listener.Close(); }
+        }
+    }
+
     // Serves one file over HTTP (localhost), as archive.org would serve a zip.
     sealed class FileServer : IDisposable
     {
-        readonly HttpListener listener = new();
+        readonly HttpListener listener;
         public readonly string Url;
 
         public FileServer(string file)
         {
-            int port = new Random().Next(20000, 60000);
+            (listener, int port) = StartListener();
             Url = $"http://localhost:{port}/files/{Path.GetFileName(file)}";
-            listener.Prefixes.Add($"http://localhost:{port}/files/");
-            listener.Start();
             _ = Task.Run(async () =>
             {
                 while (listener.IsListening)
@@ -249,10 +265,8 @@ public class LibraryTests
         File.Delete(sample.Zip);
         // The first request: half of the zip, then nothing (as a server of archive.org that stops answering); the next one
         // asks for the rest (Range) and gets it.
-        int port = new Random().Next(20000, 60000);
-        using var listener = new HttpListener();
-        listener.Prefixes.Add($"http://localhost:{port}/files/");
-        listener.Start();
+        var (listener, port) = StartListener();
+        using var stopped = listener;   // closed at the end
         var ranges = new List<string>();
         _ = Task.Run(async () =>
         {
@@ -307,10 +321,8 @@ public class LibraryTests
         File.Delete(sample.Zip);
         // The whole zip sent without its size (chunked), then nothing instead of the end of the stream: complete, so no
         // request for the rest (which a server refuses: 416).
-        int port = new Random().Next(20000, 60000);
-        using var listener = new HttpListener();
-        listener.Prefixes.Add($"http://localhost:{port}/files/");
-        listener.Start();
+        var (listener, port) = StartListener();
+        using var stopped = listener;   // closed at the end
         var ranges = new List<string>();
         _ = Task.Run(async () =>
         {

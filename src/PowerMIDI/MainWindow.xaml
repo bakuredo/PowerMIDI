@@ -246,13 +246,20 @@
                 </TextBlock.Style>
               </TextBlock>
 
-              <!-- Activity LED. -->
-              <Ellipse Grid.Column="1" Width="9" Height="9" ToolTip="Activity">
+              <!-- Activity LED: orange while the channel is muted (its notes are played, not heard). -->
+              <Ellipse Grid.Column="1" Width="9" Height="9" ToolTip="Activity (orange: muted)">
                 <Ellipse.Style>
                   <Style TargetType="Ellipse">
                     <Setter Property="Fill" Value="{DynamicResource InactiveBrush}"/>
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="Fill" Value="{DynamicResource GreenBrush}"/></DataTrigger>
+                      <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                          <Condition Binding="{Binding IsActive}" Value="True"/>
+                          <Condition Binding="{Binding IsMuted}" Value="True"/>
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Fill" Value="{DynamicResource WarningBrush}"/>
+                      </MultiDataTrigger>
                     </Style.Triggers>
                   </Style>
                 </Ellipse.Style>
