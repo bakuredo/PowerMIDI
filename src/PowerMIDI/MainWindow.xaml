@@ -715,8 +715,16 @@
         <StackPanel>
           <TextBlock Text="{Binding DetailTitle}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"
                      Foreground="{DynamicResource TextBrush}" ToolTip="{Binding DetailTitle}"/>
-          <TextBlock Text="{Binding DetailFolder}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"
-                     Foreground="{DynamicResource TextSoftBrush}" ToolTip="{Binding DetailFolder}"/>
+          <TextBlock Text="{Binding DetailInternalTitle}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"
+                     Foreground="{DynamicResource TextSoftBrush}" ToolTip="{Binding DetailInternalTitle}">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding DetailInternalTitle}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
           <TextBlock Text="{Binding DetailInfo}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"
                      Foreground="{DynamicResource TextSoftBrush}" ToolTip="{Binding DetailInfo}"/>
           <TextBlock Text="{Binding DetailMore}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"

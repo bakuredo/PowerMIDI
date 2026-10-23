@@ -317,11 +317,12 @@ public sealed class LibraryViewModel : ObservableObject
 
     // ---------- Details (panel under the list) ----------
 
-    // The file selected: its title, folders, format, length, tracks and channels, what it has, title in the file,
-    // copyright, plays; a folder or nothing selected: no panel.
+    // The file selected: its name, the title in the file (when it has another one), format, length, tracks and
+    // channels, what it has, copyright, plays; a folder or nothing selected: no panel.
     public bool HasDetails => selectedRow?.File != null;
     public string DetailTitle => selectedRow?.File == null ? "" : selectedRow.Title + (selectedRow.Favorite ? "  ★" : "");
-    public string DetailFolder => selectedRow?.File is { } f ? ShownPath(f.FolderPath) : "";
+    public string DetailInternalTitle =>
+        selectedRow?.File is { InternalTitle: { } title } f && title != f.Title ? $"Title: {title}" : "";
 
     public string DetailInfo
     {
@@ -343,7 +344,6 @@ public sealed class LibraryViewModel : ObservableObject
         {
             if (selectedRow?.File is not { } f) return "";
             var parts = new List<string>();
-            if (f.InternalTitle != null && f.InternalTitle != f.Title) parts.Add($"Title: {f.InternalTitle}");
             // The copyright as the file has it, "©" before it unless it says so already.
             if (f.Copyright != null)
                 parts.Add(f.Copyright.Contains('©') || f.Copyright.Contains("copyright", StringComparison.OrdinalIgnoreCase) ||
@@ -357,7 +357,7 @@ public sealed class LibraryViewModel : ObservableObject
 
     void NotifyDetails()
     {
-        foreach (var name in new[] { nameof(HasDetails), nameof(DetailTitle), nameof(DetailFolder), nameof(DetailInfo), nameof(DetailMore) })
+        foreach (var name in new[] { nameof(HasDetails), nameof(DetailTitle), nameof(DetailInternalTitle), nameof(DetailInfo), nameof(DetailMore) })
             OnPropertyChanged(name);
     }
 
