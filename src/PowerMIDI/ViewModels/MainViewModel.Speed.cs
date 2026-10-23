@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Windows.Input;
 using Melanchall.DryWetMidi.Common;
+using Melanchall.DryWetMidi.Interaction;
 using Melanchall.DryWetMidi.Multimedia;
 using PowerMIDI.Core;
 
@@ -13,6 +15,20 @@ namespace PowerMIDI.ViewModels;
 public sealed partial class MainViewModel
 {
     public const int MinSpeed = 50, MaxSpeed = 200, MaxTranspose = 6;   // MaxTranspose in whole tones
+
+    // Tempo of the track at the position (bottom left of the window), as the file has it; with the speed slider moved,
+    // the tempo heard too. Empty without a track.
+    string tempoText = "";
+    public string TempoText { get => tempoText; private set => Set(ref tempoText, value); }
+
+    void UpdateTempo()
+    {
+        if (current == null || tempoMap == null) { TempoText = ""; return; }
+        double bpm = tempoMap.GetTempoAtTime(new MidiTimeSpan(playback != null ? CurrentTick() : 0)).BeatsPerMinute;
+        string Bpm(double value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+        TempoText = Math.Abs(speed - 100) < 0.5 ? $"Tempo: {Bpm(bpm)} BPM"
+                  : $"Tempo: {Bpm(bpm)} BPM ({Bpm(bpm * speed / 100)} at {speed.ToString("0", CultureInfo.InvariantCulture)} %)";
+    }
 
     double speed = 100;
     public double Speed

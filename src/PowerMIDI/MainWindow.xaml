@@ -146,8 +146,20 @@
   <DockPanel Margin="12">
 
   <!-- Status line: under both panels, whose bottoms are thus aligned. -->
-  <TextBlock DockPanel.Dock="Bottom" Margin="2,8,0,0" Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12"
-             Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
+  <!-- Status line, after the tempo of the track. -->
+  <DockPanel DockPanel.Dock="Bottom" Margin="2,8,0,0">
+    <TextBlock DockPanel.Dock="Left" Margin="0,0,16,0" Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12"
+               Text="{Binding TempoText}" ToolTip="Tempo of track at playback position">
+      <TextBlock.Style>
+        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding TempoText}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </TextBlock.Style>
+    </TextBlock>
+    <TextBlock Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12" Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
+  </DockPanel>
 
   <!-- Right panel: Mixer (16 channels), Effects (those of the current mode), Library and About tabs -->
   <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
@@ -708,6 +720,29 @@
         </ItemsControl>
       </DockPanel>
       <TextBlock DockPanel.Dock="Bottom" Margin="2,6,0,0" Text="{Binding CountText}" Foreground="{DynamicResource TextMutedBrush}" FontSize="12"/>
+      <!-- Details of the row selected (LibraryViewModel: Details), between the list and the count. -->
+      <Border DockPanel.Dock="Bottom" Margin="0,6,0,0" Padding="8,5" Background="{DynamicResource HeaderBrush}"
+              BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="4"
+              Visibility="{Binding HasDetails, Converter={StaticResource BoolToVisibility}}">
+        <StackPanel>
+          <TextBlock Text="{Binding DetailTitle}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"
+                     Foreground="{DynamicResource TextBrush}" ToolTip="{Binding DetailTitle}"/>
+          <TextBlock Text="{Binding DetailFolder}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"
+                     Foreground="{DynamicResource TextSoftBrush}" ToolTip="{Binding DetailFolder}"/>
+          <TextBlock Text="{Binding DetailInfo}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,3,0,0"
+                     Foreground="{DynamicResource TextSoftBrush}" ToolTip="{Binding DetailInfo}"/>
+          <TextBlock Text="{Binding DetailMore}" FontSize="12" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"
+                     Foreground="{DynamicResource TextMutedBrush}" ToolTip="{Binding DetailMore}">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding DetailMore}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </StackPanel>
+      </Border>
       <TextBlock DockPanel.Dock="Top" Margin="2,12,2,0" TextWrapping="Wrap" Foreground="{DynamicResource TextSoftBrush}"
                  Visibility="{Binding HasNoLibrary, Converter={StaticResource BoolToVisibility}}"
                  Text="No library: library\library.db missing next to PowerMIDI.exe."/>
@@ -744,7 +779,7 @@
                 <DataTemplate><TextBlock Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource TextSoftBrush}"/></DataTemplate>
               </GridViewColumn.CellTemplate>
             </GridViewColumn>
-            <GridViewColumn x:Name="LibraryTitleColumn" Header="Title" Width="280">
+            <GridViewColumn x:Name="LibraryTitleColumn" Header="File" Width="280">
               <GridViewColumn.CellTemplate>
                 <DataTemplate><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/></DataTemplate>
               </GridViewColumn.CellTemplate>

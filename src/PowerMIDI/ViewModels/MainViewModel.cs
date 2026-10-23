@@ -595,6 +595,7 @@ public sealed partial class MainViewModel : ObservableObject
         SetPosition(0);
         eventEditor?.Clear();   // nothing to list
         SetLyrics(null);
+        TempoText = "";
     }
 
     string playGlyph = GlyphPlay;
@@ -737,9 +738,13 @@ public sealed partial class MainViewModel : ObservableObject
         SetState("playing");
         SelectedTrack = item;
         UpdateNumbers();
-        var text = $"Playing on {output.Name} — reset {std}{LoopStatus}";
-        if (clearedSettings) text += " — manual settings of the previous track cleared";
-        Status = text;
+        // Status line: only what is worth knowing (the port and the mode are shown elsewhere): the loop of the track, where
+        // a file of the Library tab is, the settings cleared.
+        var parts = new List<string>();
+        if (LoopStatus is { } loopText) parts.Add(loopText);
+        if (item.Library is { } libraryKey) parts.Add(Library.ShownPath(libraryKey));
+        if (clearedSettings) parts.Add("Manual settings of previous track cleared");
+        Status = string.Join(" — ", parts);
     }
 
     // "Now playing": title of the file (name of its first track), otherwise the file name; tooltip; standard.
@@ -890,6 +895,7 @@ public sealed partial class MainViewModel : ObservableObject
         DisplayText = ModuleDisplay.Text;
         LoadEvents();
         RefreshEventsFixed();
+        UpdateTempo();
         if (playback == null || state != "playing") return;
         UpdateLoop();
         if (!playback.IsRunning)   // end of track

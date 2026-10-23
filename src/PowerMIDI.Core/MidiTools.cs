@@ -392,14 +392,32 @@ public static class MidiTools
     public static string EncodeText(string text) =>
         text.All(c => c < 0x80) ? text : ByteEncoding.GetString(Encoding.UTF8.GetBytes(text));
 
-    public static string DecodeText(string raw)
+    public static string DecodeText(string raw) => TextDecoder(new[] { raw })(raw);
+
+    static readonly Encoding StrictUtf8 = new UTF8Encoding(false, true);
+
+    // Texts of a file that belong together (the syllables of its lyrics) decoded the same way: the encoding is chosen
+    // on all of them at once (as DecodeText does), a syllable alone could pass for another one. A text that cannot be
+    // decoded with it is kept as it is.
+    public static Func<string, string> TextDecoder(IEnumerable<string> raws)
     {
-        if (string.IsNullOrEmpty(raw) || raw.All(c => c < 0x80) || raw.Any(c => c > 0xFF)) return raw;
-        var bytes = ByteEncoding.GetBytes(raw);
-        try { return new UTF8Encoding(false, true).GetString(bytes); } catch (DecoderFallbackException) { }
-        if (bytes.Any(b => b >= 0x81 && b <= 0x9F))
-            try { return ShiftJis.GetString(bytes); } catch (DecoderFallbackException) { }
-        try { return Windows1252.GetString(bytes); } catch (DecoderFallbackException) { return raw; }
+        var texts = raws.Where(t => !string.IsNullOrEmpty(t)).ToList();
+        if (texts.All(t => t.All(c => c < 0x80)) || texts.Any(t => t.Any(c => c > 0xFF))) return t => t;
+        var bytes = ByteEncoding.GetBytes(string.Concat(texts));
+        Encoding encoding = Windows1252;
+        if (Decodes(StrictUtf8, bytes)) encoding = StrictUtf8;
+        else if (bytes.Any(b => b >= 0x81 && b <= 0x9F) && Decodes(ShiftJis, bytes)) encoding = ShiftJis;
+        else if (!Decodes(Windows1252, bytes)) return t => t;
+        return t =>
+        {
+            if (string.IsNullOrEmpty(t) || t.All(c => c < 0x80)) return t;
+            try { return encoding.GetString(ByteEncoding.GetBytes(t)); } catch (DecoderFallbackException) { return t; }
+        };
+    }
+
+    static bool Decodes(Encoding encoding, byte[] bytes)
+    {
+        try { encoding.GetString(bytes); return true; } catch (DecoderFallbackException) { return false; }
     }
 
     // Title and descriptive texts of a file (null / empty if it has none).

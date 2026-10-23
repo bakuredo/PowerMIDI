@@ -71,4 +71,24 @@ public class KaraokeLyricsTests
         Assert.StartsWith("Love goes away", shown[1]);                                  // a new page at a capital letter
         Assert.Contains(shown, s => s.Contains("Our love"));
     }
+
+    // Japanese lyrics (Shift-JIS bytes, as the file has them): decoded; a Japanese character takes two columns of the
+    // screen, the lines cut between them (no spaces).
+    [Fact]
+    public void Japanese_lyrics_decoded_and_cut_by_columns()
+    {
+        var sjis = System.Text.CodePagesEncodingProvider.Instance.GetEncoding(932);
+        string Raw(string text) => System.Text.Encoding.Latin1.GetString(sjis.GetBytes(text));   // as ReadFile gives them
+        var syllables = new[] { "ＯＮＥ～輝く季節へ～/Tactics", "作曲　YET11", "データ作成　hiro", "Thank you for listening" };
+        var lyrics = KaraokeLyrics.Read(File(syllables.Select(s => (MidiEvent)new LyricEvent(Raw(s)) { DeltaTime = 100 }).ToArray()));
+        Assert.Equal(string.Concat(syllables), string.Concat(lyrics.Lines[0].Select(s => s.Text)));
+        static int Columns(string row) => row.Sum(c => c >= '⺀' ? 2 : 1);
+        for (long tick = 100; tick <= 400; tick += 100)
+        {
+            var (sung, coming) = lyrics.At(tick, 32);
+            Assert.True((sung + coming).Split('\n').All(row => Columns(row) <= 32), sung + coming);   // fits the screen
+        }
+        var (endSung, endComing) = lyrics.At(400, 32);
+        Assert.EndsWith("listening", (endSung + endComing).Replace("\n", " "));
+    }
 }

@@ -39,6 +39,17 @@ public sealed class LibraryUserData : IDisposable
         Run("INSERT INTO usage (collection_id, path, favorite) VALUES ($id, $path, $fav) ON CONFLICT (collection_id, path) DO UPDATE SET favorite = $fav",
             ("$id", id), ("$path", path), ("$fav", favorite ? 1 : 0));
 
+    // Plays of a file now (0, null: never played).
+    public (int Count, string Last) Plays(string id, string path)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT play_count, last_played FROM usage WHERE collection_id = $id AND path = $path";
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.AddWithValue("$path", path);
+        using var reader = command.ExecuteReader();
+        return reader.Read() ? (reader.GetInt32(0), reader.IsDBNull(1) ? null : reader.GetString(1)) : (0, null);
+    }
+
     public void RecordPlay(string id, string path) =>
         Run("""
             INSERT INTO usage (collection_id, path, play_count, last_played) VALUES ($id, $path, 1, $at)

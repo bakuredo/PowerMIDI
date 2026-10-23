@@ -291,8 +291,8 @@ public sealed class LibraryViewModel : ObservableObject
     string randomFrom, randomTo;
 
     // A file of the folder and of its subfolders, shown by the filters, chosen at random, shown in the list (its folder
-    // opened, the file selected; in a search or a played list: selected there) and played (as a double click). Again
-    // from the folder of that file: chosen again from the folder where it started.
+    // opened, the file selected; in a search or a played list: selected there) and played as with a double click (the
+    // Mixer tab shown). Again from the folder of that file: chosen again from the folder where it started.
     void PlayRandom()
     {
         if (catalog == null) return;
@@ -308,12 +308,85 @@ public sealed class LibraryViewModel : ObservableObject
         var row = rows.FirstOrDefault(r => r.File?.Path == file.Path) ?? FileRow(file);
         SelectedRow = row;
         setStatus($"Random: {file.Title}");
-        Open(row, false);
+        Open(row);
     }
 
     // Row selected in the list (the random file; the view keeps it visible).
     LibraryRow selectedRow;
-    public LibraryRow SelectedRow { get => selectedRow; set => Set(ref selectedRow, value); }
+    public LibraryRow SelectedRow { get => selectedRow; set { if (Set(ref selectedRow, value)) NotifyDetails(); } }
+
+    // ---------- Details (panel under the list) ----------
+
+    // The file selected: its title, folders, format, length, tracks and channels, what it has, title in the file,
+    // copyright, plays; a folder or nothing selected: no panel.
+    public bool HasDetails => selectedRow?.File != null;
+    public string DetailTitle => selectedRow?.File == null ? "" : selectedRow.Title + (selectedRow.Favorite ? "  ★" : "");
+    public string DetailFolder => selectedRow?.File is { } f ? ShownPath(f.FolderPath) : "";
+
+    public string DetailInfo
+    {
+        get
+        {
+
+            if (selectedRow?.File is not { } f) return "";
+            if (f.Error != null) return $"Unreadable: {f.Error}";
+            var parts = new List<string> { f.Standard, selectedRow.Time, $"{f.Tracks} track{(f.Tracks != 1 ? "s" : "")}", ChannelsText(f) };
+            if (f.HasLyrics) parts.Add("Karaoke");
+            if (f.HasLoop) parts.Add("Loop");
+            return string.Join(" · ", parts.Where(p => !string.IsNullOrEmpty(p)));
+        }
+    }
+
+    public string DetailMore
+    {
+        get
+        {
+            if (selectedRow?.File is not { } f) return "";
+            var parts = new List<string>();
+            if (f.InternalTitle != null && f.InternalTitle != f.Title) parts.Add($"Title: {f.InternalTitle}");
+            // The copyright as the file has it, "©" before it unless it says so already.
+            if (f.Copyright != null)
+                parts.Add(f.Copyright.Contains('©') || f.Copyright.Contains("copyright", StringComparison.OrdinalIgnoreCase) ||
+                          f.Copyright.Contains("(c)", StringComparison.OrdinalIgnoreCase) ? f.Copyright : $"© {f.Copyright}");
+            // Plays as they are now (the row has them as they were when listed).
+            var (count, last) = selectedCollection != null ? UserDatabase().Plays(selectedCollection.Id, f.Path) : (f.PlayCount, f.LastPlayed);
+            parts.Add(count > 0 ? $"Played {count} time{(count > 1 ? "s" : "")}, last {LocalTime(last)}" : "Not played yet");
+            return string.Join(" · ", parts);
+        }
+    }
+
+    void NotifyDetails()
+    {
+        foreach (var name in new[] { nameof(HasDetails), nameof(DetailTitle), nameof(DetailFolder), nameof(DetailInfo), nameof(DetailMore) })
+            OnPropertyChanged(name);
+    }
+
+    // Where a file of a collection is, as the tab shows it: "VGMusic Archive (2018) › NES › MM3_SparkMan.mid" (its
+    // folders by their names shown when it is the collection shown).
+    public string ShownPath(LibraryKey key)
+    {
+        int slash = key.Path.LastIndexOf('/');
+        var name = key.Path[(slash + 1)..];
+        if (catalog?.Info.Id == key.CollectionId)
+            return slash < 0 ? $"{catalog.Info.Name} › {name}" : $"{catalog.Info.Name} › {ShownPath(key.Path[..slash])} › {name}";
+        var collection = Collections.FirstOrDefault(c => c.Id == key.CollectionId)?.Name ?? key.CollectionId;
+        return $"{collection} › {key.Path.Replace("/", " › ")}";
+    }
+
+    // Folders of a path by the names shown ("NES › Mega Man 3"); the root: the collection.
+    string ShownPath(string path)
+    {
+        if (catalog == null) return "";
+        if (path == "") return catalog.Info.Name;
+        var parts = path.Split('/');
+        return string.Join(" › ", parts.Select((p, i) => catalog.Folders.TryGetValue(string.Join('/', parts.Take(i + 1)), out var f) ? f.Shown : p));
+    }
+
+    static string ChannelsText(LibraryFile f)
+    {
+        var channels = Enumerable.Range(0, 16).Where(c => ((f.Channels ?? 0) >> c & 1) != 0).Select(c => (c + 1).ToString()).ToList();
+        return channels.Count == 0 ? "" : $"channel{(channels.Count != 1 ? "s" : "")} {string.Join(", ", channels)}";
+    }
 
     // ---------- Filters ----------
 
@@ -349,13 +422,13 @@ public sealed class LibraryViewModel : ObservableObject
     string countText = "";
     public string CountText { get => countText; private set => Set(ref countText, value); }
 
-    string sortColumn = "Title";
+    string sortColumn = "File";   // the header of the column (the title of the file)
     bool sortDescending;
 
     // Click on a column header: sorted by it (again: the other way round); the folders stay first.
     public void SortBy(string column)
     {
-        if (column is not ("Title" or "Folder" or "Format" or "Time" or "★")) return;
+        if (column is not ("File" or "Folder" or "Format" or "Time" or "★")) return;
         sortDescending = column == sortColumn && !sortDescending;
         sortColumn = column;
         Rows = Sorted(rows);
@@ -364,7 +437,7 @@ public sealed class LibraryViewModel : ObservableObject
     IReadOnlyList<LibraryRow> Sorted(IEnumerable<LibraryRow> list)
     {
         // Played lists: in their own order (last played, most played) until a column is chosen.
-        if (sortColumn == "Title" && !sortDescending && (LibraryShow)showIndex is LibraryShow.RecentlyPlayed or LibraryShow.MostPlayed)
+        if (sortColumn == "File" && !sortDescending && (LibraryShow)showIndex is LibraryShow.RecentlyPlayed or LibraryShow.MostPlayed)
             return list.ToList();
         Func<LibraryRow, object> key = sortColumn switch
         {
@@ -446,8 +519,7 @@ public sealed class LibraryViewModel : ObservableObject
         if (f.Error != null) tip.Add($"Unreadable: {f.Error}");
         else
         {
-            var channels = Enumerable.Range(0, 16).Where(c => ((f.Channels ?? 0) >> c & 1) != 0).Select(c => (c + 1).ToString()).ToList();
-            tip.Add($"{f.Tracks} track{(f.Tracks != 1 ? "s" : "")} · channel{(channels.Count != 1 ? "s" : "")} {string.Join(", ", channels)}");
+            tip.Add($"{f.Tracks} track{(f.Tracks != 1 ? "s" : "")} · {ChannelsText(f)}");
             var extras = new List<string>();
             if (f.HasLyrics) extras.Add("Karaoke");
             if (f.HasLoop) extras.Add("Loop");
@@ -475,7 +547,7 @@ public sealed class LibraryViewModel : ObservableObject
     // ---------- Actions ----------
 
     // Double click or Enter: a folder is entered; a file is taken from the zip, added to the playlist and played, the Mixer
-    // tab shown (showMixer false: the Library tab stays, the random file selected in it).
+    // tab shown (showMixer false: the Library tab stays).
     void Open(LibraryRow row, bool showMixer = true)
     {
         if (row == null) return;
@@ -524,6 +596,7 @@ public sealed class LibraryViewModel : ObservableObject
         if (row == null || row.IsFolder || selectedCollection == null) return;
         row.Favorite = !row.Favorite;
         UserDatabase().SetFavorite(selectedCollection.Id, row.File.Path, row.Favorite);
+        if (row == selectedRow) NotifyDetails();
         if ((LibraryShow)showIndex == LibraryShow.Favorites) Refresh();
     }
 
@@ -539,6 +612,7 @@ public sealed class LibraryViewModel : ObservableObject
         {
             UserDatabase().RecordPlay(key.CollectionId, key.Path);
             if (selectedCollection?.Id == key.CollectionId && (LibraryShow)showIndex is LibraryShow.RecentlyPlayed or LibraryShow.MostPlayed or LibraryShow.NotPlayed) Refresh();
+            else if (selectedCollection?.Id == key.CollectionId && selectedRow?.File?.Path == key.Path) NotifyDetails();   // its plays in the panel
         }
         catch { }   // the count is not worth an error
     }

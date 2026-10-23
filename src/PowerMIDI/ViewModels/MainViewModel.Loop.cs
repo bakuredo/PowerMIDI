@@ -184,5 +184,5 @@ public sealed partial class MainViewModel
             playback.PlaybackStart = new MidiTimeSpan(loop.Value.Start);
     }
 
-    string LoopStatus => loop is { } l ? $" — loop {MidiTools.FormatTime(TickToTime(l.Start))} → {MidiTools.FormatTime(TickToTime(l.End))}" : "";
+    string LoopStatus => loop is { } l ? $"Loop {MidiTools.FormatTime(TickToTime(l.Start))} → {MidiTools.FormatTime(TickToTime(l.End))}" : null;
 }
