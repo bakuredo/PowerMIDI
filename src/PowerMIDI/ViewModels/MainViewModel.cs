@@ -219,7 +219,7 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.Device = output;   // for resending after a reset sent by the file
         ChannelMixer.SetMasterVolume(output, (int)MasterVolume);
         ApplyMixerState();
-        Status = $"Output: {name}";
+        Status = "";   // the port is shown in its list
         if (wasPlaying != null) StartTrack(wasPlaying);
     }
 
@@ -595,7 +595,6 @@ public sealed partial class MainViewModel : ObservableObject
         SetPosition(0);
         eventEditor?.Clear();   // nothing to list
         SetLyrics(null);
-        TempoText = "";
     }
 
     string playGlyph = GlyphPlay;
@@ -691,10 +690,9 @@ public sealed partial class MainViewModel : ObservableObject
 
         // Another file: the manual settings of the previous track (instruments, volume, pan, effects,
         // muted channels, forced mode) are cleared. They are kept if the same track is played again.
-        bool clearedSettings = false;
         if (settingsFile != null && settingsFile != item.Path)
         {
-            clearedSettings = ClearManualSettings();
+            ClearManualSettings();
             savedSignature = "";
             ResetSpeedAndPitch();
             lastSavedTarget = null;
@@ -739,11 +737,10 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedTrack = item;
         UpdateNumbers();
         // Status line: only what is worth knowing (the port and the mode are shown elsewhere): the loop of the track, where
-        // a file of the Library tab is, the settings cleared.
+        // a file of the Library tab is.
         var parts = new List<string>();
         if (LoopStatus is { } loopText) parts.Add(loopText);
         if (item.Library is { } libraryKey) parts.Add(Library.ShownPath(libraryKey));
-        if (clearedSettings) parts.Add("Manual settings of previous track cleared");
         Status = string.Join(" — ", parts);
     }
 
@@ -895,7 +892,6 @@ public sealed partial class MainViewModel : ObservableObject
         DisplayText = ModuleDisplay.Text;
         LoadEvents();
         RefreshEventsFixed();
-        UpdateTempo();
         if (playback == null || state != "playing") return;
         UpdateLoop();
         if (!playback.IsRunning)   // end of track

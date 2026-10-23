@@ -146,20 +146,8 @@
   <DockPanel Margin="12">
 
   <!-- Status line: under both panels, whose bottoms are thus aligned. -->
-  <!-- Status line, after the tempo of the track. -->
-  <DockPanel DockPanel.Dock="Bottom" Margin="2,8,0,0">
-    <TextBlock DockPanel.Dock="Left" Margin="0,0,16,0" Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12"
-               Text="{Binding TempoText}" ToolTip="Tempo of track at playback position">
-      <TextBlock.Style>
-        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-          <Style.Triggers>
-            <DataTrigger Binding="{Binding TempoText}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
-          </Style.Triggers>
-        </Style>
-      </TextBlock.Style>
-    </TextBlock>
-    <TextBlock Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12" Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
-  </DockPanel>
+  <TextBlock DockPanel.Dock="Bottom" Margin="4,8,0,0" Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12"
+             Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
 
   <!-- Right panel: Mixer (16 channels), Effects (those of the current mode), Library and About tabs -->
   <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
