@@ -236,6 +236,15 @@ public partial class MainWindow : Window, IMainView
         _ => null,
     };
 
+    // Playlist: the File column takes the width the other columns leave (the room of a vertical scroll bar kept, so that
+    // it does not change when one appears).
+    void OnPlaylistSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (PlaylistView.View is not System.Windows.Controls.GridView grid) return;
+        double others = grid.Columns.Where(c => c != PlaylistFileColumn).Sum(c => c.Width);
+        PlaylistFileColumn.Width = Math.Max(120, PlaylistView.ActualWidth - others - SystemParameters.VerticalScrollBarWidth - 8);
+    }
+
     bool themeReady;   // false while the theme list is filled at startup
 
     // Theme chosen in the About tab: applied at once and remembered.
