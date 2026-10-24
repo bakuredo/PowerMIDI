@@ -236,13 +236,15 @@ public partial class MainWindow : Window, IMainView
         _ => null,
     };
 
-    // Playlist: the File column takes the width the other columns leave (the room of a vertical scroll bar kept, so that
-    // it does not change when one appears).
-    void OnPlaylistSizeChanged(object sender, SizeChangedEventArgs e)
+    // Playlist: the File column takes the width the other columns leave in the visible part of the list (without the
+    // vertical scroll bar when there is one), so that the columns end at its right edge. The visible width changes with
+    // the size of the window and when the scroll bar appears or goes.
+    void OnPlaylistScrollChanged(object sender, System.Windows.Controls.ScrollChangedEventArgs e)
     {
-        if (PlaylistView.View is not System.Windows.Controls.GridView grid) return;
+        if (e.ViewportWidthChange == 0 || e.OriginalSource is not System.Windows.Controls.ScrollViewer viewer ||
+            PlaylistView.View is not System.Windows.Controls.GridView grid) return;
         double others = grid.Columns.Where(c => c != PlaylistFileColumn).Sum(c => c.Width);
-        PlaylistFileColumn.Width = Math.Max(120, PlaylistView.ActualWidth - others - SystemParameters.VerticalScrollBarWidth - 8);
+        PlaylistFileColumn.Width = Math.Max(120, Math.Floor(viewer.ViewportWidth - others));
     }
 
     bool themeReady;   // false while the theme list is filled at startup

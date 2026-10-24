@@ -317,12 +317,13 @@ public sealed class LibraryViewModel : ObservableObject
 
     // ---------- Details (panel under the list) ----------
 
-    // The file selected: its name, the title in the file (when it has another one), format, length, tracks and
+    // The file selected: its name, the title in the file (or that it has none), format, length, tracks and
     // channels, what it has, copyright, plays; a folder or nothing selected: no panel.
     public bool HasDetails => selectedRow?.File != null;
     public string DetailTitle => selectedRow?.File == null ? "" : selectedRow.Title + (selectedRow.Favorite ? "  ★" : "");
+    // The title in the file (its first track name), or that it has none.
     public string DetailInternalTitle =>
-        selectedRow?.File is { InternalTitle: { } title } f && title != f.Title ? $"Title: {title}" : "";
+        selectedRow?.File is not { } f ? "" : f.InternalTitle is { } title ? $"Title: {title}" : "No title";
 
     public string DetailInfo
     {

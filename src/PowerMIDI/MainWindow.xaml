@@ -866,11 +866,9 @@
     <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
       <TextBlock Text="MIDI port" Margin="0,0,8,0" VerticalAlignment="Center"/>
       <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}"/>
-      <Button Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="6,0,18,0" Command="{Binding RefreshPortsCommand}"
-              ToolTip="Refresh port list"/>
-      <TextBlock Text="Mode" Margin="0,0,8,0" VerticalAlignment="Center"/>
-      <ComboBox Width="120" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
-                ToolTip="Auto follows file; other mode forced on it (SysEx of other modes ignored)">
+      <!-- Mode, right after the port (no label: its tooltip says what it is), then the refresh of the port list. -->
+      <ComboBox Width="120" Margin="6,0,0,0" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
+                ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
         <ComboBoxItem Content="Auto"/>
         <ComboBoxItem Content="GS"/>
         <ComboBoxItem Content="XG"/>
@@ -879,6 +877,8 @@
         <ComboBoxItem Content="MT-32"
                       ToolTip="Roland MT-32 / CM-32L"/>
       </ComboBox>
+      <Button Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="6,0,0,0" Command="{Binding RefreshPortsCommand}"
+              ToolTip="Refresh port list"/>
     </DockPanel>
 
     <!-- Playlist: double click (see the ListViewItem style) or Enter plays the track, Del removes the selected tracks;
@@ -888,7 +888,7 @@
               SelectedItem="{Binding SelectedTrack}" SelectionChanged="OnPlaylistSelectionChanged"
               PreviewMouseLeftButtonDown="OnPlaylistMouseDown" PreviewMouseMove="OnPlaylistMouseMove"
               PreviewMouseLeftButtonUp="OnPlaylistMouseUp" DragOver="OnPlaylistDragOver" Drop="OnPlaylistDrop"
-              PreviewKeyDown="OnPlaylistKeyDown" SizeChanged="OnPlaylistSizeChanged"
+              PreviewKeyDown="OnPlaylistKeyDown" ScrollViewer.ScrollChanged="OnPlaylistScrollChanged"
               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
       <ListView.InputBindings>
         <KeyBinding Key="Return" Command="{Binding PlaySelectedCommand}"/>
@@ -899,7 +899,7 @@
         <GridView>
           <GridViewColumn Header="" Width="28" DisplayMemberBinding="{Binding Playing}"/>
           <GridViewColumn Header="#" Width="44" DisplayMemberBinding="{Binding Index}"/>
-          <!-- Width: the space the other columns leave (OnPlaylistSizeChanged), so that no horizontal scroll bar is needed. -->
+          <!-- Width: the space the other columns leave (OnPlaylistScrollChanged), so that no horizontal scroll bar is needed. -->
           <GridViewColumn x:Name="PlaylistFileColumn" Header="File" Width="360" DisplayMemberBinding="{Binding Name}"/>
           <GridViewColumn Header="Format" Width="80" DisplayMemberBinding="{Binding Standard}"/>
           <GridViewColumn Header="Duration" Width="80" DisplayMemberBinding="{Binding Duration}"/>
