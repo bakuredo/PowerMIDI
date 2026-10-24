@@ -268,12 +268,12 @@ public partial class MainWindow : Window, IMainView
         if (IsLoaded) SaveSettings();
     });
 
-    // The controls of the tabs (right panel) light or in the colors of the theme (see Themes.DarkControls).
+    // The controls of the tabs (right panel) and of the Event Editor light or in the colors of the theme (see
+    // Themes.DarkControls).
     void ApplyControlColors()
     {
-        var merged = RightTabs.Resources.MergedDictionaries;
-        merged.Clear();
-        if (!Themes.DarkControls) merged.Add(Themes.LightControlBrushes());
+        Themes.ApplyControls(RightTabs.Resources);
+        if (eventWindow != null) Themes.ApplyControls(eventWindow.Resources);
     }
 
     void OnPreviewKeyUp(object sender, KeyEventArgs e)
@@ -418,6 +418,7 @@ public partial class MainWindow : Window, IMainView
     {
         if (eventWindow != null) { eventWindow.Activate(); return; }
         eventWindow = new EventEditorWindow(editor);
+        Themes.ApplyControls(eventWindow.Resources);
         eventWindow.Closed += (_, _) => { eventWindow = null; closed(); };
         eventWindow.Show();
     }

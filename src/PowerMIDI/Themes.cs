@@ -23,10 +23,10 @@ public static class Themes
 
     public static string Current { get; private set; } = Default;
 
-    // Dark controls (About tab, PowerMIDI.ini): the drop-down lists of the tabs (right panel) in the colors of the theme.
-    // Off by default: they are drawn light, as Windows draws them, whatever the theme; the rest of the window keeps the
-    // colors of the theme. The window then puts LightControlBrushes in the resources of its tabs (they are found there
-    // before those of the theme).
+    // Dark controls (About tab, PowerMIDI.ini): the drop-down lists of the tabs (right panel) and of the Event Editor in
+    // the colors of the theme. Off by default: they are drawn light, as Windows draws them, whatever the theme; the rest
+    // of the windows keeps the colors of the theme. ApplyControls then puts LightControlBrushes in the resources of the
+    // tabs and of the Event Editor (they are found there before those of the theme).
     public static bool DarkControls { get; set; }
 
     // Colors of the controls (Styles.xaml): those of the theme (set with it), or the light ones. Background, border,
@@ -47,8 +47,11 @@ public static class Themes
         dictionary["ControlDisabledOpacity"] = 0.5;
     }
 
-    public static ResourceDictionary LightControlBrushes()
+    static ResourceDictionary lightControlBrushes;
+
+    static ResourceDictionary LightControlBrushes()
     {
+        if (lightControlBrushes != null) return lightControlBrushes;
         var dictionary = new ResourceDictionary();
         for (int i = 0; i < ControlKeys.Length; i++)
         {
@@ -57,7 +60,16 @@ public static class Themes
             dictionary[ControlKeys[i]] = brush;
         }
         dictionary["ControlDisabledOpacity"] = 1.0;
-        return dictionary;
+        return lightControlBrushes = dictionary;
+    }
+
+    // Puts the light colors of the controls in these resources (tabs of the main window, Event Editor), or takes them
+    // away with DarkControls; the other merged dictionaries (e.g. Styles.xaml) are kept.
+    public static void ApplyControls(ResourceDictionary resources)
+    {
+        var merged = resources.MergedDictionaries;
+        merged.Remove(LightControlBrushes());
+        if (!DarkControls) merged.Add(LightControlBrushes());
     }
 
     static string FindBuiltIn(string name) => BuiltIn.FirstOrDefault(b => string.Equals(b, name, StringComparison.OrdinalIgnoreCase));
