@@ -146,16 +146,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------- Settings (PowerMIDI.ini) ----------
 
-    // The mode, the "Sliders" menu, shuffle and repeat are not remembered: PowerMIDI starts in Auto, on Volume (CC7),
-    // without shuffle nor repeat.
+    // The mode, the XG voice map and GS default map, the "Sliders" menu, shuffle and repeat are not remembered:
+    // PowerMIDI starts in Auto (the file's choices), on Volume (CC7), without shuffle nor repeat.
     public void LoadSettings(IniFile ini)
     {
         savedPort = ini.Get("MIDI", "Port");
         if (savedPort == "") savedPort = null;
         lastFolder = ini.Get("Playback", "LastFolder");
         if (ini.GetInt("Playback", "MasterVolume") is int volume && volume is >= 0 and <= 127) MasterVolume = volume;
-        Mixer.LoadVoiceMap(ini.Get("MIDI", "XgDefaultMap"));
-        Mixer.LoadGsDefaultMap(ini.Get("MIDI", "GsDefaultMap"));
         Library.LoadSettings(ini);
     }
 
@@ -164,8 +162,6 @@ public sealed partial class MainViewModel : ObservableObject
         ini.Set("MIDI", "Port", savedPort ?? output?.Name ?? "");
         ini.Set("Playback", "MasterVolume", (int)MasterVolume);
         ini.Set("Playback", "LastFolder", lastFolder ?? "");
-        ini.Set("MIDI", "XgDefaultMap", Mixer.VoiceMapSetting);
-        ini.Set("MIDI", "GsDefaultMap", Mixer.GsDefaultMapSetting);
         Library.WriteSettings(ini);
     }
 

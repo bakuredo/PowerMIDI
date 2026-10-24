@@ -64,9 +64,9 @@ public sealed class MixerViewModel : ObservableObject
     // ---------- XG voice map (the list next to the Sliders one): Auto, MU100 Native, MU Basic ----------
     // It tells which version of the 128 capital voices bank LSB 0 plays (see ChannelMixer.VoiceMap): sent to the
     // module, and followed by the names and the maps shown. It belongs to the module, not to the track: kept from
-    // one track to the next and remembered in PowerMIDI.ini; it is not written into the saved files.
+    // one track to the next; not remembered (PowerMIDI starts in Auto: the file's choice), nor written into the saved
+    // files.
     public static readonly string[] VoiceMapNames = { "Auto", "MU100 Native", "MU Basic" };
-    static readonly string[] VoiceMapKeys = { "Auto", "Native", "Basic" };
     // Voice map of an item of the list (ChannelMixer.VoiceMapNative = 1, VoiceMapBasic = 0; -1 = Auto) and back.
     static int VoiceMapOfIndex(int index) => index == 0 ? -1 : 2 - index;
     static int IndexOfVoiceMap(int map) => map < 0 ? 0 : 2 - map;
@@ -90,7 +90,8 @@ public sealed class MixerViewModel : ObservableObject
 
     // ---------- GS default map (the same list, in GS mode): Auto, SC-8850, SC-88Pro, SC-88, SC-55 ----------
     // Map played by bank LSB 0 (see ChannelMixer.GsDefaultMap): sent to the module, followed by the names and the
-    // map selectors. Kept from one track to the next, remembered in PowerMIDI.ini, not written into the saved files.
+    // map selectors. Kept from one track to the next; not remembered (PowerMIDI starts in Auto), nor written into the
+    // saved files.
     public static readonly string[] GsDefaultMapNames = { "Auto", "SC-8850", "SC-88Pro", "SC-88", "SC-55" };
     // Map of an item of the list (the newest module first, as in the map selectors of the channels) and back.
     static int GsMapOfIndex(int index) => index == 0 ? -1 : 5 - index;
@@ -113,25 +114,8 @@ public sealed class MixerViewModel : ObservableObject
         }
     }
 
-    public string GsDefaultMapSetting => GsDefaultMapNames[GsDefaultMapIndex];
-    public void LoadGsDefaultMap(string setting)
-    {
-        int index = Array.FindIndex(GsDefaultMapNames, k => string.Equals(k, setting, StringComparison.OrdinalIgnoreCase));
-        ChannelMixer.GsDefaultMapOverride = GsMapOfIndex(Math.Max(index, 0));
-        OnPropertyChanged(nameof(GsDefaultMapIndex));
-    }
-
     // GS mode: the default map list is shown instead of the XG voice map one.
     public bool IsGs => HasGsMaps;
-
-    // Value written in PowerMIDI.ini, and read from it at startup (nothing is sent: no track yet).
-    public string VoiceMapSetting => VoiceMapKeys[VoiceMapIndex];
-    public void LoadVoiceMap(string setting)
-    {
-        int index = Array.FindIndex(VoiceMapKeys, k => string.Equals(k, setting, StringComparison.OrdinalIgnoreCase));
-        ChannelMixer.VoiceMapOverride = VoiceMapOfIndex(Math.Max(index, 0));
-        OnPropertyChanged(nameof(VoiceMapIndex));
-    }
 
     // Bank LSB of an XG capital voice as it sounds: LSB 0 follows the voice map, LSB 126 is the MU100 Native one
     // (written 0, as in the definition file), LSB 127 the MU Basic one.
