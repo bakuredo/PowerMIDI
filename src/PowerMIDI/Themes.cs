@@ -32,7 +32,8 @@ public static class Themes
     // Colors of the controls (Styles.xaml): those of the theme (set with it), or the light ones. Background, border,
     // text, under the mouse, selected or pressed, arrow and disabled text, then the state colors (value set by hand,
     // sound missing, set by a SysEx), and the text of a disabled list. A disabled list is dimmed with the colors of the
-    // theme (ControlDisabledOpacity), kept light otherwise.
+    // theme (ControlDisabledOpacity), kept light otherwise. The item of a list under the mouse is framed in the light
+    // ones only (ControlHoverLineBrush, as in the Explorer).
     static readonly string[] ControlKeys =
         { "ControlBrush", "ControlLineBrush", "ControlTextBrush", "ControlHoverBrush", "ControlSelectedBrush", "ControlMutedBrush",
           "ControlFixedBrush", "ControlMissingBrush", "ControlSysExBrush", "ControlDisabledTextBrush" };
@@ -45,6 +46,7 @@ public static class Themes
     {
         for (int i = 0; i < ControlKeys.Length; i++) dictionary[ControlKeys[i]] = dictionary[ThemeControlKeys[i]];
         dictionary["ControlDisabledOpacity"] = 0.5;
+        dictionary["ControlHoverLineBrush"] = Brushes.Transparent;
     }
 
     static ResourceDictionary lightControlBrushes;
@@ -60,6 +62,7 @@ public static class Themes
             dictionary[ControlKeys[i]] = brush;
         }
         dictionary["ControlDisabledOpacity"] = 1.0;
+        dictionary["ControlHoverLineBrush"] = dictionary["ControlTextBrush"];
         return lightControlBrushes = dictionary;
     }
 

@@ -1,7 +1,8 @@
 <!-- Styles shared by the windows (main window, Event Editor), merged in their resources; the colors come from the
      theme (Themes.cs). -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:b="clr-namespace:PowerMIDI.Behaviors">
   <Style TargetType="Button">
     <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
     <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -48,7 +49,9 @@
       </Trigger>
     </ControlTemplate.Triggers>
   </ControlTemplate>
+  <!-- The wheel over a closed list: previous / next item (a list with its own wheel command keeps it, see Wheel). -->
   <Style TargetType="ComboBox">
+    <Setter Property="b:Wheel.ComboStep" Value="True"/>
     <Setter Property="Foreground" Value="{DynamicResource ControlTextBrush}"/>
     <Setter Property="Padding" Value="6,3,2,3"/>
     <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -99,17 +102,24 @@
   </Style>
   <Style TargetType="ComboBoxItem">
     <Setter Property="Foreground" Value="{DynamicResource ControlTextBrush}"/>
-    <Setter Property="Padding" Value="6,2"/>
+    <Setter Property="Padding" Value="5,1"/>   <!-- 6,2 with the frame (1 px) of the hovered item -->
     <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <!-- No dotted frame of keyboard focus (arrow keys from the search box of the instrument list): the item is already
+         highlighted. -->
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ComboBoxItem">
-          <Border x:Name="Bd" Background="Transparent" Padding="{TemplateBinding Padding}">
+          <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="2" Padding="{TemplateBinding Padding}">
             <ContentPresenter/>
           </Border>
           <ControlTemplate.Triggers>
+            <!-- Hovered: framed as in the Explorer with the light controls (ControlHoverLineBrush; none with the theme colors). -->
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlHoverLineBrush}"/>
+            </Trigger>
             <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlSelectedBrush}"/></Trigger>
-            <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}"/></Trigger>
             <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource ControlMutedBrush}"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -124,13 +134,59 @@
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
     <Setter Property="Template">
       <Setter.Value>
+        <!-- Rounded corners as the panels around (the header and the rows cut to them), the header without the margin
+             of the Windows template (a strip of the list background at its left and right). -->
         <ControlTemplate TargetType="ListView">
           <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
-            <ScrollViewer Style="{DynamicResource {x:Static GridView.GridViewScrollViewerStyleKey}}" Padding="{TemplateBinding Padding}"
-                          Focusable="False">
-              <ItemsPresenter/>
-            </ScrollViewer>
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" SnapsToDevicePixels="True">
+            <Grid>
+              <Border x:Name="Mask" Background="{TemplateBinding Background}" CornerRadius="5"/>
+              <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="False"
+                            HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                            VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
+                            CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}">
+                <ScrollViewer.OpacityMask>
+                  <VisualBrush Visual="{Binding ElementName=Mask}"/>
+                </ScrollViewer.OpacityMask>
+                <ScrollViewer.Template>
+                  <ControlTemplate TargetType="ScrollViewer">
+                    <Grid Background="{TemplateBinding Background}">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                      </Grid.RowDefinitions>
+                      <DockPanel Margin="{TemplateBinding Padding}">
+                        <ScrollViewer DockPanel.Dock="Top" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" Focusable="False">
+                          <GridViewHeaderRowPresenter
+                              Columns="{Binding TemplatedParent.View.Columns, RelativeSource={RelativeSource TemplatedParent}}"
+                              ColumnHeaderContainerStyle="{Binding TemplatedParent.View.ColumnHeaderContainerStyle, RelativeSource={RelativeSource TemplatedParent}}"
+                              ColumnHeaderTemplate="{Binding TemplatedParent.View.ColumnHeaderTemplate, RelativeSource={RelativeSource TemplatedParent}}"
+                              ColumnHeaderTemplateSelector="{Binding TemplatedParent.View.ColumnHeaderTemplateSelector, RelativeSource={RelativeSource TemplatedParent}}"
+                              ColumnHeaderStringFormat="{Binding TemplatedParent.View.ColumnHeaderStringFormat, RelativeSource={RelativeSource TemplatedParent}}"
+                              AllowsColumnReorder="{Binding TemplatedParent.View.AllowsColumnReorder, RelativeSource={RelativeSource TemplatedParent}}"
+                              ColumnHeaderContextMenu="{Binding TemplatedParent.View.ColumnHeaderContextMenu, RelativeSource={RelativeSource TemplatedParent}}"
+                              ColumnHeaderToolTip="{Binding TemplatedParent.View.ColumnHeaderToolTip, RelativeSource={RelativeSource TemplatedParent}}"
+                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </ScrollViewer>
+                        <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" KeyboardNavigation.DirectionalNavigation="Local"
+                                                CanContentScroll="{TemplateBinding CanContentScroll}" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                      </DockPanel>
+                      <ScrollBar x:Name="PART_HorizontalScrollBar" Grid.Row="1" Orientation="Horizontal" Cursor="Arrow"
+                                 Maximum="{TemplateBinding ScrollableWidth}" ViewportSize="{TemplateBinding ViewportWidth}"
+                                 Value="{TemplateBinding HorizontalOffset}" Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"/>
+                      <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="1" Orientation="Vertical" Cursor="Arrow"
+                                 Maximum="{TemplateBinding ScrollableHeight}" ViewportSize="{TemplateBinding ViewportHeight}"
+                                 Value="{TemplateBinding VerticalOffset}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+                    </Grid>
+                  </ControlTemplate>
+                </ScrollViewer.Template>
+                <ItemsPresenter/>
+              </ScrollViewer>
+            </Grid>
           </Border>
         </ControlTemplate>
       </Setter.Value>
@@ -174,11 +230,12 @@
               <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"
                                 RecognizesAccessKey="True"/>
             </Border>
-            <Thumb x:Name="PART_HeaderGripper" HorizontalAlignment="Right" Width="9" Margin="0,0,-4,0" Cursor="SizeWE">
+            <Thumb x:Name="PART_HeaderGripper" HorizontalAlignment="Right" Width="9" Margin="0,0,-4,0" Cursor="SizeWE"
+                   BorderBrush="{DynamicResource LineBrush}">
               <Thumb.Template>
                 <ControlTemplate TargetType="Thumb">
                   <Border Background="Transparent">
-                    <Rectangle Width="1" HorizontalAlignment="Center" Fill="{DynamicResource LineBrush}"/>
+                    <Rectangle Width="1" HorizontalAlignment="Center" Fill="{TemplateBinding BorderBrush}"/>
                   </Border>
                 </ControlTemplate>
               </Thumb.Template>
@@ -189,6 +246,17 @@
             <Trigger Property="Role" Value="Padding">
               <Setter TargetName="PART_HeaderGripper" Property="Visibility" Value="Collapsed"/>
             </Trigger>
+            <!-- Nor the last column (its separator would show against the rounded border); it can still be resized. -->
+            <DataTrigger Value="True">
+              <DataTrigger.Binding>
+                <MultiBinding>
+                  <MultiBinding.Converter><b:IsLastColumn/></MultiBinding.Converter>
+                  <Binding Path="Column" RelativeSource="{RelativeSource Self}"/>
+                  <Binding Path="Columns" RelativeSource="{RelativeSource AncestorType=GridViewHeaderRowPresenter}"/>
+                </MultiBinding>
+              </DataTrigger.Binding>
+              <Setter TargetName="PART_HeaderGripper" Property="BorderBrush" Value="Transparent"/>
+            </DataTrigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>

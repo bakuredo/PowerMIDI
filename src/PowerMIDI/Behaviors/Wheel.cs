@@ -11,7 +11,9 @@ public sealed record WheelStep(int Direction, ModifierKeys Modifiers);
 // Attached mouse wheel behaviors, set in XAML:
 // - Wheel.SliderStep="True": the wheel moves a slider by ±1, or ±8 with Ctrl;
 // - Wheel.Command="{Binding …}": the wheel runs a command with a WheelStep parameter
-//   (on a combo box, only while its list is closed: an open list keeps its normal scrolling).
+//   (on a combo box, only while its list is closed: an open list keeps its normal scrolling);
+// - Wheel.ComboStep="True": the wheel selects the previous / next item of a closed combo box (set for all of them by
+//   the ComboBox style of Styles.xaml).
 public static class Wheel
 {
     public static readonly DependencyProperty SliderStepProperty = DependencyProperty.RegisterAttached(
@@ -56,11 +58,12 @@ public static class Wheel
         if ((bool)e.NewValue) combo.PreviewMouseWheel += StepCombo;
     }
 
-    // Next / previous item (stops at both ends); an open list keeps its normal scrolling.
+    // Next / previous item (stops at both ends); an open list keeps its normal scrolling, a list with its own wheel
+    // command (Wheel.Command) runs that one instead.
     static void StepCombo(object sender, MouseWheelEventArgs e)
     {
         var combo = (ComboBox)sender;
-        if (combo.IsDropDownOpen) return;
+        if (combo.IsDropDownOpen || GetCommand(combo) != null) return;
         int index = Math.Max(0, Math.Min(combo.Items.Count - 1, combo.SelectedIndex - Math.Sign(e.Delta)));
         if (index != combo.SelectedIndex) combo.SelectedIndex = index;
         e.Handled = true;

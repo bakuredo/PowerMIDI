@@ -165,7 +165,7 @@
                       IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
         <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
-        <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}" b:Wheel.ComboStep="True"
+        <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}"
                   ToolTip="Controller set by the sliders">
           <!-- Order of the menu: see MixerViewModel.MenuOrder -->
           <ComboBoxItem Content="Modulation (CC1)"
@@ -199,11 +199,11 @@
         </ComboBox>
         <!-- XG voice map (XG mode only): which version of the capital voices the module plays, see MixerViewModel. -->
         <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.VoiceMapNames}"
-                  SelectedIndex="{Binding VoiceMapIndex}" b:Wheel.ComboStep="True" Visibility="{Binding IsXg, Converter={StaticResource BoolToVisibility}}"
+                  SelectedIndex="{Binding VoiceMapIndex}" Visibility="{Binding IsXg, Converter={StaticResource BoolToVisibility}}"
                   ToolTip="Voice map: version of XG base sounds (Auto: file choice)"/>
         <!-- GS default map (GS mode only): map of the sounds whose bank LSB is 0, see MixerViewModel. -->
         <ComboBox Width="120" HorizontalAlignment="Left" Margin="8,0,0,0" ItemsSource="{x:Static vm:MixerViewModel.GsDefaultMapNames}"
-                  SelectedIndex="{Binding GsDefaultMapIndex}" b:Wheel.ComboStep="True" Visibility="{Binding IsGs, Converter={StaticResource BoolToVisibility}}"
+                  SelectedIndex="{Binding GsDefaultMapIndex}" Visibility="{Binding IsGs, Converter={StaticResource BoolToVisibility}}"
                   ToolTip="Default map: map of GS sounds without bank LSB (Auto: file choice)"/>
       </DockPanel>
       <!-- Speed and pitch of the playback (listening aids, see MainViewModel.Speed.cs). The tab's DataContext is the
@@ -838,10 +838,22 @@
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
 
-    <!-- Port and mode -->
+    <!-- Port and mode (no wheel step on the port: a change of port is not to be done by mistake) -->
     <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
-      <TextBlock Text="MIDI port" Margin="0,0,8,0" VerticalAlignment="Center"/>
-      <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}"/>
+      <!-- MIDI OUT: a MIDI socket (5-pin DIN seen from the front: the pins on an arc, the notch at the bottom), in the
+           color of the text of the window. -->
+      <Viewbox Width="18" Height="18" Margin="3,0,5,0" VerticalAlignment="Center">
+        <Canvas Width="20" Height="20" Background="Transparent" ToolTip="MIDI OUT">
+          <Ellipse Width="18" Height="18" Canvas.Left="1" Canvas.Top="1" StrokeThickness="1.5" Stroke="{DynamicResource WindowTextBrush}"/>
+          <Path Fill="{DynamicResource WindowTextBrush}" Data="M8.6,16.6 L11.4,16.6 L11.4,19 L8.6,19 Z"/>
+          <Ellipse Width="2.4" Height="2.4" Canvas.Left="3.8" Canvas.Top="8.8" Fill="{DynamicResource WindowTextBrush}"/>
+          <Ellipse Width="2.4" Height="2.4" Canvas.Left="5.26" Canvas.Top="5.26" Fill="{DynamicResource WindowTextBrush}"/>
+          <Ellipse Width="2.4" Height="2.4" Canvas.Left="8.8" Canvas.Top="3.8" Fill="{DynamicResource WindowTextBrush}"/>
+          <Ellipse Width="2.4" Height="2.4" Canvas.Left="12.34" Canvas.Top="5.26" Fill="{DynamicResource WindowTextBrush}"/>
+          <Ellipse Width="2.4" Height="2.4" Canvas.Left="13.8" Canvas.Top="8.8" Fill="{DynamicResource WindowTextBrush}"/>
+        </Canvas>
+      </Viewbox>
+      <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" b:Wheel.ComboStep="False"/>
       <!-- Mode, right after the port (no label: its tooltip says what it is), then the refresh of the port list. -->
       <ComboBox Width="120" Margin="6,0,0,0" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
                 ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
