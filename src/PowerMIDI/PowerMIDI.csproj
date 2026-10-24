@@ -38,12 +38,14 @@
        program in its library folder (Library tab). The downloaded zips and the user's favorites go there too. -->
   <ItemGroup>
     <None Include="..\..\library\library.db" Link="library\library.db" CopyToOutputDirectory="PreserveNewest"
-          Condition="Exists('..\..\library\library.db')" />
+          CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" Condition="Exists('..\..\library\library.db')" />
   </ItemGroup>
 
-  <!-- Module definition files in the Domino format (..\..\instruments), copied next to the program. -->
+  <!-- Module definition files in the Domino format (..\..\instruments), copied next to the program. Published next to
+       the exe too (never inside the single file: they are read from the instruments folder). -->
   <ItemGroup>
-    <None Include="..\..\instruments\*.xml" Link="instruments\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\instruments\*.xml" Link="instruments\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
   <!-- Color themes: compiled into the program, and copied next to it (themes folder) where they can be edited

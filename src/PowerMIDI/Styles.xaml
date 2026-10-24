@@ -144,7 +144,9 @@
               <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlItemSelectedBrush}"/>
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlItemSelectedLineBrush}"/>
             </Trigger>
-            <!-- Highlighted (keyboard): the selected item keeps its look (it is highlighted when the list opens). -->
+            <!-- Highlighted (the list moves it with the mouse and the keyboard: one item at a time, also while the wheel
+                 scrolls the list under a still mouse): the selected item keeps its look (it is highlighted when the
+                 list opens), unless the mouse is on it. -->
             <MultiTrigger>
               <MultiTrigger.Conditions>
                 <Condition Property="IsHighlighted" Value="True"/>
@@ -153,10 +155,14 @@
               <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlItemHoverBrush}"/>
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlItemHoverLineBrush}"/>
             </MultiTrigger>
-            <Trigger Property="IsMouseOver" Value="True">
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="IsHighlighted" Value="True"/>
+                <Condition Property="IsMouseOver" Value="True"/>
+              </MultiTrigger.Conditions>
               <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlItemHoverBrush}"/>
               <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlItemHoverLineBrush}"/>
-            </Trigger>
+            </MultiTrigger>
             <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource ControlMutedBrush}"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
