@@ -602,9 +602,9 @@
                       IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
-        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"/>
+        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="5,0,0,0"/>
       </DockPanel>
-      <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">
+      <TextBlock DockPanel.Dock="Top" Margin="5,0,0,6" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">
         <TextBlock.Style>
           <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
             <Style.Triggers>
@@ -614,7 +614,7 @@
         </TextBlock.Style>
       </TextBlock>
       <!-- GS and XG: tab strip of the blocks, one shown at a time at full width. -->
-      <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" Margin="0,0,0,8" Focusable="False"
+      <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" Margin="3,0,0,8" Focusable="False"
                     Visibility="{Binding HasTabs, Converter={StaticResource BoolToVisibility}}">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>

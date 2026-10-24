@@ -383,8 +383,8 @@ public sealed partial class EffectsViewModel : ObservableObject
 
     public string Title => Mode switch
     {
-        "XG" => "XG effects", "MT-32" => "MT-32 effects (CM-32L / CM-64)", "GM2" => "GM2 effects",
-        "GS" => "GS effects (SC-88 / SC-88Pro / SC-8850)",
+        "XG" => "XG effects", "MT-32" => "MT-32 effects", "GM2" => "GM2 effects",
+        "GS" => "GS effects",
         _ => $"{standard} effects",
     };
     public string InfoText => IsAvailable ? null : $"No effect settings in {standard} mode (GS, XG, GM2 and MT-32 only).";
