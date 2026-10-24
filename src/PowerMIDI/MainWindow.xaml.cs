@@ -30,7 +30,15 @@ public partial class MainWindow : Window, IMainView
         PositionBar.AddHandler(PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(OnPositionMouseDown), true);
         PositionBar.AddHandler(PreviewMouseLeftButtonUpEvent, new MouseButtonEventHandler(OnPositionMouseUp), true);
         PositionBar.PreviewMouseRightButtonDown += OnPositionRightClick;
-        var defs =InstrumentDefinitions.Load(Path.Combine(BaseDir, "instruments"));
+        // Names of the instruments (instruments folder): a damaged file is said, and the instruments are then shown by
+        // their numbers.
+        InstrumentDefinitions defs;
+        try { defs = InstrumentDefinitions.Load(Path.Combine(BaseDir, "instruments")); }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Instrument names not read (instruments folder): {ex.Message}", "PowerMIDI", MessageBoxButton.OK, MessageBoxImage.Warning);
+            defs = new InstrumentDefinitions();
+        }
         vm = new MainViewModel(this, defs);
         DataContext = vm;
         vm.Library.PropertyChanged += OnLibraryChanged;
@@ -286,8 +294,6 @@ public partial class MainWindow : Window, IMainView
     // Another window gets the focus: the notes held on the computer keyboard are released (their key up would be lost).
     void OnDeactivated(object sender, EventArgs e) => Run(vm.ReleaseKeyboardNotes);
 
-    // Double click on a row: plays that track. (A mouse binding on the list itself does not work on the
-    // rows: they handle the click for the selection.)
     // Search box of an instrument list: focused when the list opens (after the list has focused its current item).
     void OnInstrumentSearchVisible(object sender, DependencyPropertyChangedEventArgs e)
     {
@@ -321,6 +327,8 @@ public partial class MainWindow : Window, IMainView
         }
     }
 
+    // Double click on a row: plays that track. (A mouse binding on the list itself does not work on the
+    // rows: they handle the click for the selection.)
     void OnPlaylistItemDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (sender is not System.Windows.Controls.ListViewItem { DataContext: PlaylistItem item }) return;

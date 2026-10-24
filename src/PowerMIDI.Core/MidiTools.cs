@@ -373,8 +373,26 @@ public static class MidiTools
         ExtraTrackChunkPolicy = ExtraTrackChunkPolicy.Read,
     };
 
+    // Written next to it first, then put in its place: a write that fails (disk full…) leaves the file as it was (saving
+    // over the track being played is the usual case).
     public static void WriteFile(MidiFile file, string path) =>
-        file.Write(path, true, settings: new WritingSettings { TextEncoding = ByteEncoding });
+        WriteSafely(path, temp => file.Write(temp, true, settings: new WritingSettings { TextEncoding = ByteEncoding }));
+
+    // Writes a file through a temporary one in the same folder (write: writes that one), which then replaces it.
+    public static void WriteSafely(string path, Action<string> write)
+    {
+        var temp = path + ".tmp";
+        try
+        {
+            write(temp);
+            File.Move(temp, path, true);
+        }
+        catch
+        {
+            try { File.Delete(temp); } catch { }
+            throw;
+        }
+    }
 
     static readonly Encoding ShiftJis = GetCodePage(932), Windows1252 = GetCodePage(1252);
 

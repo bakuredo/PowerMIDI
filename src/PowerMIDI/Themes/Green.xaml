@@ -24,10 +24,7 @@
   <SolidColorBrush x:Key="AccentBrush" Color="#E0B050"/>
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#E0A050"/>
-  <!-- On the light surfaces Windows draws in both themes (lists, hovered or pressed buttons, selected rows) -->
+  <!-- On the light background of the hovered or pressed buttons, whatever the theme -->
   <SolidColorBrush x:Key="OnLightTextBrush" Color="#1E1E1E"/>
-  <SolidColorBrush x:Key="OnLightDisabledBrush" Color="#8A8A8A"/>
   <SolidColorBrush x:Key="OnLightFixedBrush" Color="#1F5FBF"/>
-  <SolidColorBrush x:Key="OnLightMissingBrush" Color="#C62828"/>
-  <SolidColorBrush x:Key="OnLightSysExBrush" Color="#2E7D32"/>
 </ResourceDictionary>

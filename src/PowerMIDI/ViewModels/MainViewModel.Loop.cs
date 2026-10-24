@@ -95,7 +95,12 @@ public sealed partial class MainViewModel
             else MidiEventEdits.SetLoopPoint(file, point, tick);
             return null;
         });
-        if (loop == null && tick != null) { Status = "Loop end set: set loop start too (none in track)"; return; }
+        if (loop == null && tick != null)
+        {
+            Status = point == MidiTools.LoopPoint.Start ? "Loop start set: set loop end too (none in track)"
+                                                        : "Loop end set: set loop start too (none in track)";
+            return;
+        }
         Status = loop is { } now ? $"Loop from {MidiTools.FormatTime(TickToTime(now.Start))} to {MidiTools.FormatTime(TickToTime(now.End))} (Ctrl+Z in Event Editor: undo)"
                                  : "No loop";
     }

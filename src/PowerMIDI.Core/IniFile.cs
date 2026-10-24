@@ -46,7 +46,7 @@ public sealed class IniFile
     public int? GetInt(string section, string key) =>
         int.TryParse(Get(section, key), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) || int.TryParse(Get(section, key), out n) ? n : null;
 
-    // Written in UTF-8 with BOM.
+    // Written in UTF-8 with BOM, through a temporary file (a write that fails leaves the old one as it was).
     public void Write(string path, string header = null)
     {
         var lines = new List<string>();
@@ -61,6 +61,6 @@ public sealed class IniFile
             foreach (var kv in values) lines.Add($"{kv.Key}={kv.Value}");
             lines.Add("");
         }
-        File.WriteAllLines(path, lines, new UTF8Encoding(true));
+        MidiTools.WriteSafely(path, temp => File.WriteAllLines(temp, lines, new UTF8Encoding(true)));
     }
 }
