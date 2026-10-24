@@ -9,7 +9,7 @@
     <RootNamespace>PowerMIDI</RootNamespace>
     <AssemblyName>PowerMIDI</AssemblyName>
     <!-- Shown in the title bar ("PowerMIDI 1.0.1"; a final 0 is left out: "PowerMIDI 1.1"). -->
-    <Version>1.3.0</Version>
+    <Version>1.4.0</Version>
     <Product>PowerMIDI</Product>
     <Authors>Bakuredo</Authors>
     <!-- No company nor copyright in the properties of the exe. -->
