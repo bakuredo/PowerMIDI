@@ -329,7 +329,6 @@ public sealed class LibraryViewModel : ObservableObject
     {
         get
         {
-
             if (selectedRow?.File is not { } f) return "";
             if (f.Error != null) return $"Unreadable: {f.Error}";
             var parts = new List<string> { f.Standard, selectedRow.Time, $"{f.Tracks} track{(f.Tracks != 1 ? "s" : "")}", ChannelsText(f) };
@@ -349,8 +348,10 @@ public sealed class LibraryViewModel : ObservableObject
             if (f.Copyright != null)
                 parts.Add(f.Copyright.Contains('©') || f.Copyright.Contains("copyright", StringComparison.OrdinalIgnoreCase) ||
                           f.Copyright.Contains("(c)", StringComparison.OrdinalIgnoreCase) ? f.Copyright : $"© {f.Copyright}");
-            // Plays as they are now (the row has them as they were when listed).
-            var (count, last) = selectedCollection != null ? UserDatabase().Plays(selectedCollection.Id, f.Path) : (f.PlayCount, f.LastPlayed);
+            // Plays as they are now (the row has them as they were when listed; also when the database cannot be read).
+            var (count, last) = (f.PlayCount, f.LastPlayed);
+            if (selectedCollection != null)
+                try { (count, last) = UserDatabase().Plays(selectedCollection.Id, f.Path); } catch { }
             parts.Add(count > 0 ? $"Played {count} time{(count > 1 ? "s" : "")}, last {LocalTime(last)}" : "Not played yet");
             return string.Join(" · ", parts);
         }
@@ -369,13 +370,13 @@ public sealed class LibraryViewModel : ObservableObject
         int slash = key.Path.LastIndexOf('/');
         var name = key.Path[(slash + 1)..];
         if (catalog?.Info.Id == key.CollectionId)
-            return slash < 0 ? $"{catalog.Info.Name} › {name}" : $"{catalog.Info.Name} › {ShownPath(key.Path[..slash])} › {name}";
+            return slash < 0 ? $"{catalog.Info.Name} › {name}" : $"{catalog.Info.Name} › {ShownFolders(key.Path[..slash])} › {name}";
         var collection = Collections.FirstOrDefault(c => c.Id == key.CollectionId)?.Name ?? key.CollectionId;
         return $"{collection} › {key.Path.Replace("/", " › ")}";
     }
 
     // Folders of a path by the names shown ("NES › Mega Man 3"); the root: the collection.
-    string ShownPath(string path)
+    string ShownFolders(string path)
     {
         if (catalog == null) return "";
         if (path == "") return catalog.Info.Name;

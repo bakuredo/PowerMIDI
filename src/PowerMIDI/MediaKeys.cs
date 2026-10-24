@@ -28,10 +28,7 @@ public sealed class MediaKeys : IDisposable
 
     readonly HwndSource source;
     readonly Action<Key> pressed;
-    readonly List<int> registered = new();
-
-    // The keys taken (the others: already taken by another program).
-    public IReadOnlyList<Key> Registered => registered.Select(id => Keys.First(k => k.VirtualKey == id).Key).ToList();
+    readonly List<int> registered = new();   // the keys taken (the others: already taken by another program)
 
     // For a window that has its handle (after SourceInitialized); pressed: the key, on the thread of the window.
     public MediaKeys(Window window, Action<Key> pressed)

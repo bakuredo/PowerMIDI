@@ -102,6 +102,7 @@ public sealed class KaraokeLyrics
         var (cut, atSpace) = LineBreak(text, width);
         return Columns(atSpace ? text[(cut + 1)..] : text[cut..]) <= width;
     }
+
     // A line too long for the two lines of the screen (a file that marks no line breaks: the whole song on one line) is
     // shown by pages that fit, cut between words; preferably before a word starting with a capital letter (the start of
     // a phrase), when the page keeps at least one line of the screen. The page shown: the last one started.
