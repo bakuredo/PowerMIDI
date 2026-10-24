@@ -27,6 +27,95 @@
       <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
     </Style.Triggers>
   </Style>
+  <!-- Drop-down lists, in the colors of the theme (the Windows ones stay light whatever the theme). Closed: the colors of
+       the buttons, its arrow at the right; open: the same background, the item under the mouse and the selected one in
+       the colors of the tabs. The button of a list (ComboToggleTemplate) is also used by the instrument list of the Mixer
+       (InstrumentComboTemplate, MainWindow.xaml). -->
+  <ControlTemplate x:Key="ComboToggleTemplate" TargetType="ToggleButton">
+    <Border x:Name="Bd" Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource ControlLineBrush}" BorderThickness="1"
+            SnapsToDevicePixels="True">
+      <Path x:Name="Arrow" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" Fill="{DynamicResource ControlMutedBrush}"
+            Data="M0,0 L3.5,4 L7,0 Z"/>
+    </Border>
+    <ControlTemplate.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
+        <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource ControlTextBrush}"/>
+      </Trigger>
+      <Trigger Property="IsChecked" Value="True">
+        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlSelectedBrush}"/>
+        <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource ControlTextBrush}"/>
+      </Trigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate>
+  <Style TargetType="ComboBox">
+    <Setter Property="Foreground" Value="{DynamicResource ControlTextBrush}"/>
+    <Setter Property="Padding" Value="6,3,2,3"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="ScrollViewer.CanContentScroll" Value="True"/>
+    <Setter Property="ItemsPanel">
+      <Setter.Value><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></Setter.Value>
+    </Setter>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBox">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="16"/>
+            </Grid.ColumnDefinitions>
+            <ToggleButton Grid.ColumnSpan="2" Style="{x:Null}" Template="{StaticResource ComboToggleTemplate}" Focusable="False" ClickMode="Press"
+                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
+            <ContentPresenter x:Name="Content" IsHitTestVisible="False" Margin="{TemplateBinding Padding}" HorizontalAlignment="Left" VerticalAlignment="Center"
+                              Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                              ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                              ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
+            <!-- Keyboard focus (Tab): the border in the blue of the theme. -->
+            <Border x:Name="Focus" Grid.ColumnSpan="2" BorderBrush="{DynamicResource ControlFixedBrush}" BorderThickness="1"
+                    IsHitTestVisible="False" Visibility="Collapsed"/>
+            <Popup x:Name="PART_Popup" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                   Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+              <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource ControlLineBrush}" BorderThickness="1"
+                      MaxHeight="{TemplateBinding MaxDropDownHeight}" SnapsToDevicePixels="True"
+                      MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                <ScrollViewer CanContentScroll="True">
+                  <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Focus" Property="Visibility" Value="Visible"/></Trigger>
+            <Trigger Property="IsDropDownOpen" Value="True"><Setter TargetName="Focus" Property="Visibility" Value="Collapsed"/></Trigger>
+            <!-- Disabled: dimmed with the theme colors, kept light otherwise (ControlDisabledOpacity, Themes.cs). -->
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="{DynamicResource ControlDisabledOpacity}"/>
+              <Setter TargetName="Content" Property="TextElement.Foreground" Value="{DynamicResource ControlMutedBrush}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style TargetType="ComboBoxItem">
+    <Setter Property="Foreground" Value="{DynamicResource ControlTextBrush}"/>
+    <Setter Property="Padding" Value="6,2"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBoxItem">
+          <Border x:Name="Bd" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <ContentPresenter/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlSelectedBrush}"/></Trigger>
+            <Trigger Property="IsHighlighted" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource ControlMutedBrush}"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
   <!-- Lists with columns (playlist, Event Editor): own template, the default one lights the border up under the mouse
        and with the focus. -->
   <Style x:Key="ThemedListView" TargetType="ListView">

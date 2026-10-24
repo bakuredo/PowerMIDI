@@ -17,37 +17,20 @@
         <ResourceDictionary Source="Styles.xaml"/>   <!-- buttons, lists -->
       </ResourceDictionary.MergedDictionaries>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
-    <!-- Instrument list of a channel: the look of a Windows list, with a search box above the sounds (it filters
-         them while typing; see ChannelViewModel.SearchText). The colors of the closed list are Windows' own. -->
+    <!-- Instrument list of a channel: the drop-down lists of the theme (Styles.xaml), with a search box above the sounds
+         (it filters them while typing; see ChannelViewModel.SearchText). -->
     <ControlTemplate x:Key="InstrumentComboTemplate" TargetType="ComboBox">
       <Grid SnapsToDevicePixels="True">
-        <ToggleButton Focusable="False" ClickMode="Press"
-                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
-          <ToggleButton.Template>
-            <ControlTemplate TargetType="ToggleButton">
-              <Border x:Name="Bd" Background="#FFF0F0F0" BorderBrush="#FFACACAC" BorderThickness="1">
-                <Path HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0" Fill="#FF606060" Data="M0,0 L3.5,4 L7,0 Z"/>
-              </Border>
-              <ControlTemplate.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                  <Setter TargetName="Bd" Property="Background" Value="#FFE5F1FB"/>
-                  <Setter TargetName="Bd" Property="BorderBrush" Value="#FF7EB4EA"/>
-                </Trigger>
-                <Trigger Property="IsChecked" Value="True">
-                  <Setter TargetName="Bd" Property="Background" Value="#FFCCE4F7"/>
-                  <Setter TargetName="Bd" Property="BorderBrush" Value="#FF569DE5"/>
-                </Trigger>
-              </ControlTemplate.Triggers>
-            </ControlTemplate>
-          </ToggleButton.Template>
-        </ToggleButton>
+        <ToggleButton Style="{x:Null}" Template="{StaticResource ComboToggleTemplate}" Focusable="False" ClickMode="Press"
+                      IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
         <ContentPresenter IsHitTestVisible="False" Margin="6,0,20,0" HorizontalAlignment="Left" VerticalAlignment="Center"
                           Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                           ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
         <Popup x:Name="PART_Popup" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
                Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-          <Border Background="White" BorderBrush="#FF828790" BorderThickness="1" MaxHeight="{TemplateBinding MaxDropDownHeight}"
+          <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource ControlLineBrush}" BorderThickness="1"
+                  MaxHeight="{TemplateBinding MaxDropDownHeight}"
                   MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
             <DockPanel>
               <TextBox DockPanel.Dock="Top" Margin="3" Padding="2,1" FontWeight="Normal" Foreground="#FF1E1E1E"
@@ -152,7 +135,7 @@
   <!-- Right panel: Mixer (16 channels), Effects (those of the current mode), Library and About tabs -->
   <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
           BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="6">
-    <TabControl Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}"
+    <TabControl x:Name="RightTabs" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}"
                 SelectedIndex="{Binding SelectedTab}">
     <TabItem Header="Mixer" DataContext="{Binding Mixer}" d:DataContext="{d:DesignInstance vm:MixerViewModel}">
     <DockPanel>
@@ -324,19 +307,18 @@
                   <ItemsPanelTemplate><VirtualizingStackPanel Width="260"/></ItemsPanelTemplate>
                 </ComboBox.ItemsPanel>
                 <ComboBox.Style>
-                  <Style TargetType="ComboBox">
-                    <Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/>
+                  <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
                     <Setter Property="Template" Value="{StaticResource InstrumentComboTemplate}"/>
                     <Style.Triggers>
-                      <DataTrigger Binding="{Binding InstrumentState}" Value="Unused"><Setter Property="Foreground" Value="{DynamicResource OnLightDisabledBrush}"/></DataTrigger>
+                      <DataTrigger Binding="{Binding InstrumentState}" Value="Unused"><Setter Property="Foreground" Value="{DynamicResource ControlMutedBrush}"/></DataTrigger>
                       <DataTrigger Binding="{Binding InstrumentState}" Value="Manual">
-                        <Setter Property="Foreground" Value="{DynamicResource OnLightFixedBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource ControlFixedBrush}"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
                       </DataTrigger>
                       <!-- XG instrument set by a Multi Part SysEx of the file. -->
-                      <DataTrigger Binding="{Binding IsSysExPatch}" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightSysExBrush}"/></DataTrigger>
+                      <DataTrigger Binding="{Binding IsSysExPatch}" Value="True"><Setter Property="Foreground" Value="{DynamicResource ControlSysExBrush}"/></DataTrigger>
                       <!-- Sound not in the list of the mode (last: wins over the colors above). -->
-                      <DataTrigger Binding="{Binding IsInstrumentMissing}" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightMissingBrush}"/></DataTrigger>
+                      <DataTrigger Binding="{Binding IsInstrumentMissing}" Value="True"><Setter Property="Foreground" Value="{DynamicResource ControlMissingBrush}"/></DataTrigger>
                     </Style.Triggers>
                   </Style>
                 </ComboBox.Style>
@@ -421,12 +403,11 @@
               <MouseBinding MouseAction="RightClick" Command="{Binding ClearCommand}"/>
             </ComboBox.InputBindings>
             <ComboBox.Style>
-              <Style TargetType="ComboBox">
-                <Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/>
+              <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
                 <Style.Triggers>
                   <DataTrigger Binding="{Binding ValueText}" Value=""><Setter Property="Grid.ColumnSpan" Value="2"/></DataTrigger>
                   <DataTrigger Binding="{Binding IsFixed}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource OnLightFixedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource ControlFixedBrush}"/>
                     <Setter Property="FontWeight" Value="Bold"/>
                   </DataTrigger>
                 </Style.Triggers>
@@ -804,10 +785,13 @@
          (set in MainWindow.xaml.cs from the version of the program). -->
     <TabItem Header="About">
     <DockPanel>
-      <!-- Color theme (Themes.cs), remembered in PowerMIDI.ini. -->
+      <!-- Color theme (Themes.cs) and dark controls, remembered in PowerMIDI.ini. -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
         <TextBlock Text="Theme" Margin="0,0,8,0"/>
         <ComboBox x:Name="ThemeBox" Width="110" SelectionChanged="OnThemeChanged" ToolTip="Colors of the window"/>
+        <CheckBox x:Name="DarkControlsBox" Content="Dark controls" Margin="16,0,0,0" VerticalAlignment="Center"
+                  Foreground="{DynamicResource TextBrush}" Click="OnDarkControlsClick"
+                  ToolTip="Drop-down lists of tabs in theme colors instead of light"/>
       </StackPanel>
       <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
         <Viewbox Width="128" Height="128">
