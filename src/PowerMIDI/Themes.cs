@@ -29,24 +29,30 @@ public static class Themes
     // tabs and of the Event Editor (they are found there before those of the theme).
     public static bool LightControls { get; set; }
 
-    // Colors of the controls (Styles.xaml): those of the theme (set with it), or the light ones. Background, border,
-    // text, under the mouse, selected or pressed, arrow and disabled text, then the state colors (value set by hand,
-    // sound missing, set by a SysEx), and the text of a disabled list. A disabled list is dimmed with the colors of the
-    // theme (ControlDisabledOpacity), kept light otherwise. The item of a list under the mouse is framed in the light
-    // ones only (ControlHoverLineBrush, as in the Explorer).
+    // Colors of the controls (Styles.xaml): those of the theme (set with it), or the light ones (those of the Windows
+    // lists). Background, border, text, under the mouse, selected or pressed, arrow and disabled text, then the state
+    // colors (value set by hand, sound missing, set by a SysEx), the text of a disabled list, then the open list:
+    // background, border, item under the mouse and its frame, item selected and its frame (frames: light ones only, none
+    // with the theme), and the background of the search boxes. A disabled list is dimmed with the colors of the theme
+    // (ControlDisabledOpacity), kept light otherwise.
     static readonly string[] ControlKeys =
         { "ControlBrush", "ControlLineBrush", "ControlTextBrush", "ControlHoverBrush", "ControlSelectedBrush", "ControlMutedBrush",
-          "ControlFixedBrush", "ControlMissingBrush", "ControlSysExBrush", "ControlDisabledTextBrush" };
+          "ControlFixedBrush", "ControlMissingBrush", "ControlSysExBrush", "ControlDisabledTextBrush",
+          "ControlPopupBrush", "ControlPopupLineBrush", "ControlItemHoverBrush", "ControlItemHoverLineBrush", "ControlItemSelectedBrush",
+          "ControlItemSelectedLineBrush", "ControlFieldBrush" };
+    // Of the theme (null: none).
     static readonly string[] ThemeControlKeys =
-        { "ButtonBrush", "LineBrush", "TextBrush", "TabHoverBrush", "TabSelectedBrush", "TextMutedBrush", "FixedBrush", "MuteBrush", "GreenBrush", "TextBrush" };
+        { "ButtonBrush", "LineBrush", "TextBrush", "TabHoverBrush", "TabSelectedBrush", "TextMutedBrush", "FixedBrush", "MuteBrush", "GreenBrush", "TextBrush",
+          "ButtonBrush", "LineBrush", "TabHoverBrush", null, "TabSelectedBrush", null, "ButtonBrush" };
     static readonly string[] LightControlColors =
-        { "#FFEDEDED", "#FFACACAC", "#FF1E1E1E", "#FFE5F1FB", "#FFCCE4F7", "#FF606060", "#FF1F5FBF", "#FFC62828", "#FF2E7D32", "#FF8A8A8A" };
+        { "#FFEDEDED", "#FFACACAC", "#FF1E1E1E", "#FFE5F1FB", "#FFCCE4F7", "#FF606060", "#FF1F5FBF", "#FFC62828", "#FF2E7D32", "#FF8A8A8A",
+          "#FFFFFFFF", "#FF646464", "#FFB8E0F3", "#FF26A0DA", "#FFF6F6F6", "#FFDADADA", "#FFFFFFFF" };
 
     static void SetControlColors(ResourceDictionary dictionary)
     {
-        for (int i = 0; i < ControlKeys.Length; i++) dictionary[ControlKeys[i]] = dictionary[ThemeControlKeys[i]];
+        for (int i = 0; i < ControlKeys.Length; i++)
+            dictionary[ControlKeys[i]] = ThemeControlKeys[i] is { } key ? dictionary[key] : Brushes.Transparent;
         dictionary["ControlDisabledOpacity"] = 0.5;
-        dictionary["ControlHoverLineBrush"] = Brushes.Transparent;
     }
 
     static ResourceDictionary lightControlBrushes;
@@ -62,9 +68,6 @@ public static class Themes
             dictionary[ControlKeys[i]] = brush;
         }
         dictionary["ControlDisabledOpacity"] = 1.0;
-        var hoverLine = new SolidColorBrush(Color.FromRgb(0x90, 0x90, 0x90));   // grey
-        hoverLine.Freeze();
-        dictionary["ControlHoverLineBrush"] = hoverLine;
         return lightControlBrushes = dictionary;
     }
 

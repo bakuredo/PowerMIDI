@@ -10,7 +10,31 @@
     <Setter Property="Padding" Value="10,4"/>
     <Setter Property="Margin" Value="0,0,6,0"/>
     <Setter Property="Cursor" Value="Hand"/>
-    <!-- Hover / click: Windows lightens background, so text turns black to stay readable. -->
+    <!-- Own template, with the colors of the Windows one under the mouse and pressed (light blue); disabled: the colors
+         of the theme dimmed (the Windows one turns light grey whatever the theme). -->
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True" Focusable="False"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#FFBEE6FD"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="#FF3C7FB1"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="#FFC4E5F6"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="#FF2C628B"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.45"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <!-- Hover / click: light background, so text turns black to stay readable. -->
     <Style.Triggers>
       <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
       <Trigger Property="IsPressed" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
@@ -73,12 +97,12 @@
                               Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                               ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
-            <!-- Keyboard focus (Tab): the border in the blue of the theme. -->
-            <Border x:Name="Focus" Grid.ColumnSpan="2" BorderBrush="{DynamicResource ControlFixedBrush}" BorderThickness="1"
+            <!-- Keyboard focus (Tab): the border in the grey of the muted text (as the search boxes). -->
+            <Border x:Name="Focus" Grid.ColumnSpan="2" BorderBrush="{DynamicResource ControlMutedBrush}" BorderThickness="1"
                     IsHitTestVisible="False" Visibility="Collapsed"/>
             <Popup x:Name="PART_Popup" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
                    Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-              <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource ControlLineBrush}" BorderThickness="1"
+              <Border Background="{DynamicResource ControlPopupBrush}" BorderBrush="{DynamicResource ControlPopupLineBrush}" BorderThickness="1"
                       MaxHeight="{TemplateBinding MaxDropDownHeight}" SnapsToDevicePixels="True"
                       MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                 <ScrollViewer CanContentScroll="True">
@@ -100,9 +124,11 @@
       </Setter.Value>
     </Setter>
   </Style>
+  <!-- Items of the open lists: with the light controls, as in the Windows lists (selected: grey, framed; under the mouse
+       or the keyboard: blue, framed); with the theme colors, those of the tabs, without frames. -->
   <Style TargetType="ComboBoxItem">
     <Setter Property="Foreground" Value="{DynamicResource ControlTextBrush}"/>
-    <Setter Property="Padding" Value="5,1"/>   <!-- 6,2 with the frame (1 px) of the hovered item -->
+    <Setter Property="Padding" Value="5,1"/>   <!-- 6,2 with the frame (1 px) -->
     <Setter Property="SnapsToDevicePixels" Value="True"/>
     <!-- No dotted frame of keyboard focus (arrow keys from the search box of the instrument list): the item is already
          highlighted. -->
@@ -110,28 +136,68 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ComboBoxItem">
-          <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="2" Padding="{TemplateBinding Padding}">
+          <Border x:Name="Bd" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" Padding="{TemplateBinding Padding}">
             <ContentPresenter/>
           </Border>
           <ControlTemplate.Triggers>
-            <!-- Hovered: framed as in the Explorer with the light controls (ControlHoverLineBrush; none with the theme colors). -->
-            <Trigger Property="IsHighlighted" Value="True">
-              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}"/>
-              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlHoverLineBrush}"/>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlItemSelectedBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlItemSelectedLineBrush}"/>
             </Trigger>
-            <Trigger Property="IsSelected" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlSelectedBrush}"/></Trigger>
+            <!-- Highlighted (keyboard): the selected item keeps its look (it is highlighted when the list opens). -->
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="IsHighlighted" Value="True"/>
+                <Condition Property="IsSelected" Value="False"/>
+              </MultiTrigger.Conditions>
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlItemHoverBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlItemHoverLineBrush}"/>
+            </MultiTrigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlItemHoverBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlItemHoverLineBrush}"/>
+            </Trigger>
             <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource ControlMutedBrush}"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
   </Style>
-  <!-- Lists with columns (playlist, Event Editor): own template, the default one lights the border up under the mouse
-       and with the focus. -->
+  <!-- Search boxes (Library tab, Event Editor, instrument list of the Mixer) in the colors of the drop-down lists
+       (theme, or light with the light controls); the Windows ones stay white. -->
+  <Style x:Key="SearchBox" TargetType="TextBox">
+    <Setter Property="Background" Value="{DynamicResource ControlFieldBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource ControlTextBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource ControlLineBrush}"/>
+    <Setter Property="CaretBrush" Value="{DynamicResource ControlTextBrush}"/>
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                  SnapsToDevicePixels="True">
+            <ScrollViewer x:Name="PART_ContentHost" Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlHoverBrush}"/></Trigger>
+            <!-- Typing in it: the border in the grey of the muted text (of the theme, or of the light controls). -->
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlFieldBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource ControlMutedBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="{DynamicResource ControlDisabledOpacity}"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <!-- Lists with columns (playlist, Library tab, Event Editor): own template, the default one lights the border up under
+       the mouse and with the focus. -->
   <Style x:Key="ThemedListView" TargetType="ListView">
     <Setter Property="Background" Value="{DynamicResource PanelBrush}"/>
     <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+    <Setter Property="b:LastColumn.Track" Value="True"/>
     <Setter Property="Template">
       <Setter.Value>
         <!-- Rounded corners as the panels around (the header and the rows cut to them), the header without the margin
@@ -139,15 +205,10 @@
         <ControlTemplate TargetType="ListView">
           <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" SnapsToDevicePixels="True">
-            <Grid>
-              <Border x:Name="Mask" Background="{TemplateBinding Background}" CornerRadius="5"/>
-              <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="False"
+              <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="False" b:RoundedClip.Radius="5"
                             HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
                             VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
                             CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}">
-                <ScrollViewer.OpacityMask>
-                  <VisualBrush Visual="{Binding ElementName=Mask}"/>
-                </ScrollViewer.OpacityMask>
                 <ScrollViewer.Template>
                   <ControlTemplate TargetType="ScrollViewer">
                     <Grid Background="{TemplateBinding Background}">
@@ -186,7 +247,6 @@
                 </ScrollViewer.Template>
                 <ItemsPresenter/>
               </ScrollViewer>
-            </Grid>
           </Border>
         </ControlTemplate>
       </Setter.Value>
@@ -246,17 +306,11 @@
             <Trigger Property="Role" Value="Padding">
               <Setter TargetName="PART_HeaderGripper" Property="Visibility" Value="Collapsed"/>
             </Trigger>
-            <!-- Nor the last column (its separator would show against the rounded border); it can still be resized. -->
-            <DataTrigger Value="True">
-              <DataTrigger.Binding>
-                <MultiBinding>
-                  <MultiBinding.Converter><b:IsLastColumn/></MultiBinding.Converter>
-                  <Binding Path="Column" RelativeSource="{RelativeSource Self}"/>
-                  <Binding Path="Columns" RelativeSource="{RelativeSource AncestorType=GridViewHeaderRowPresenter}"/>
-                </MultiBinding>
-              </DataTrigger.Binding>
+            <!-- Nor the last column (its separator would show against the rounded border, see LastColumn); it can still
+                 be resized. -->
+            <Trigger Property="b:LastColumn.IsLast" Value="True">
               <Setter TargetName="PART_HeaderGripper" Property="BorderBrush" Value="Transparent"/>
-            </DataTrigger>
+            </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>

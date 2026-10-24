@@ -68,7 +68,7 @@
                  VerticalAlignment="Center" Margin="12,0,12,0"/>
       <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="208"/></Grid.ColumnDefinitions>
-        <TextBox Margin="8,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
+        <TextBox Style="{StaticResource SearchBox}" Margin="8,0,0,0" Padding="2,1" VerticalContentAlignment="Center"
                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search in type, data and description"/>
         <!-- Hint while empty (over the box, not hit by the mouse), as in the Library tab. -->
         <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" Foreground="#FF8A8A8A"

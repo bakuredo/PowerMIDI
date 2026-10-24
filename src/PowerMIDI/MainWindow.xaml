@@ -29,13 +29,27 @@
                           ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
         <Popup x:Name="PART_Popup" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
                Placement="Bottom" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-          <Border Background="{DynamicResource ControlBrush}" BorderBrush="{DynamicResource ControlLineBrush}" BorderThickness="1"
+          <Border Background="{DynamicResource ControlPopupBrush}" BorderBrush="{DynamicResource ControlPopupLineBrush}" BorderThickness="1"
                   MaxHeight="{TemplateBinding MaxDropDownHeight}"
                   MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
             <DockPanel>
-              <TextBox DockPanel.Dock="Top" Margin="3" Padding="2,1" FontWeight="Normal" Foreground="#FF1E1E1E"
-                       Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search sounds (Enter: first match)"
-                       IsVisibleChanged="OnInstrumentSearchVisible" PreviewKeyDown="OnInstrumentSearchKeyDown"/>
+              <!-- Search box, as those of the Library tab and of the Event Editor, with its hint while empty. -->
+              <Grid DockPanel.Dock="Top" Margin="3">
+                <TextBox Style="{StaticResource SearchBox}" Padding="2,1" FontWeight="Normal" VerticalContentAlignment="Center"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="Search sounds (Enter: first match)"
+                         IsVisibleChanged="OnInstrumentSearchVisible" PreviewKeyDown="OnInstrumentSearchKeyDown"/>
+                <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" FontWeight="Normal" Foreground="#FF8A8A8A">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding SearchText}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                  <Run Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="11"/><Run Text="  Search instruments..."/>
+                </TextBlock>
+              </Grid>
               <ScrollViewer CanContentScroll="True">
                 <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"/>
               </ScrollViewer>
@@ -647,7 +661,7 @@
                   SelectedIndex="{Binding FormatIndex}" ToolTip="Files of one standard"/>
         <!-- Search box, with its hint while empty (over it, not hit by the mouse). -->
         <Grid>
-          <TextBox Padding="2,1" VerticalContentAlignment="Center" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+          <TextBox Style="{StaticResource SearchBox}" Padding="2,1" VerticalContentAlignment="Center" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                    ToolTip="Search titles, folders and lyrics, in this folder and below (Esc: clear)">
             <TextBox.InputBindings>
               <KeyBinding Key="Escape" Command="{Binding ClearSearchCommand}"/>
@@ -853,7 +867,8 @@
           <Ellipse Width="2.4" Height="2.4" Canvas.Left="13.8" Canvas.Top="8.8" Fill="{DynamicResource WindowTextBrush}"/>
         </Canvas>
       </Viewbox>
-      <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" b:Wheel.ComboStep="False"/>
+      <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" b:Wheel.ComboStep="False"
+                AutomationProperties.Name="MIDI OUT"/>
       <!-- Mode, right after the port (no label: its tooltip says what it is), then the refresh of the port list. -->
       <ComboBox Width="120" Margin="6,0,0,0" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
                 ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
