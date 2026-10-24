@@ -964,8 +964,12 @@
               <ContextMenu>
                 <MenuItem Header="{Binding LoopStartMenuText}" Command="{Binding SetLoopStartCommand}"/>
                 <MenuItem Header="{Binding LoopEndMenuText}" Command="{Binding SetLoopEndCommand}"/>
-                <Separator/>
                 <MenuItem Header="Remove loop" Command="{Binding RemoveLoopCommand}" IsEnabled="{Binding HasLoop}"/>
+                <Separator/>
+                <!-- Temporary loop: played instead of the track's, in memory only (MainViewModel.Loop.cs). -->
+                <MenuItem Header="{Binding TempLoopStartMenuText}" Command="{Binding SetTempLoopStartCommand}"/>
+                <MenuItem Header="{Binding TempLoopEndMenuText}" Command="{Binding SetTempLoopEndCommand}"/>
+                <MenuItem Header="Remove temporary loop" Command="{Binding RemoveTempLoopCommand}" IsEnabled="{Binding HasTempLoop}"/>
               </ContextMenu>
             </Slider.ContextMenu>
           </Slider>
@@ -989,6 +993,29 @@
                 <MultiBinding Converter="{StaticResource LoopOffset}">
                   <Binding Path="LoopEndFraction"/>
                   <Binding Path="ActualWidth" ElementName="LoopCanvas"/>
+                </MultiBinding>
+              </Canvas.Left>
+            </Path>
+          </Canvas>
+          <!-- Temporary loop (right click on the bar): orange markers, over the green ones. -->
+          <Canvas x:Name="TempLoopCanvas" VerticalAlignment="Top" Height="9" Margin="0,1,0,0"
+                  Visibility="{Binding HasTempLoop, Converter={StaticResource BoolToVisibility}}">
+            <Canvas.Resources>
+              <b:FractionToOffset x:Key="TempLoopOffset"/>
+            </Canvas.Resources>
+            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource WarningBrush}" ToolTip="{Binding TempLoopToolTip}">
+              <Canvas.Left>
+                <MultiBinding Converter="{StaticResource TempLoopOffset}">
+                  <Binding Path="TempLoopStartFraction"/>
+                  <Binding Path="ActualWidth" ElementName="TempLoopCanvas"/>
+                </MultiBinding>
+              </Canvas.Left>
+            </Path>
+            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource WarningBrush}" ToolTip="{Binding TempLoopToolTip}">
+              <Canvas.Left>
+                <MultiBinding Converter="{StaticResource TempLoopOffset}">
+                  <Binding Path="TempLoopEndFraction"/>
+                  <Binding Path="ActualWidth" ElementName="TempLoopCanvas"/>
                 </MultiBinding>
               </Canvas.Left>
             </Path>

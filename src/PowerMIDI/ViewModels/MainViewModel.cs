@@ -59,6 +59,9 @@ public sealed partial class MainViewModel : ObservableObject
         SetLoopStartCommand = Command(() => SetLoopPoint(MidiTools.LoopPoint.Start, menuBarStart));
         SetLoopEndCommand = Command(() => SetLoopPoint(MidiTools.LoopPoint.End, menuBarEnd));
         RemoveLoopCommand = Command(() => SetLoopPoint(MidiTools.LoopPoint.None, null));
+        SetTempLoopStartCommand = Command(() => SetTempLoopPoint(MidiTools.LoopPoint.Start, menuBarStart));
+        SetTempLoopEndCommand = Command(() => SetTempLoopPoint(MidiTools.LoopPoint.End, menuBarEnd));
+        RemoveTempLoopCommand = Command(() => SetTempLoopPoint(MidiTools.LoopPoint.None, null));
         StopCommand = Command(Stop);
         NextCommand = Command(() => MoveTrack(1));
         PreviousCommand = Command(Previous);
@@ -105,6 +108,9 @@ public sealed partial class MainViewModel : ObservableObject
     public ICommand SetLoopStartCommand { get; }   // menu of the position bar (MainViewModel.Loop.cs)
     public ICommand SetLoopEndCommand { get; }
     public ICommand RemoveLoopCommand { get; }
+    public ICommand SetTempLoopStartCommand { get; }   // temporary loop: in memory only (MainViewModel.Loop.cs)
+    public ICommand SetTempLoopEndCommand { get; }
+    public ICommand RemoveTempLoopCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand NextCommand { get; }
     public ICommand PreviousCommand { get; }
@@ -716,6 +722,7 @@ public sealed partial class MainViewModel : ObservableObject
         ApplyMixerState();   // same track played again: the chosen instruments are resent
 
         loopsDone = 0;
+        if (current?.Path != item.Path) ForgetTempLoop();   // another track: its own loop only
         var pb = CreatePlayback(midi);
         SetPosition(0);
         TimeText = $"00:00 / {durationText}";
