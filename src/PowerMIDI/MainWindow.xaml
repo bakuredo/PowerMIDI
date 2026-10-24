@@ -777,13 +777,13 @@
          (set in MainWindow.xaml.cs from the version of the program). -->
     <TabItem Header="About">
     <DockPanel>
-      <!-- Color theme (Themes.cs) and dark controls, remembered in PowerMIDI.ini. -->
+      <!-- Color theme (Themes.cs) and light controls, remembered in PowerMIDI.ini. -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
         <TextBlock Text="Theme" Margin="0,0,8,0"/>
         <ComboBox x:Name="ThemeBox" Width="110" SelectionChanged="OnThemeChanged" ToolTip="Colors of the window"/>
-        <CheckBox x:Name="DarkControlsBox" Content="Dark controls" Margin="16,0,0,0" VerticalAlignment="Center"
-                  Foreground="{DynamicResource TextBrush}" Click="OnDarkControlsClick"
-                  ToolTip="Drop-down lists of tabs in theme colors instead of light"/>
+        <CheckBox x:Name="LightControlsBox" Content="Light controls" Margin="16,0,0,0" VerticalAlignment="Center"
+                  Foreground="{DynamicResource TextBrush}" Click="OnLightControlsClick"
+                  ToolTip="Drop-down lists of tabs drawn light, whatever the theme"/>
       </StackPanel>
       <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
         <Viewbox Width="128" Height="128">

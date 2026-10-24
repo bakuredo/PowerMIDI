@@ -260,16 +260,16 @@ public partial class MainWindow : Window, IMainView
         });
     }
 
-    // Dark controls (About tab): applied at once and remembered.
-    void OnDarkControlsClick(object sender, RoutedEventArgs e) => Run(() =>
+    // Light controls (About tab): applied at once and remembered.
+    void OnLightControlsClick(object sender, RoutedEventArgs e) => Run(() =>
     {
-        Themes.DarkControls = DarkControlsBox.IsChecked == true;
+        Themes.LightControls = LightControlsBox.IsChecked == true;
         ApplyControlColors();
         if (IsLoaded) SaveSettings();
     });
 
     // The controls of the tabs (right panel) and of the Event Editor light or in the colors of the theme (see
-    // Themes.DarkControls).
+    // Themes.LightControls).
     void ApplyControlColors()
     {
         Themes.ApplyControls(RightTabs.Resources);
@@ -440,7 +440,7 @@ public partial class MainWindow : Window, IMainView
         ini.Set("Window", "Height", (int)bounds.Height);
         ini.Set("Window", "Maximized", WindowState == WindowState.Maximized ? 1 : 0);
         ini.Set("Window", "Theme", Themes.Current);
-        ini.Set("Window", "DarkControls", Themes.DarkControls ? 1 : 0);
+        ini.Set("Window", "LightControls", Themes.LightControls ? 1 : 0);
         ini.Write(SettingsPath, "PowerMIDI settings (written on close).");
     }
 
@@ -475,11 +475,11 @@ public partial class MainWindow : Window, IMainView
         }
         if (ini.Get("Window", "Maximized") == "1") WindowState = WindowState.Maximized;
 
-        // Color theme and dark controls (About tab); a missing or unknown name gives the default theme.
-        Themes.DarkControls = ini.Get("Window", "DarkControls") == "1";
+        // Color theme and light controls (About tab); a missing or unknown name gives the default theme.
+        Themes.LightControls = ini.Get("Window", "LightControls") == "1";
         ApplyControlColors();
         Themes.Apply(ini.Get("Window", "Theme"));
-        DarkControlsBox.IsChecked = Themes.DarkControls;
+        LightControlsBox.IsChecked = Themes.LightControls;
         ThemeBox.ItemsSource = Themes.Names;
         ThemeBox.SelectedItem = Themes.Current;
         themeReady = true;

@@ -23,11 +23,11 @@ public static class Themes
 
     public static string Current { get; private set; } = Default;
 
-    // Dark controls (About tab, PowerMIDI.ini): the drop-down lists of the tabs (right panel) and of the Event Editor in
-    // the colors of the theme. Off by default: they are drawn light, as Windows draws them, whatever the theme; the rest
+    // Light controls (About tab, PowerMIDI.ini; off by default): the drop-down lists of the tabs (right panel) and of the
+    // Event Editor drawn light, as Windows draws them, whatever the theme (otherwise in the colors of the theme); the rest
     // of the windows keeps the colors of the theme. ApplyControls then puts LightControlBrushes in the resources of the
     // tabs and of the Event Editor (they are found there before those of the theme).
-    public static bool DarkControls { get; set; }
+    public static bool LightControls { get; set; }
 
     // Colors of the controls (Styles.xaml): those of the theme (set with it), or the light ones. Background, border,
     // text, under the mouse, selected or pressed, arrow and disabled text, then the state colors (value set by hand,
@@ -62,17 +62,19 @@ public static class Themes
             dictionary[ControlKeys[i]] = brush;
         }
         dictionary["ControlDisabledOpacity"] = 1.0;
-        dictionary["ControlHoverLineBrush"] = dictionary["ControlTextBrush"];
+        var hoverLine = new SolidColorBrush(Color.FromRgb(0x90, 0x90, 0x90));   // grey
+        hoverLine.Freeze();
+        dictionary["ControlHoverLineBrush"] = hoverLine;
         return lightControlBrushes = dictionary;
     }
 
     // Puts the light colors of the controls in these resources (tabs of the main window, Event Editor), or takes them
-    // away with DarkControls; the other merged dictionaries (e.g. Styles.xaml) are kept.
+    // away without LightControls; the other merged dictionaries (e.g. Styles.xaml) are kept.
     public static void ApplyControls(ResourceDictionary resources)
     {
         var merged = resources.MergedDictionaries;
         merged.Remove(LightControlBrushes());
-        if (!DarkControls) merged.Add(LightControlBrushes());
+        if (LightControls) merged.Add(LightControlBrushes());
     }
 
     static string FindBuiltIn(string name) => BuiltIn.FirstOrDefault(b => string.Equals(b, name, StringComparison.OrdinalIgnoreCase));
