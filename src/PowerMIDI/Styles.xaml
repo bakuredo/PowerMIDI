@@ -133,6 +133,8 @@
     <!-- No dotted frame of keyboard focus (arrow keys from the search box of the instrument list): the item is already
          highlighted. -->
     <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <!-- No scrolling of the list by the mouse moving onto a row cut at its bottom (see NoMouseScroll). -->
+    <Setter Property="b:NoMouseScroll.IsEnabled" Value="True"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ComboBoxItem">
