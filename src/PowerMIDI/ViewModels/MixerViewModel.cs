@@ -418,7 +418,7 @@ public sealed class MixerViewModel : ObservableObject
         var items = new List<InstrumentChoice> { new() { Text = $"↺ File instrument ({ShownName(fileInfo)})", IsReset = true } };
         int others = OtherPassages(ch.Channel);
         if (others > 0)
-            items.Add(new InstrumentChoice { Text = $"↺ File instrument in all passages ({others} other{(others > 1 ? "s" : "")} changed)", IsReset = true, AllPassages = true });
+            items.Add(new InstrumentChoice { Text = $"↺ File instrument passage ({others} other{(others > 1 ? "s" : "")} changed)", IsReset = true, AllPassages = true });
         if (HasGsMaps)
         {
             int rhythm = ChannelMixer.Rhythm(ch.Channel);
