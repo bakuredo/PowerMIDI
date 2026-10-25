@@ -93,6 +93,10 @@ public static class GsDrumMap
         return new NormalSysExEvent(d);
     }
 
+    // A drum map SysEx (DT1 41 mx …): a Program Change on a drum part initializes the map again.
+    public static bool IsDrumMapSysEx(byte[] d) =>
+        d.Length >= 10 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x41 && d[5] >> 4 < Maps;
+
     // Values written by a drum map SysEx (one note per data byte, from rr on), as (position, note, parameter); its map
     // in map (-1: not a drum map SysEx, or a parameter not shown: the map name).
     static List<(int Position, int Note, int Param)> Positions(byte[] d, out int map)

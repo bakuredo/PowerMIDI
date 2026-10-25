@@ -28,7 +28,8 @@ public sealed partial class MainViewModel
 
     // The state of the channels at a position, from the events of the track before it (since its last reset): read again
     // (Mixer and Effects tabs), then sent to the module: the parameter SysEx (the last one of each address: not the
-    // resets, nor the bulk dumps of an MT-32), the instrument of each channel (bank select, then program), the other
+    // resets, nor the bulk dumps of an MT-32), the instrument of each channel (bank select, then program), the drum setups
+    // and drum maps (after the programs, which reset them), the other
     // controllers (their last value; mono / poly), the RPN / NRPN (the last value of each), then the controllers and the
     // settings of the interface. Everything goes through the mixer, as when played. from: the position before a jump
     // back; a parameter set between the two positions and not before the new one gets its value after a reset again: the
@@ -62,8 +63,16 @@ public sealed partial class MainViewModel
         bool reset = from > tick && playedFile.GetTimedEvents().Any(t => t.Time >= tick && t.Time < from &&
                                                                          t.Event is SysExEvent sx && ParameterKey(sx) is { } key && !sysEx.ContainsKey(key));
         if (reset && std != "MT-32") MidiTools.SendReset(output, std);   // (an MT-32 restarts completely: never)
-        foreach (var (_, e) in sysEx.Values.OrderBy(x => x.Order))
-            if (ChannelMixer.Callback(e.Clone(), 0, TimeSpan.Zero) is { } played) output.SendEvent(played);
+        // The drum setups (XG) and drum maps (GS) after the instruments: the Program Change of a drum part sets them back
+        // to the kit's values (e.g. Rosenoelfee.mid, channel 11: its kit tuned by 89 drum setup messages).
+        var inOrder = sysEx.Values.OrderBy(x => x.Order).Select(x => x.Event).ToList();
+        bool IsDrumSetup(SysExEvent e) => XgDrumSetup.SetupOf(e.Data) >= 0 || GsDrumMap.IsDrumMapSysEx(e.Data);
+        void Send(IEnumerable<SysExEvent> events)
+        {
+            foreach (var e in events)
+                if (ChannelMixer.Callback(e.Clone(), 0, TimeSpan.Zero) is { } played) output.SendEvent(played);
+        }
+        Send(inOrder.Where(e => !IsDrumSetup(e)));
         for (int c = 0; c < 16; c++)
         {
             if (!ChannelMixer.Used[c]) continue;
@@ -76,6 +85,7 @@ public sealed partial class MainViewModel
             })   // at the time just before the position: the passage the channel is in (see ChannelMixer.Passages)
                 if (ChannelMixer.Callback(e, tick - 1, TimeSpan.Zero) is { } played) output.SendEvent(played);
         }
+        Send(inOrder.Where(IsDrumSetup));
         var events = new List<MidiEvent>();
         foreach (var ((c, n), _) in controllers.OrderBy(x => x.Value.Order)) events.Add(MidiTools.Cc(c, n, controllers[(c, n)].Value));
         foreach (var ((c, rpn, msb, lsb, fine), (_, value)) in parameters.OrderBy(x => x.Value.Order))
