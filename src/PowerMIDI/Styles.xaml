@@ -76,6 +76,7 @@
   <!-- The wheel over a closed list: previous / next item (a list with its own wheel command keeps it, see Wheel). -->
   <Style TargetType="ComboBox">
     <Setter Property="b:Wheel.ComboStep" Value="True"/>
+    <Setter Property="b:KeyboardFocusCue.Track" Value="True"/>
     <Setter Property="Foreground" Value="{DynamicResource ControlTextBrush}"/>
     <Setter Property="Padding" Value="6,3,2,3"/>
     <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -97,7 +98,8 @@
                               Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                               ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
-            <!-- Keyboard focus (Tab): the border in the grey of the muted text (as the search boxes). -->
+            <!-- Keyboard focus reached with Tab (not after a click, see KeyboardFocusCue): the border in the grey of the muted
+                 text (as the search boxes). -->
             <Border x:Name="Focus" Grid.ColumnSpan="2" BorderBrush="{DynamicResource ControlMutedBrush}" BorderThickness="1"
                     IsHitTestVisible="False" Visibility="Collapsed"/>
             <Popup x:Name="PART_Popup" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
@@ -112,7 +114,7 @@
             </Popup>
           </Grid>
           <ControlTemplate.Triggers>
-            <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="Focus" Property="Visibility" Value="Visible"/></Trigger>
+            <Trigger Property="b:KeyboardFocusCue.IsShown" Value="True"><Setter TargetName="Focus" Property="Visibility" Value="Visible"/></Trigger>
             <Trigger Property="IsDropDownOpen" Value="True"><Setter TargetName="Focus" Property="Visibility" Value="Collapsed"/></Trigger>
             <!-- Disabled: dimmed with the theme colors, kept light otherwise (ControlDisabledOpacity, Themes.cs). -->
             <Trigger Property="IsEnabled" Value="False">
