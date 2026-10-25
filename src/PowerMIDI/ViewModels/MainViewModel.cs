@@ -691,8 +691,9 @@ public sealed partial class MainViewModel : ObservableObject
         if (mixerAppendTick != null) { mixerAppendTick = null; NotifyInsert(); }   // Append of the Mixer: over (its position is the old playback's)
 
         // Another file: the manual settings of the previous track (instruments, volume, pan, effects,
-        // muted channels, forced mode) are cleared. They are kept if the same track is played again.
-        if (settingsFile != null && settingsFile != item.Path)
+        // muted channels, forced mode) are cleared. They are kept if the same track is played again. Also those set while
+        // no track was loaded (after a track was removed or the playlist cleared): a file starts with its own values.
+        if (settingsFile != item.Path)
         {
             ClearManualSettings();
             savedSignature = "";
