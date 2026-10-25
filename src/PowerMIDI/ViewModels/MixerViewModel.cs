@@ -450,9 +450,7 @@ public sealed class MixerViewModel : ObservableObject
     internal void FilterInstrumentList(ChannelViewModel ch)
     {
         var text = ch.SearchText.Trim();
-        var items = text == "" ? ch.AllItems
-                  : ch.AllItems.Where(i => !i.IsReset && i.AssignPart == null && i.AssignXgBank == null &&
-                                           i.Text.Contains(text, StringComparison.OrdinalIgnoreCase)).ToList();
+        var items = text == "" ? ch.AllItems : Matches(ch.AllItems, text);
         var selected = ch.SelectedInstrument;
         Update(ch, () =>
         {
@@ -461,11 +459,34 @@ public sealed class MixerViewModel : ObservableObject
         });
     }
 
+    // Sounds whose name contains the text; a variation found (indented: "      · Water Piano") comes under its base sound
+    // (the program it belongs to, "001 Piano 1"), listed too even when its name does not match, so that it is not shown
+    // under the base sound of another program.
+    static List<InstrumentChoice> Matches(IReadOnlyList<InstrumentChoice> all, string text)
+    {
+        var found = new List<InstrumentChoice>();
+        InstrumentChoice baseSound = null;
+        foreach (var i in all)
+        {
+            if (i.IsReset || i.AssignPart != null || i.AssignXgBank != null || i.IsDisplay) continue;
+            bool variation = i.Text.StartsWith(' ');
+            if (!variation) baseSound = i;
+            if (!i.Text.Contains(text, StringComparison.OrdinalIgnoreCase)) continue;
+            if (variation && baseSound != null && !found.Contains(baseSound)) found.Add(baseSound);
+            found.Add(i);
+        }
+        return found;
+    }
+
     // Enter in the search box: the first sound found is chosen.
     internal void ChooseFirstMatch(ChannelViewModel ch)
     {
-        var first = ch.InstrumentItems.FirstOrDefault(i => !i.IsReset && i.AssignPart == null && i.AssignXgBank == null && !i.IsDisplay);
-        if (first != null && ch.SearchText.Trim() != "") ch.SelectedInstrument = first;
+        var text = ch.SearchText.Trim();
+        if (text == "") return;
+        // The first one whose name matches (not a base sound listed only above its variations).
+        var first = ch.InstrumentItems.FirstOrDefault(i => !i.IsReset && i.AssignPart == null && i.AssignXgBank == null && !i.IsDisplay &&
+                                                           i.Text.Contains(text, StringComparison.OrdinalIgnoreCase));
+        if (first != null) ch.SelectedInstrument = first;
     }
 
     internal void SelectInstrument(int c, InstrumentChoice item)
