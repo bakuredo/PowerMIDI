@@ -252,6 +252,12 @@ public sealed class MixerViewModel : ObservableObject
         });
     }
 
+    // A drum kit in the Mixer tab (closed list, "File instrument" of the open one, tooltip): its name alone, without the
+    // "Drums · " of InstrumentDefinitions (kept in the Event Editor and the status line).
+    const string DrumsPrefix = "Drums · ";
+    static string WithoutDrumsPrefix(string name) => name.StartsWith(DrumsPrefix, StringComparison.Ordinal) ? name[DrumsPrefix.Length..] : name;
+    static string ShownName(InstrumentInfo info) => info.Drum ? WithoutDrumsPrefix(info.Name) : info.Name;
+
     // Instrument of a channel: name only (closed list). force: even if nothing changed.
     internal void RefreshInstrument(ChannelViewModel ch, bool force = true)
     {
@@ -282,7 +288,7 @@ public sealed class MixerViewModel : ObservableObject
         {
             int part = ChannelMixer.RhythmOverride[c];
             var partText = part > 0 ? $" · drum part {part}" : part == 0 ? " · normal part" : "";
-            (name, state, tooltip) = (currentInfo.Name, InstrumentState.Manual, $"{currentInfo.Detail}{partText}{sharedText} (file: {fileInfo.Name})");
+            (name, state, tooltip) = (currentInfo.Name, InstrumentState.Manual, $"{currentInfo.Detail}{partText}{sharedText} (file: {ShownName(fileInfo)})");
         }
         else (name, state, tooltip) = (currentInfo.Name, InstrumentState.File, $"{currentInfo.Detail}{sharedText}");
         // The choice applies to the passage being played (until the next Program Change of the file).
@@ -301,6 +307,7 @@ public sealed class MixerViewModel : ObservableObject
             sysExPatch = partName != null || Mt32Patches.IsCustom(ChannelMixer.Program[c]);
         }
         if (sysExPatch) tooltip += " · set by SysEx";
+        if (currentInfo.Drum) name = WithoutDrumsPrefix(name);
 
         var display = new InstrumentChoice { Text = name, IsDisplay = true };
         Update(ch, () =>
@@ -408,7 +415,7 @@ public sealed class MixerViewModel : ObservableObject
     internal void OpenInstrumentList(ChannelViewModel ch)
     {
         var (choices, index, _, fileInfo) = GetChannelChoices(ch.Channel);
-        var items = new List<InstrumentChoice> { new() { Text = $"↺ File instrument ({fileInfo.Name})", IsReset = true } };
+        var items = new List<InstrumentChoice> { new() { Text = $"↺ File instrument ({ShownName(fileInfo)})", IsReset = true } };
         int others = OtherPassages(ch.Channel);
         if (others > 0)
             items.Add(new InstrumentChoice { Text = $"↺ File instrument in all passages ({others} other{(others > 1 ? "s" : "")} changed)", IsReset = true, AllPassages = true });

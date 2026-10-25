@@ -855,21 +855,34 @@
     <!-- Port and mode (no wheel step on the port: a change of port is not to be done by mistake) -->
     <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
       <!-- MIDI OUT: a MIDI socket (5-pin DIN seen from the front: the pins on an arc, the notch at the bottom), in the
-           color of the text of the window. -->
-      <Viewbox Width="18" Height="18" Margin="3,0,5,0" VerticalAlignment="Center">
-        <Canvas Width="20" Height="20" Background="Transparent" ToolTip="MIDI OUT">
-          <Ellipse Width="18" Height="18" Canvas.Left="1" Canvas.Top="1" StrokeThickness="1.5" Stroke="{DynamicResource WindowTextBrush}"/>
-          <Path Fill="{DynamicResource WindowTextBrush}" Data="M8.6,16.6 L11.4,16.6 L11.4,19 L8.6,19 Z"/>
-          <Ellipse Width="2.4" Height="2.4" Canvas.Left="3.8" Canvas.Top="8.8" Fill="{DynamicResource WindowTextBrush}"/>
-          <Ellipse Width="2.4" Height="2.4" Canvas.Left="5.26" Canvas.Top="5.26" Fill="{DynamicResource WindowTextBrush}"/>
-          <Ellipse Width="2.4" Height="2.4" Canvas.Left="8.8" Canvas.Top="3.8" Fill="{DynamicResource WindowTextBrush}"/>
-          <Ellipse Width="2.4" Height="2.4" Canvas.Left="12.34" Canvas.Top="5.26" Fill="{DynamicResource WindowTextBrush}"/>
-          <Ellipse Width="2.4" Height="2.4" Canvas.Left="13.8" Canvas.Top="8.8" Fill="{DynamicResource WindowTextBrush}"/>
-        </Canvas>
-      </Viewbox>
+           color of the text of the window; a click refreshes the port list (a module plugged in since). Dimmed under the
+           mouse. -->
+      <Button Margin="3,0,5,0" VerticalAlignment="Center" Cursor="Hand" Focusable="False" Command="{Binding RefreshPortsCommand}"
+              ToolTip="MIDI OUT (click: refresh port list)" AutomationProperties.Name="Refresh port list">
+        <Button.Template>
+          <ControlTemplate TargetType="Button">
+            <ContentPresenter x:Name="Cp"/>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Cp" Property="Opacity" Value="0.65"/></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="Cp" Property="Opacity" Value="0.4"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Button.Template>
+        <Viewbox Width="18" Height="18">
+          <Canvas Width="20" Height="20" Background="Transparent">
+            <Ellipse Width="18" Height="18" Canvas.Left="1" Canvas.Top="1" StrokeThickness="1.5" Stroke="{DynamicResource WindowTextBrush}"/>
+            <Path Fill="{DynamicResource WindowTextBrush}" Data="M8.6,16.6 L11.4,16.6 L11.4,19 L8.6,19 Z"/>
+            <Ellipse Width="2.4" Height="2.4" Canvas.Left="3.8" Canvas.Top="8.8" Fill="{DynamicResource WindowTextBrush}"/>
+            <Ellipse Width="2.4" Height="2.4" Canvas.Left="5.26" Canvas.Top="5.26" Fill="{DynamicResource WindowTextBrush}"/>
+            <Ellipse Width="2.4" Height="2.4" Canvas.Left="8.8" Canvas.Top="3.8" Fill="{DynamicResource WindowTextBrush}"/>
+            <Ellipse Width="2.4" Height="2.4" Canvas.Left="12.34" Canvas.Top="5.26" Fill="{DynamicResource WindowTextBrush}"/>
+            <Ellipse Width="2.4" Height="2.4" Canvas.Left="13.8" Canvas.Top="8.8" Fill="{DynamicResource WindowTextBrush}"/>
+          </Canvas>
+        </Viewbox>
+      </Button>
       <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" b:Wheel.ComboStep="False"
                 AutomationProperties.Name="MIDI OUT"/>
-      <!-- Mode, right after the port (no label: its tooltip says what it is), then the refresh of the port list. -->
+      <!-- Mode, right after the port (no label: its tooltip says what it is). -->
       <ComboBox Width="120" Margin="6,0,0,0" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
                 ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
         <ComboBoxItem Content="Auto"/>
@@ -880,8 +893,6 @@
         <ComboBoxItem Content="MT-32"
                       ToolTip="Roland MT-32 / CM-32L"/>
       </ComboBox>
-      <Button Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" Margin="6,0,0,0" Command="{Binding RefreshPortsCommand}"
-              ToolTip="Refresh port list"/>
     </DockPanel>
 
     <!-- Playlist: double click (see the ListViewItem style) or Enter plays the track, Del removes the selected tracks;
