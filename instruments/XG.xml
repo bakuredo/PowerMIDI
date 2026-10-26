@@ -291,11 +291,11 @@
 				<Bank Name="Accordion" MSB="0" LSB="126" />
 				<Bank Name="Accordion" MSB="0" LSB="127" />
 			</PC>
-			<PC Name="Hamonica" PC="23">
-				<Bank Name="Hamonica" MSB="0" LSB="0" MU50="1" />
+			<PC Name="Harmonica" PC="23">
+				<Bank Name="Harmonica" MSB="0" LSB="0" MU50="1" />
 				<Bank Name="Harmonica 2" MSB="0" LSB="32" MU50="1" />
-				<Bank Name="Hamonica" MSB="0" LSB="126" />
-				<Bank Name="Hamonica" MSB="0" LSB="127" />
+				<Bank Name="Harmonica" MSB="0" LSB="126" />
+				<Bank Name="Harmonica" MSB="0" LSB="127" />
 			</PC>
 			<PC Name="Tango Accordion #" PC="24">
 				<Bank Name="Tango Accordion #" MSB="0" LSB="0" MU50="1" />
@@ -387,7 +387,7 @@
 				<Bank Name="Wrench Heavy" MSB="0" LSB="65" />
 				<Bank Name="Wrench Double" MSB="0" LSB="66" />
 				<Bank Name="Tin" MSB="0" LSB="67" />
-				<Bank Name="Groovey Muted Guitar" MSB="0" LSB="68" />
+				<Bank Name="Groovy Muted Guitar" MSB="0" LSB="68" />
 				<Bank Name="Muted Distortion Guitar" MSB="0" LSB="96" />
 				<Bank Name="Muted Guitar #" MSB="0" LSB="126" />
 				<Bank Name="Muted Guitar" MSB="0" LSB="127" />
@@ -562,7 +562,7 @@
 				<Bank Name="Fast Resonant Bass 2" MSB="0" LSB="91" />
 				<Bank Name="Minneapolis Bass" MSB="0" LSB="92" />
 				<Bank Name="Miami Bass" MSB="0" LSB="93" />
-				<Bank Name="Resonace Talking Box" MSB="0" LSB="94" />
+				<Bank Name="Resonance Talking Box" MSB="0" LSB="94" />
 				<Bank Name="Hammer" MSB="0" LSB="96" MU50="1" />
 				<Bank Name="Synth Bass 1" MSB="0" LSB="126" />
 				<Bank Name="Synth Bass 1" MSB="0" LSB="127" />
@@ -728,7 +728,7 @@
 				<Bank Name="Thulium" MSB="0" LSB="68" />
 				<Bank Name="Brook" MSB="0" LSB="69" />
 				<Bank Name="Brook Stereo" MSB="0" LSB="70" />
-				<Bank Name="Old Syhth Strings" MSB="0" LSB="71" />
+				<Bank Name="Old Synth Strings" MSB="0" LSB="71" />
 				<Bank Name="Synth Strings 1" MSB="0" LSB="126" />
 				<Bank Name="Synth Strings 1" MSB="0" LSB="127" />
 			</PC>
@@ -822,7 +822,7 @@
 				<Bank Name="4th Trumpet" MSB="0" LSB="69" />
 				<Bank Name="Synth Trumpet" MSB="0" LSB="70" />
 				<Bank Name="Sweet Trumpet" MSB="0" LSB="71" />
-				<Bank Name="Mewllow Sweet Trumpet" MSB="0" LSB="72" />
+				<Bank Name="Mellow Sweet Trumpet" MSB="0" LSB="72" />
 				<Bank Name="Normal Trumpets" MSB="0" LSB="73" />
 				<Bank Name="Brilliant Trumpet" MSB="0" LSB="74" />
 				<Bank Name="Fanfare" MSB="0" LSB="75" />
@@ -5430,7 +5430,7 @@
 					<Tone Name="Muted Percussion SL 2" Key="43" />
 					<Tone Name="Muted Percussion SL 3" Key="44" />
 					<Tone Name="Muted Percussion SL 4" Key="45" />
-					<Tone Name="Pandiero" Key="46" />
+					<Tone Name="Pandeiro" Key="46" />
 					<Tone Name="Surdo Mute SL 1" Key="47" />
 					<Tone Name="Surdo Mute SL 2" Key="48" />
 					<Tone Name="Surdo Open SL" Key="49" />
@@ -11716,7 +11716,7 @@
 					<Entry Label="112  Slice" Value="14592" />
 					<Entry Label="113  Isolator" Value="14720" />
 					<Entry Label="114  Low Resolution" Value="14848" />
-					<Entry Label="115  Digital Turmtable" Value="14976" />
+					<Entry Label="115  Digital Turntable" Value="14976" />
 					<Entry Label="116  Digital Scratch" Value="15104" />
 					<Entry Label="117  Thru" Value="8192" />
 					<Entry Label="118  Hall 1" Value="128" />
@@ -17015,7 +17015,7 @@
 					<Data>@SYSEX F0H 43H 10H 4CH 02H 01H 54H #VH #VL F7H</Data>
 				</CCM>
 			</Folder>
-			<Folder Name="115 Digital Turmtable">
+			<Folder Name="115 Digital Turntable">
 				<CCM ID="21704" Name="Var:P Click Density">
 					<Value Default="1" Min="0" Max="5" />
 					<Data>@SYSEX F0H 43H 10H 4CH 02H 01H 42H #VH #VL F7H</Data>

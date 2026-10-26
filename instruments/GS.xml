@@ -17976,7 +17976,7 @@
 
 			</Folder>
 
-			<Folder Name="Paramaeter">
+			<Folder Name="Parameter">
 				<CCM ID="311" Name="EFX Parameter 1">
 					<Value />
 					<Data>@SYSEX F0H 41H 10H 42H 12H [ 40H 03H 03H #VL ] F7H</Data>
