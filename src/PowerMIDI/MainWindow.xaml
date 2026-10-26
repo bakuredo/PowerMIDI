@@ -23,7 +23,25 @@
       <Grid SnapsToDevicePixels="True">
         <ToggleButton Style="{x:Null}" Template="{StaticResource ComboToggleTemplate}" Focusable="False" ClickMode="Press"
                       IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
-        <ContentPresenter IsHitTestVisible="False" Margin="6,0,20,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+        <!-- What the channel plays: piano keys for a sound, a drum for a drum kit (none while unused), in the color of the
+             arrow. -->
+        <Viewbox x:Name="SoundIcon" IsHitTestVisible="False" Margin="5,0,0,0" Width="12" Height="12" HorizontalAlignment="Left"
+                 VerticalAlignment="Center">
+          <Canvas Width="12" Height="12">
+            <!-- Three white keys (a frame and two lines) and two black keys. -->
+            <Path Stroke="{DynamicResource ControlMutedBrush}" StrokeThickness="1.1" Data="M0.6,1.4 H11.4 V10.6 H0.6 Z M4.2,7 V10.6 M7.8,7 V10.6"/>
+            <Path Fill="{DynamicResource ControlMutedBrush}" Data="M2.8,1.4 H5.6 V7 H2.8 Z M6.4,1.4 H9.2 V7 H6.4 Z"/>
+          </Canvas>
+        </Viewbox>
+        <Viewbox x:Name="DrumIcon" IsHitTestVisible="False" Margin="5,0,0,0" Width="12" Height="12" HorizontalAlignment="Left"
+                 VerticalAlignment="Center" Visibility="Collapsed">
+          <Canvas Width="12" Height="12">
+            <!-- A drum: its head (an ellipse), its body and two sticks. -->
+            <Path Stroke="{DynamicResource ControlMutedBrush}" StrokeThickness="1.2"
+                  Data="M1.5,5 A4.5,1.8 0 1 0 10.5,5 A4.5,1.8 0 1 0 1.5,5 Z M1.5,5 L1.5,9.5 A4.5,1.8 0 0 0 10.5,9.5 L10.5,5 M3,1 L5.5,4.2 M9,1 L6.5,4.2"/>
+          </Canvas>
+        </Viewbox>
+        <ContentPresenter x:Name="Cp" IsHitTestVisible="False" Margin="22,0,20,0" HorizontalAlignment="Left" VerticalAlignment="Center"
                           Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                           ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
@@ -59,6 +77,15 @@
       </Grid>
       <ControlTemplate.Triggers>
         <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.6"/></Trigger>
+        <DataTrigger Binding="{Binding IsDrum}" Value="True">
+          <Setter TargetName="SoundIcon" Property="Visibility" Value="Collapsed"/>
+          <Setter TargetName="DrumIcon" Property="Visibility" Value="Visible"/>
+        </DataTrigger>
+        <DataTrigger Binding="{Binding InstrumentState}" Value="Unused">
+          <Setter TargetName="SoundIcon" Property="Visibility" Value="Collapsed"/>
+          <Setter TargetName="DrumIcon" Property="Visibility" Value="Collapsed"/>
+          <Setter TargetName="Cp" Property="Margin" Value="6,0,20,0"/>
+        </DataTrigger>
       </ControlTemplate.Triggers>
     </ControlTemplate>
     <!-- Playlist rows (Styles.xaml); double click plays the track. -->
@@ -178,7 +205,9 @@
                       IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
-        <TextBlock Text="Sliders:" FontWeight="SemiBold" Margin="0,0,8,0"/>
+        <!-- Icons in place of the labels (Sliders, Speed, Pitch): Segoe MDL2 Assets, named by their tooltips. -->
+        <TextBlock Text="&#xE9E9;" FontFamily="Segoe MDL2 Assets" FontSize="15" VerticalAlignment="Center" Margin="5,0,8,0"
+                   ToolTip="Sliders" AutomationProperties.Name="Sliders"/>
         <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}"
                   ToolTip="Controller set by the sliders">
           <!-- Order of the menu: see MixerViewModel.MenuOrder -->
@@ -230,9 +259,12 @@
           <ColumnDefinition Width="52"/>
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="34"/>
+          <ColumnDefinition Width="28"/>   <!-- as the M buttons of the channels: the value centered under them -->
         </Grid.ColumnDefinitions>
-        <TextBlock Text="Speed" FontWeight="SemiBold" Margin="0,0,8,0"/>
+        <!-- Speed: fast forward, filled (two triangles), in the color of the text. -->
+        <Viewbox Width="17" Height="12" VerticalAlignment="Center" Margin="3,0,8,0" ToolTip="Speed" AutomationProperties.Name="Speed">
+          <Path Fill="{Binding (TextElement.Foreground), RelativeSource={RelativeSource Self}}" Data="M0,0 L8,6 L0,12 Z M8.5,0 L16.5,6 L8.5,12 Z"/>
+        </Viewbox>
         <Slider Grid.Column="1" Minimum="50" Maximum="200" Value="{Binding Speed}" SmallChange="1" LargeChange="10"
                 IsMoveToPointEnabled="True" VerticalAlignment="Center" b:Wheel.SliderStep="True"
                 ToolTip="Playback speed (right click: 100 %)">
@@ -240,8 +272,13 @@
             <MouseBinding MouseAction="RightClick" Command="{Binding ResetSpeedCommand}"/>
           </Slider.InputBindings>
         </Slider>
-        <TextBlock Grid.Column="2" Text="{Binding SpeedText}" FontFamily="Consolas" TextAlignment="Right"/>
-        <TextBlock Grid.Column="3" Text="Pitch" FontWeight="SemiBold" Margin="18,0,8,0"/>
+        <TextBlock Grid.Column="2" Text="{Binding SpeedText}" FontFamily="Consolas" TextAlignment="Right" Margin="0,0,6,0"/>
+        <!-- Pitch: an arrow up and an arrow down, drawn bold, in the color of the text. -->
+        <Viewbox Grid.Column="3" Width="14" Height="15" VerticalAlignment="Center" Margin="18,0,8,0" ToolTip="Pitch" AutomationProperties.Name="Pitch">
+          <Path Stroke="{Binding (TextElement.Foreground), RelativeSource={RelativeSource Self}}" StrokeThickness="1.9"
+                StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                Data="M3.5,14 V1.5 M0.5,4.5 L3.5,1.5 L6.5,4.5 M10.5,1 V13.5 M7.5,10.5 L10.5,13.5 L13.5,10.5"/>
+        </Viewbox>
         <Slider Grid.Column="4" Minimum="-6" Maximum="6" Value="{Binding Transpose}" SmallChange="1" LargeChange="6"
                 IsMoveToPointEnabled="True" VerticalAlignment="Center" b:Wheel.SliderStep="True"
                 ToolTip="Transposition in whole tones, drums excluded (right click: 0)">
@@ -249,7 +286,7 @@
             <MouseBinding MouseAction="RightClick" Command="{Binding ResetTransposeCommand}"/>
           </Slider.InputBindings>
         </Slider>
-        <TextBlock Grid.Column="5" Text="{Binding TransposeText}" FontFamily="Consolas" TextAlignment="Right"/>
+        <TextBlock Grid.Column="5" Text="{Binding TransposeText}" FontFamily="Consolas" TextAlignment="Center"/>
       </Grid>
       <!-- One row per channel: number · LED · map · instrument · slider · value · M -->
       <ItemsControl ItemsSource="{Binding Channels}">
