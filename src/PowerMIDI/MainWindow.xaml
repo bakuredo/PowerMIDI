@@ -350,10 +350,11 @@
                         b:Wheel.Command="{Binding MapWheelCommand}"
                         FontSize="11" Height="22" Margin="6,0,4,0" Padding="4,0,0,0"/>
 
-              <!-- Instrument: the name when closed, all the sounds of the map when open (virtualized: up to 1262 sounds). -->
+              <!-- Instrument: the name when closed, all the sounds of the map when open (virtualized: up to 1262 sounds). No tooltip
+                   (ChannelViewModel.InstrumentToolTip, its details, is not shown). -->
               <ComboBox Grid.Column="3" ItemsSource="{Binding InstrumentItems}" DisplayMemberPath="Text" TextSearch.TextPath="Text"
                         SelectedItem="{Binding SelectedInstrument}" IsDropDownOpen="{Binding IsListOpen}"
-                        ToolTip="{Binding InstrumentToolTip}" b:Wheel.Command="{Binding InstrumentWheelCommand}"
+                        b:Wheel.Command="{Binding InstrumentWheelCommand}"
                         MaxDropDownHeight="420" FontSize="12" Height="22" Margin="2,0,8,0">
                 <!-- Fixed width: a virtualized list would follow the names on screen while scrolling. -->
                 <ComboBox.ItemsPanel>
