@@ -24,24 +24,26 @@
         <ToggleButton Style="{x:Null}" Template="{StaticResource ComboToggleTemplate}" Focusable="False" ClickMode="Press"
                       IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
         <!-- What the channel plays: piano keys for a sound, a drum for a drum kit (none while unused), in the color of the
-             arrow. -->
-        <Viewbox x:Name="SoundIcon" IsHitTestVisible="False" Margin="5,0,0,0" Width="12" Height="12" HorizontalAlignment="Left"
-                 VerticalAlignment="Center">
-          <Canvas Width="12" Height="12">
-            <!-- Three white keys (a frame and two lines) and two black keys. -->
-            <Path Stroke="{DynamicResource ControlMutedBrush}" StrokeThickness="1.1" Data="M0.6,1.4 H11.4 V10.6 H0.6 Z M4.2,7 V10.6 M7.8,7 V10.6"/>
-            <Path Fill="{DynamicResource ControlMutedBrush}" Data="M2.8,1.4 H5.6 V7 H2.8 Z M6.4,1.4 H9.2 V7 H6.4 Z"/>
-          </Canvas>
-        </Viewbox>
-        <Viewbox x:Name="DrumIcon" IsHitTestVisible="False" Margin="5,0,0,0" Width="12" Height="12" HorizontalAlignment="Left"
-                 VerticalAlignment="Center" Visibility="Collapsed">
-          <Canvas Width="12" Height="12">
-            <!-- A drum: its head (an ellipse), its body and two sticks. -->
-            <Path Stroke="{DynamicResource ControlMutedBrush}" StrokeThickness="1.2"
-                  Data="M1.5,5 A4.5,1.8 0 1 0 10.5,5 A4.5,1.8 0 1 0 1.5,5 Z M1.5,5 L1.5,9.5 A4.5,1.8 0 0 0 10.5,9.5 L10.5,5 M3,1 L5.5,4.2 M9,1 L6.5,4.2"/>
-          </Canvas>
-        </Viewbox>
-        <ContentPresenter x:Name="Cp" IsHitTestVisible="False" Margin="22,0,20,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+             arrow; not with the light controls (InstrumentIconsVisibility, InstrumentTextMargin: Themes.cs). -->
+        <Grid Visibility="{DynamicResource InstrumentIconsVisibility}" HorizontalAlignment="Left">
+          <Viewbox x:Name="SoundIcon" IsHitTestVisible="False" Margin="5,0,0,0" Width="12" Height="12" HorizontalAlignment="Left"
+                   VerticalAlignment="Center">
+            <Canvas Width="12" Height="12">
+              <!-- Three white keys (a frame and two lines) and two black keys. -->
+              <Path Stroke="{DynamicResource ControlMutedBrush}" StrokeThickness="1.1" Data="M0.6,1.4 H11.4 V10.6 H0.6 Z M4.2,7 V10.6 M7.8,7 V10.6"/>
+              <Path Fill="{DynamicResource ControlMutedBrush}" Data="M2.8,1.4 H5.6 V7 H2.8 Z M6.4,1.4 H9.2 V7 H6.4 Z"/>
+            </Canvas>
+          </Viewbox>
+          <Viewbox x:Name="DrumIcon" IsHitTestVisible="False" Margin="5,0,0,0" Width="12" Height="12" HorizontalAlignment="Left"
+                   VerticalAlignment="Center" Visibility="Collapsed">
+            <Canvas Width="12" Height="12">
+              <!-- A drum: its head (an ellipse), its body and two sticks. -->
+              <Path Stroke="{DynamicResource ControlMutedBrush}" StrokeThickness="1.2"
+                    Data="M1.5,5 A4.5,1.8 0 1 0 10.5,5 A4.5,1.8 0 1 0 1.5,5 Z M1.5,5 L1.5,9.5 A4.5,1.8 0 0 0 10.5,9.5 L10.5,5 M3,1 L5.5,4.2 M9,1 L6.5,4.2"/>
+            </Canvas>
+          </Viewbox>
+        </Grid>
+        <ContentPresenter x:Name="Cp" IsHitTestVisible="False" Margin="{DynamicResource InstrumentTextMargin}" HorizontalAlignment="Left" VerticalAlignment="Center"
                           Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                           ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                           ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>

@@ -53,6 +53,9 @@ public static class Themes
         for (int i = 0; i < ControlKeys.Length; i++)
             dictionary[ControlKeys[i]] = ThemeControlKeys[i] is { } key ? dictionary[key] : Brushes.Transparent;
         dictionary["ControlDisabledOpacity"] = 0.5;
+        // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls).
+        dictionary["InstrumentIconsVisibility"] = Visibility.Visible;
+        dictionary["InstrumentTextMargin"] = new Thickness(22, 0, 20, 0);
     }
 
     static ResourceDictionary lightControlBrushes;
@@ -68,6 +71,8 @@ public static class Themes
             dictionary[ControlKeys[i]] = brush;
         }
         dictionary["ControlDisabledOpacity"] = 1.0;
+        dictionary["InstrumentIconsVisibility"] = Visibility.Collapsed;
+        dictionary["InstrumentTextMargin"] = new Thickness(6, 0, 20, 0);
         return lightControlBrushes = dictionary;
     }
 
