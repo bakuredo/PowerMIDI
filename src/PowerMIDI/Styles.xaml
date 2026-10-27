@@ -94,7 +94,7 @@
             </Grid.ColumnDefinitions>
             <ToggleButton Grid.ColumnSpan="2" Style="{x:Null}" Template="{StaticResource ComboToggleTemplate}" Focusable="False" ClickMode="Press"
                           IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
-            <ContentPresenter x:Name="Content" IsHitTestVisible="False" Margin="{TemplateBinding Padding}" HorizontalAlignment="Left" VerticalAlignment="Center"
+            <ContentPresenter x:Name="Content" IsHitTestVisible="False" Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"
                               Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
                               ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"/>
