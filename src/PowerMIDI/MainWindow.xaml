@@ -24,7 +24,7 @@
         <ToggleButton Style="{x:Null}" Template="{StaticResource ComboToggleTemplate}" Focusable="False" ClickMode="Press"
                       IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
         <!-- What the channel plays: piano keys for a sound, a drum for a drum kit (none while unused), in the color of the
-             arrow; not with the light controls (InstrumentIconsVisibility, InstrumentTextMargin: Themes.cs). -->
+             arrow; not with the light controls nor with InstrumentIcons=0 in the INI (InstrumentIconsVisibility, InstrumentTextMargin: Themes.cs). -->
         <Grid Visibility="{DynamicResource InstrumentIconsVisibility}" HorizontalAlignment="Left">
           <Viewbox x:Name="SoundIcon" IsHitTestVisible="False" Margin="5,0,0,0" Width="12" Height="12" HorizontalAlignment="Left"
                    VerticalAlignment="Center">
@@ -1002,8 +1002,8 @@
             </Border.Style>
             <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="White"/>
           </Border>
-          <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end on the one of the position bar. -->
-          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,4,1"/>
+          <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the position bar. -->
+          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,5,1"/>
           <TextBlock Text="{Binding Title}" ToolTip="{Binding TitleToolTip}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom"/>
         </DockPanel>
         <!-- Position: the jump happens when the mouse button is released. -->

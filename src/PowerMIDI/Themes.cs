@@ -29,6 +29,10 @@ public static class Themes
     // tabs and of the Event Editor (they are found there before those of the theme).
     public static bool LightControls { get; set; }
 
+    // Icons before the instrument of each channel in the Mixer (PowerMIDI.ini only, Window/InstrumentIcons; on by
+    // default). Never with the light controls.
+    public static bool InstrumentIcons { get; set; } = true;
+
     // Colors of the controls (Styles.xaml): those of the theme (set with it), or the light ones (those of the Windows
     // lists). Background, border, text, under the mouse, selected or pressed, arrow and disabled text, then the state
     // colors (value set by hand, sound missing, set by a SysEx), the text of a disabled list, then the open list:
@@ -53,7 +57,8 @@ public static class Themes
         for (int i = 0; i < ControlKeys.Length; i++)
             dictionary[ControlKeys[i]] = ThemeControlKeys[i] is { } key ? dictionary[key] : Brushes.Transparent;
         dictionary["ControlDisabledOpacity"] = 0.5;
-        // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls).
+        // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls nor with
+        // InstrumentIcons off: NoInstrumentIcons).
         dictionary["InstrumentIconsVisibility"] = Visibility.Visible;
         dictionary["InstrumentTextMargin"] = new Thickness(22, 0, 20, 0);
     }
@@ -71,18 +76,29 @@ public static class Themes
             dictionary[ControlKeys[i]] = brush;
         }
         dictionary["ControlDisabledOpacity"] = 1.0;
-        dictionary["InstrumentIconsVisibility"] = Visibility.Collapsed;
-        dictionary["InstrumentTextMargin"] = new Thickness(6, 0, 20, 0);
+        foreach (System.Collections.DictionaryEntry entry in NoInstrumentIcons()) dictionary[entry.Key] = entry.Value;
         return lightControlBrushes = dictionary;
     }
 
+    static ResourceDictionary noInstrumentIcons;
+
+    // The instrument names of the Mixer without their icons.
+    static ResourceDictionary NoInstrumentIcons() => noInstrumentIcons ??= new ResourceDictionary
+    {
+        ["InstrumentIconsVisibility"] = Visibility.Collapsed,
+        ["InstrumentTextMargin"] = new Thickness(6, 0, 20, 0),
+    };
+
     // Puts the light colors of the controls in these resources (tabs of the main window, Event Editor), or takes them
-    // away without LightControls; the other merged dictionaries (e.g. Styles.xaml) are kept.
+    // away without LightControls; the same for the instrument icons hidden (InstrumentIcons). The other merged
+    // dictionaries (e.g. Styles.xaml) are kept.
     public static void ApplyControls(ResourceDictionary resources)
     {
         var merged = resources.MergedDictionaries;
         merged.Remove(LightControlBrushes());
+        merged.Remove(NoInstrumentIcons());
         if (LightControls) merged.Add(LightControlBrushes());
+        if (!InstrumentIcons) merged.Add(NoInstrumentIcons());
     }
 
     static string FindBuiltIn(string name) => BuiltIn.FirstOrDefault(b => string.Equals(b, name, StringComparison.OrdinalIgnoreCase));

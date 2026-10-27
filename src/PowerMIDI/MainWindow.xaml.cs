@@ -449,6 +449,7 @@ public partial class MainWindow : Window, IMainView
         ini.Set("Window", "Maximized", WindowState == WindowState.Maximized ? 1 : 0);
         ini.Set("Window", "Theme", Themes.Current);
         ini.Set("Window", "LightControls", Themes.LightControls ? 1 : 0);
+        ini.Set("Window", "InstrumentIcons", Themes.InstrumentIcons ? 1 : 0);
         ini.Write(SettingsPath, "PowerMIDI settings (written on close).");
     }
 
@@ -483,8 +484,10 @@ public partial class MainWindow : Window, IMainView
         }
         if (ini.Get("Window", "Maximized") == "1") WindowState = WindowState.Maximized;
 
-        // Color theme and light controls (About tab); a missing or unknown name gives the default theme.
+        // Color theme and light controls (About tab); a missing or unknown name gives the default theme. Instrument
+        // icons of the Mixer: in the INI only, shown unless 0.
         Themes.LightControls = ini.Get("Window", "LightControls") == "1";
+        Themes.InstrumentIcons = ini.Get("Window", "InstrumentIcons") != "0";
         ApplyControlColors();
         Themes.Apply(ini.Get("Window", "Theme"));
         LightControlsBox.IsChecked = Themes.LightControls;
