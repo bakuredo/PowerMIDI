@@ -327,9 +327,9 @@
     </Setter>
   </Style>
   <!-- Sliders in the colors of the theme (applied by key, see ThemedSlider users): a thin rail in the color of the lines,
-       filled up to the thumb in the accent color (from 0 with SliderFill.FromZero), the thumb in the soft text color (the
-       text color under the mouse or dragged). The parts of the rail are repeat buttons of the track (a click beside the
-       thumb moves it). -->
+       filled up to the thumb in white on the dark themes, black on the light ones (SliderFillBrush, Themes.cs; from 0 with
+       SliderFill.FromZero), the thumb in the soft text color (the text color under the mouse or dragged). The parts of the
+       rail are repeat buttons of the track (a click beside the thumb moves it). -->
   <b:ZeroFillMargin x:Key="ZeroFillMargin"/>
   <Style x:Key="SliderRailPart" TargetType="RepeatButton">
     <Setter Property="Focusable" Value="False"/>
@@ -348,7 +348,7 @@
     <Grid Height="16" Background="Transparent">
       <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{DynamicResource LineBrush}"/>
       <!-- Fill from 0 (SliderFill.FromZero): in place of the one of the start of the rail. -->
-      <Border x:Name="ZeroFill" Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{DynamicResource AccentBrush}"
+      <Border x:Name="ZeroFill" Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{DynamicResource SliderFillBrush}"
               Visibility="Collapsed">
         <Border.Margin>
           <MultiBinding Converter="{StaticResource ZeroFillMargin}">
@@ -361,7 +361,7 @@
       </Border>
       <Track x:Name="PART_Track">
         <Track.DecreaseRepeatButton>
-          <RepeatButton x:Name="StartFill" Style="{StaticResource SliderRailPart}" Command="Slider.DecreaseLarge" Background="{DynamicResource AccentBrush}"/>
+          <RepeatButton x:Name="StartFill" Style="{StaticResource SliderRailPart}" Command="Slider.DecreaseLarge" Background="{DynamicResource SliderFillBrush}"/>
         </Track.DecreaseRepeatButton>
         <Track.IncreaseRepeatButton>
           <RepeatButton Style="{StaticResource SliderRailPart}" Command="Slider.IncreaseLarge" Background="Transparent"/>

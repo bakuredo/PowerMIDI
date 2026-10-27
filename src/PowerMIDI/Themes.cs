@@ -58,6 +58,9 @@ public static class Themes
             dictionary[ControlKeys[i]] = ThemeControlKeys[i] is { } key ? dictionary[key] : Brushes.Transparent;
         dictionary["ControlDisabledOpacity"] = 0.5;
         dictionary["ThemedSliders"] = true;   // sliders in the colors of the theme (Styles.xaml, ThemedSlider)
+        // Fill of these sliders: white on the dark themes (light text), black on the light ones.
+        var text = (dictionary["TextBrush"] as SolidColorBrush)?.Color ?? Colors.White;
+        dictionary["SliderFillBrush"] = 0.299 * text.R + 0.587 * text.G + 0.114 * text.B >= 128 ? Brushes.White : Brushes.Black;
         // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls nor with
         // InstrumentIcons off: NoInstrumentIcons).
         dictionary["InstrumentIconsVisibility"] = Visibility.Visible;

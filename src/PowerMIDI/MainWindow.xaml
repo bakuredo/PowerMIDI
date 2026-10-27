@@ -1011,15 +1011,15 @@
             </Border.Style>
             <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="White"/>
           </Border>
-          <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the position bar. -->
-          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,5,1"/>
+          <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the rail of the position bar. -->
+          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,1,1"/>
           <TextBlock Text="{Binding Title}" ToolTip="{Binding TitleToolTip}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom"/>
         </DockPanel>
         <!-- Position: the jump happens when the mouse button is released. -->
         <Grid Grid.Row="2">
           <!-- Mouse down / up handlers: added in MainWindow.xaml.cs (they must also get the clicks the slider handles). -->
           <!-- Right click: the loop of the track (loopStart / loopEnd markers), at the bar clicked (MainViewModel.Loop.cs). -->
-          <Slider x:Name="PositionBar" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
+          <Slider x:Name="PositionBar" Style="{StaticResource ThemedSlider}" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
                   IsMoveToPointEnabled="True" IsEnabled="{Binding HasTrack}">
             <Slider.ContextMenu>
               <ContextMenu>
@@ -1103,7 +1103,7 @@
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0" VerticalAlignment="Center"/>
-            <Slider Width="90" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
+            <Slider Width="90" Style="{StaticResource ThemedSlider}" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
             <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>
           </StackPanel>
