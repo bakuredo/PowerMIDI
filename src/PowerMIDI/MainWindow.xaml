@@ -209,8 +209,9 @@
                       IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
-        <!-- Icons in place of the labels (Sliders, Speed, Pitch): Segoe MDL2 Assets, named by their tooltips. -->
-        <TextBlock Text="&#xE9E9;" FontFamily="Segoe MDL2 Assets" FontSize="15" VerticalAlignment="Center" Margin="5,0,8,0"
+        <!-- Icons in place of the labels (Sliders, Speed, Pitch), named by their tooltips. Sliders: Segoe MDL2 Assets at 16 px, its
+             grid (at 15 px its bars fall between two pixel rows: blurred), on whole pixels. -->
+        <TextBlock Text="&#xE9E9;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
                    ToolTip="Sliders" AutomationProperties.Name="Sliders"/>
         <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}"
                   ToolTip="Controller set by the sliders">
@@ -269,7 +270,7 @@
         <Viewbox Width="17" Height="12" VerticalAlignment="Center" Margin="6,0,5,0" ToolTip="Speed" AutomationProperties.Name="Speed">
           <Path Fill="{Binding (TextElement.Foreground), RelativeSource={RelativeSource Self}}" Data="M0,0 L8,6 L0,12 Z M8.5,0 L16.5,6 L8.5,12 Z"/>
         </Viewbox>
-        <Slider Grid.Column="1" Minimum="50" Maximum="200" Value="{Binding Speed}" SmallChange="1" LargeChange="10"
+        <Slider Grid.Column="1" Style="{StaticResource ThemedSlider}" Minimum="50" Maximum="200" Value="{Binding Speed}" SmallChange="1" LargeChange="10"
                 IsMoveToPointEnabled="True" VerticalAlignment="Center" b:Wheel.SliderStep="True"
                 ToolTip="Playback speed (right click: 100 %)">
           <Slider.InputBindings>
@@ -283,7 +284,7 @@
                 StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                 Data="M3.5,14 V1.5 M0.5,4.5 L3.5,1.5 L6.5,4.5 M10.5,1 V13.5 M7.5,10.5 L10.5,13.5 L13.5,10.5"/>
         </Viewbox>
-        <Slider Grid.Column="4" Margin="0,0,-3,0" Minimum="-6" Maximum="6" Value="{Binding Transpose}" SmallChange="1" LargeChange="6"
+        <Slider Grid.Column="4" Style="{StaticResource ThemedSlider}" b:SliderFill.FromZero="True" Margin="0,0,-3,0" Minimum="-6" Maximum="6" Value="{Binding Transpose}" SmallChange="1" LargeChange="6"
                 IsMoveToPointEnabled="True" VerticalAlignment="Center" b:Wheel.SliderStep="True"
                 ToolTip="Transposition in whole tones, drums excluded (right click: 0)">
           <Slider.InputBindings>
@@ -347,13 +348,14 @@
               </Ellipse>
 
               <!-- Map of this channel: SC-8850 / SC-88Pro / SC-88 / SC-55 in GS, the MU2000 maps in XG (other modes: disabled). -->
-              <!-- Its text centered, closed (HorizontalContentAlignment) and open (ItemTemplate). -->
+              <!-- Its text centered, closed (HorizontalContentAlignment) and open (ItemTemplate), on whole pixels (centered on a
+                   half pixel, the text is blurred while the list opens). -->
               <ComboBox Grid.Column="2" ItemsSource="{Binding MapItems}"
                         SelectedItem="{Binding SelectedMap}" IsEnabled="{Binding MapEnabled}" ToolTip="{Binding MapToolTip}"
                         b:Wheel.Command="{Binding MapWheelCommand}"
                         FontSize="11" Height="22" Margin="6,0,4,0" Padding="4,0,0,0" HorizontalContentAlignment="Center">
                 <ComboBox.ItemTemplate>
-                  <DataTemplate><TextBlock Text="{Binding Text}" HorizontalAlignment="Center"/></DataTemplate>
+                  <DataTemplate><TextBlock Text="{Binding Text}" HorizontalAlignment="Center" UseLayoutRounding="True"/></DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
 
@@ -392,7 +394,7 @@
                   <MouseBinding MouseAction="RightClick" Command="{Binding ClearControllerCommand}"/>
                 </Slider.InputBindings>
                 <Slider.Style>
-                  <Style TargetType="Slider">
+                  <Style TargetType="Slider" BasedOn="{StaticResource ThemedSlider}">
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding IsMuted}" Value="True"><Setter Property="Opacity" Value="0.4"/></DataTrigger>
                     </Style.Triggers>
@@ -499,7 +501,7 @@
             <ColumnDefinition Width="{DynamicResource FxValueWidth}"/>
           </Grid.ColumnDefinitions>
           <TextBlock Text="{Binding Label}" ToolTip="{Binding Label}" Margin="8,0,4,0" TextTrimming="CharacterEllipsis"/>
-          <Slider Grid.Column="1" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Value}"
+          <Slider Grid.Column="1" Style="{StaticResource ThemedSlider}" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Value}"
                   SmallChange="1" LargeChange="8" IsMoveToPointEnabled="True" VerticalAlignment="Center"
                   ToolTip="{Binding ToolTip}" b:Wheel.SliderStep="True">
             <Slider.InputBindings>

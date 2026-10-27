@@ -326,4 +326,79 @@
       </Setter.Value>
     </Setter>
   </Style>
+  <!-- Sliders in the colors of the theme (applied by key, see ThemedSlider users): a thin rail in the color of the lines,
+       filled up to the thumb in the accent color (from 0 with SliderFill.FromZero), the thumb in the soft text color (the
+       text color under the mouse or dragged). The parts of the rail are repeat buttons of the track (a click beside the
+       thumb moves it). -->
+  <b:ZeroFillMargin x:Key="ZeroFillMargin"/>
+  <Style x:Key="SliderRailPart" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="IsTabStop" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RepeatButton">
+          <Grid Background="Transparent">
+            <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{TemplateBinding Background}"/>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <ControlTemplate x:Key="ThemedSliderTemplate" TargetType="Slider">
+    <Grid Height="16" Background="Transparent">
+      <Border Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{DynamicResource LineBrush}"/>
+      <!-- Fill from 0 (SliderFill.FromZero): in place of the one of the start of the rail. -->
+      <Border x:Name="ZeroFill" Height="4" CornerRadius="2" VerticalAlignment="Center" Background="{DynamicResource AccentBrush}"
+              Visibility="Collapsed">
+        <Border.Margin>
+          <MultiBinding Converter="{StaticResource ZeroFillMargin}">
+            <Binding Path="Value" RelativeSource="{RelativeSource TemplatedParent}"/>
+            <Binding Path="Minimum" RelativeSource="{RelativeSource TemplatedParent}"/>
+            <Binding Path="Maximum" RelativeSource="{RelativeSource TemplatedParent}"/>
+            <Binding Path="ActualWidth" RelativeSource="{RelativeSource TemplatedParent}"/>
+          </MultiBinding>
+        </Border.Margin>
+      </Border>
+      <Track x:Name="PART_Track">
+        <Track.DecreaseRepeatButton>
+          <RepeatButton x:Name="StartFill" Style="{StaticResource SliderRailPart}" Command="Slider.DecreaseLarge" Background="{DynamicResource AccentBrush}"/>
+        </Track.DecreaseRepeatButton>
+        <Track.IncreaseRepeatButton>
+          <RepeatButton Style="{StaticResource SliderRailPart}" Command="Slider.IncreaseLarge" Background="Transparent"/>
+        </Track.IncreaseRepeatButton>
+        <Track.Thumb>
+          <Thumb x:Name="Thumb" Width="10" Height="16" Focusable="False">
+            <Thumb.Template>
+              <ControlTemplate TargetType="Thumb">
+                <Border x:Name="Knob" CornerRadius="3" Background="{DynamicResource TextSoftBrush}"/>
+                <ControlTemplate.Triggers>
+                  <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Knob" Property="Background" Value="{DynamicResource TextBrush}"/></Trigger>
+                  <Trigger Property="IsDragging" Value="True"><Setter TargetName="Knob" Property="Background" Value="{DynamicResource TextBrush}"/></Trigger>
+                </ControlTemplate.Triggers>
+              </ControlTemplate>
+            </Thumb.Template>
+          </Thumb>
+        </Track.Thumb>
+      </Track>
+    </Grid>
+    <ControlTemplate.Triggers>
+      <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+      <Trigger Property="b:SliderFill.FromZero" Value="True">
+        <Setter TargetName="StartFill" Property="Background" Value="Transparent"/>
+        <Setter TargetName="ZeroFill" Property="Visibility" Value="Visible"/>
+      </Trigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate>
+  <!-- Applied only in the colors of the theme (resource ThemedSliders, Themes.cs): with the light controls, the sliders of
+       the tabs are those of Windows, as their lists. -->
+  <Style x:Key="ThemedSlider" TargetType="Slider">
+    <Setter Property="b:SliderFill.Themed" Value="{DynamicResource ThemedSliders}"/>
+    <Style.Triggers>
+      <Trigger Property="b:SliderFill.Themed" Value="True">
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+        <Setter Property="Template" Value="{StaticResource ThemedSliderTemplate}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
 </ResourceDictionary>
