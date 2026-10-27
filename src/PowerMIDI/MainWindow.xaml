@@ -270,7 +270,7 @@
         <Viewbox Width="17" Height="12" VerticalAlignment="Center" Margin="6,0,5,0" ToolTip="Speed" AutomationProperties.Name="Speed">
           <Path Fill="{Binding (TextElement.Foreground), RelativeSource={RelativeSource Self}}" Data="M0,0 L8,6 L0,12 Z M8.5,0 L16.5,6 L8.5,12 Z"/>
         </Viewbox>
-        <Slider Grid.Column="1" Style="{StaticResource ThemedSlider}" Minimum="50" Maximum="200" Value="{Binding Speed}" SmallChange="1" LargeChange="10"
+        <Slider Grid.Column="1" Minimum="50" Maximum="200" Value="{Binding Speed}" SmallChange="1" LargeChange="10"
                 IsMoveToPointEnabled="True" VerticalAlignment="Center" b:Wheel.SliderStep="True"
                 ToolTip="Playback speed (right click: 100 %)">
           <Slider.InputBindings>
@@ -284,7 +284,7 @@
                 StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                 Data="M3.5,14 V1.5 M0.5,4.5 L3.5,1.5 L6.5,4.5 M10.5,1 V13.5 M7.5,10.5 L10.5,13.5 L13.5,10.5"/>
         </Viewbox>
-        <Slider Grid.Column="4" Style="{StaticResource ThemedSlider}" b:SliderFill.FromZero="True" Margin="0,0,-3,0" Minimum="-6" Maximum="6" Value="{Binding Transpose}" SmallChange="1" LargeChange="6"
+        <Slider Grid.Column="4" Margin="0,0,-3,0" Minimum="-6" Maximum="6" Value="{Binding Transpose}" SmallChange="1" LargeChange="6"
                 IsMoveToPointEnabled="True" VerticalAlignment="Center" b:Wheel.SliderStep="True"
                 ToolTip="Transposition in whole tones, drums excluded (right click: 0)">
           <Slider.InputBindings>
@@ -394,7 +394,7 @@
                   <MouseBinding MouseAction="RightClick" Command="{Binding ClearControllerCommand}"/>
                 </Slider.InputBindings>
                 <Slider.Style>
-                  <Style TargetType="Slider" BasedOn="{StaticResource ThemedSlider}">
+                  <Style TargetType="Slider">
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding IsMuted}" Value="True"><Setter Property="Opacity" Value="0.4"/></DataTrigger>
                     </Style.Triggers>
@@ -501,7 +501,7 @@
             <ColumnDefinition Width="{DynamicResource FxValueWidth}"/>
           </Grid.ColumnDefinitions>
           <TextBlock Text="{Binding Label}" ToolTip="{Binding Label}" Margin="8,0,4,0" TextTrimming="CharacterEllipsis"/>
-          <Slider Grid.Column="1" Style="{StaticResource ThemedSlider}" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Value}"
+          <Slider Grid.Column="1" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Value}"
                   SmallChange="1" LargeChange="8" IsMoveToPointEnabled="True" VerticalAlignment="Center"
                   ToolTip="{Binding ToolTip}" b:Wheel.SliderStep="True">
             <Slider.InputBindings>
@@ -1011,15 +1011,15 @@
             </Border.Style>
             <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="White"/>
           </Border>
-          <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the rail of the position bar. -->
-          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,1,1"/>
+          <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the position bar. -->
+          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,5,1"/>
           <TextBlock Text="{Binding Title}" ToolTip="{Binding TitleToolTip}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom"/>
         </DockPanel>
         <!-- Position: the jump happens when the mouse button is released. -->
         <Grid Grid.Row="2">
           <!-- Mouse down / up handlers: added in MainWindow.xaml.cs (they must also get the clicks the slider handles). -->
           <!-- Right click: the loop of the track (loopStart / loopEnd markers), at the bar clicked (MainViewModel.Loop.cs). -->
-          <Slider x:Name="PositionBar" Style="{StaticResource ThemedSlider}" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
+          <Slider x:Name="PositionBar" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
                   IsMoveToPointEnabled="True" IsEnabled="{Binding HasTrack}">
             <Slider.ContextMenu>
               <ContextMenu>
@@ -1103,7 +1103,7 @@
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
             <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0" VerticalAlignment="Center"/>
-            <Slider Width="90" Style="{StaticResource ThemedSlider}" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
+            <Slider Width="90" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
             <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>
           </StackPanel>
