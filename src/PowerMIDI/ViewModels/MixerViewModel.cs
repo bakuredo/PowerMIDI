@@ -523,7 +523,7 @@ public sealed class MixerViewModel : ObservableObject
             int sentLsb = item.Lsb;
             foreach (int t in targets) ChannelMixer.SetOverride(output(), t, item.Msb, sentLsb, item.Program);
             var others = targets.Where(t => t != c).Select(t => (t + 1).ToString()).ToList();
-            setStatus($"Channel {c + 1}: {item.Text.Trim(' ', '·').Trim()} (MSB {item.Msb} / LSB {sentLsb} / PC {item.Program + 1})" +
+            setStatus($"Channel {c + 1}: MSB {item.Msb} / LSB {sentLsb} / PC {item.Program + 1}" +
                       (others.Count > 0 ? $" — also on channel {string.Join(", ", others)} (drum part {drumPart})" : ""));
             foreach (int t in targets.Where(t => t != c)) RefreshInstrument(Channels[t]);
         }
