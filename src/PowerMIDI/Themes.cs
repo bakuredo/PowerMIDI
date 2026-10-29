@@ -66,7 +66,6 @@ public static class Themes
         dictionary["PressedLineBrush"] = dictionary["AccentBrush"];
         dictionary["PressedTextBrush"] = dictionary["OnAccentTextBrush"];
         dictionary["ActiveIconBrush"] = dictionary["AccentBrush"];   // icon of an enabled option (transport bar)
-        dictionary["ActivityBrush"] = dictionary["AccentBrush"];   // activity LEDs of the Mixer
         // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls nor with
         // InstrumentIcons off: NoInstrumentIcons).
         dictionary["InstrumentIconsVisibility"] = Visibility.Visible;
@@ -152,7 +151,8 @@ public static class Themes
     {
         name = Names.FirstOrDefault(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase)) ?? Default;
         var dictionary = new ResourceDictionary { Source = new Uri($"/PowerMIDI;component/Themes/{FindBuiltIn(name) ?? Default}.xaml", UriKind.Relative) };
-        foreach (var (key, text) in ThemeFile.ReadColors(Path.Combine(Folder, name + ".xaml")))
+        var colors = ThemeFile.ReadColors(Path.Combine(Folder, name + ".xaml"));
+        foreach (var (key, text) in colors)
         {
             try
             {
@@ -162,6 +162,10 @@ public static class Themes
             }
             catch { }   // not a color: the built-in one is kept
         }
+        // Activity LEDs: a file that gives its accent color and not this one (e.g. written before it existed) has
+        // them in its accent color, not in the one of the built-in theme.
+        if (colors.ContainsKey("AccentBrush") && !colors.ContainsKey("ActivityBrush") && dictionary["AccentBrush"] is SolidColorBrush accent)
+            dictionary["ActivityBrush"] = accent;
         SetControlColors(dictionary);
         var merged = Application.Current.Resources.MergedDictionaries;
         if (merged.Count > 0) merged[0] = dictionary; else merged.Add(dictionary);

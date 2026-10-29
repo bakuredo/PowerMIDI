@@ -15,11 +15,12 @@
   <SolidColorBrush x:Key="TextMutedBrush" Color="#AE8A8D"/>
   <SolidColorBrush x:Key="WindowTextBrush" Color="#F3E6E6"/>
   <SolidColorBrush x:Key="WindowTextMutedBrush" Color="#AE8A8D"/>
-  <!-- States: value fixed by hand, activity / solo / loop, mute, insertion markers and keyboard channel, warnings -->
+  <!-- States -->
   <SolidColorBrush x:Key="FixedBrush" Color="#7FB6FF"/>
   <SolidColorBrush x:Key="GreenBrush" Color="#5BD16A"/>
   <SolidColorBrush x:Key="MuteBrush" Color="#FF6B6B"/>
   <SolidColorBrush x:Key="AccentBrush" Color="#FF6B81"/>
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
+  <SolidColorBrush x:Key="ActivityBrush" Color="#FF6B81"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#E0A050"/>
 </ResourceDictionary>

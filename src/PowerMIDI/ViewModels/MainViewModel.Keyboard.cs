@@ -10,12 +10,13 @@ namespace PowerMIDI.ViewModels;
 // (shown here for AZERTY / QWERTY):
 //   middle row  Q S D F G H J K L M / A S D F G H J K L ;   white keys C D E F G A B C D E
 //   upper row   Z E · T Y U · O P   / W E · T Y U · O P     black keys C# D# · F# G# A# · C# D#
-//   lower row   W X / Z X: octave − / +, C V: velocity − / +, B N: scale − / +
+//   lower row   W X / Z X: octave − / +, C V: velocity − / +, B: scale off, N: next scale (the first one from off),
+//               , ; / M ,: key of the scale − / +, : ! / . /: step − / + (with a scale)
 // Scales (as the chord mode of the Korg iM1 / Kaossilator): with a scale chosen, the keys of the middle row play the
 // notes of the scale one after the other from its key (Japanese in C: C Db F G Ab, then C Db F G Ab an octave up),
 // each with two more notes taken in the scale: the step (5 at start) is the number of scale notes between them (Major,
 // step 2: C E G; Japanese, step 5: C and the two C above), from 1 to the number of notes of the scale (then the
-// octave; 7 at most). ← →: key of the scale, ↑ ↓: step. The upper row plays nothing then. Drum channels keep single
+// octave; 7 at most). The upper row plays nothing then. Drum channels keep single
 // notes.
 // Octaves as Yamaha / Roland name them: C3 = note 60 (middle C), the starting note of the middle row.
 // A held key is one held note or chord (auto-repeat ignored). A note held by two keys (chords sharing notes) is played
@@ -29,14 +30,14 @@ public sealed partial class MainViewModel
         [0x1E] = 0, [0x1F] = 2, [0x20] = 4, [0x21] = 5, [0x22] = 7, [0x23] = 9, [0x24] = 11, [0x25] = 12, [0x26] = 14, [0x27] = 16,
         [0x11] = 1, [0x12] = 3, [0x14] = 6, [0x15] = 8, [0x16] = 10, [0x18] = 13, [0x19] = 15,
     };
-    const int OctaveDown = 0x2C, OctaveUp = 0x2D, VelocityDown = 0x2E, VelocityUp = 0x2F, ScaleDown = 0x30, ScaleUp = 0x31;
-    const int TonicDown = 0x4B, TonicUp = 0x4D, StepUp = 0x48, StepDown = 0x50;   // arrows ← → ↑ ↓
+    const int OctaveDown = 0x2C, OctaveUp = 0x2D, VelocityDown = 0x2E, VelocityUp = 0x2F, ScaleOff = 0x30, ScaleNext = 0x31;
+    const int TonicDown = 0x32, TonicUp = 0x33, StepDown = 0x34, StepUp = 0x35;   // after B N on the lower row
     const int ScaleKeys = 0x1E, ScaleKeyCount = 10;                            // middle row: scale notes 1 to 10
     const int ChordNotes = 3, MaxStep = 7;
 
     // Scales: semitones from their key. The scales of the Korg iM1, with the notes of the Korg manuals (EMX-1,
     // Kaossilator 2S), from the softest to the most dissonant (the fewer semitones, the fewer clashes in the chords),
-    // the intervals at the end (B from single notes). Japanese first, with step 5 at start: the iM1 setting.
+    // the intervals at the end. Japanese first (N from single notes), with step 5 at start: the iM1 setting.
     static readonly (string Name, int[] Notes)[] Scales =
     {
         ("Japanese", new[] { 0, 1, 5, 7, 8 }),          // Miyako-bushi
@@ -103,13 +104,13 @@ public sealed partial class MainViewModel
         var name = Mixer.InstrumentName(c, ChannelMixer.Override[c] ? ChannelMixer.OverrideMsb[c] : ChannelMixer.BankMsb[c],
                                         ChannelMixer.Override[c] ? ChannelMixer.OverrideLsb[c] : ChannelMixer.BankLsb[c],
                                         ChannelMixer.Override[c] ? ChannelMixer.OverrideProgram[c] : ChannelMixer.Program[c]);
-        var scaleText = scale < 0 ? "scale off"
-                      : Mixer.IsDrumChannel(c) ? $"{Scales[scale].Name} (not on drums)"
-                      : $"{Scales[scale].Name} in {NoteNames[scaleKey]} ({string.Join(" ", Scales[scale].Notes.Select(n => NoteNames[(scaleKey + n) % 12]))}) · " +
-                        $"← →: key · ↑ ↓: step {Step}";
+        var scaleText = scale < 0 ? $"{Keys(ScaleNext)}: scale (off)"
+                      : Mixer.IsDrumChannel(c) ? $"{Keys(ScaleOff)}: scale off · {Keys(ScaleNext)}: {Scales[scale].Name} (not on drums)"
+                      : $"{Keys(ScaleOff)}: scale off · {Keys(ScaleNext)}: {Scales[scale].Name} in {NoteNames[scaleKey]} " +
+                        $"({string.Join(" ", Scales[scale].Notes.Select(n => NoteNames[(scaleKey + n) % 12]))}) · " +
+                        $"{Keys(TonicDown, TonicUp)}: key · {Keys(StepDown, StepUp)}: step {Step}";
         return $"Keyboard on channel {c + 1} ({name}): {Keys(OctaveDown, OctaveUp)}: octave {keyboardOctave} · " +
-               $"{Keys(VelocityDown, VelocityUp)}: velocity {keyboardVelocity} · {Keys(ScaleDown, ScaleUp)}: {scaleText} · " +
-               $"Esc or click {c + 1} again: off";
+               $"{Keys(VelocityDown, VelocityUp)}: velocity {keyboardVelocity} · {scaleText} · Esc or click {c + 1} again: off";
     }
 
     // Step used: at most the number of notes of the scale (a step of the whole scale is the octave), so that the chords
@@ -153,19 +154,19 @@ public sealed partial class MainViewModel
             ChannelMixer.Used[keyboardChannel] = true;
             return true;
         }
-        // The arrows only with a scale (else they keep moving through the window).
-        bool arrow = scanCode is TonicDown or TonicUp or StepUp or StepDown;
-        if (arrow && scale < 0) return false;
+        // Key and step only with a scale.
+        bool scaleSetting = scanCode is TonicDown or TonicUp or StepUp or StepDown;
+        if (scaleSetting && scale < 0) return false;
         int octaveStep = OctaveStep(scanCode);
-        if (isRepeat) return octaveStep != 0 || arrow || scanCode is VelocityDown or VelocityUp or ScaleDown or ScaleUp;
+        if (isRepeat) return octaveStep != 0 || scaleSetting || scanCode is VelocityDown or VelocityUp or ScaleOff or ScaleNext;
         if (octaveStep != 0) keyboardOctave = Math.Clamp(keyboardOctave + octaveStep, -2, 8);   // C-2 = note 0
         else switch (scanCode)
         {
             case VelocityDown: keyboardVelocity = Math.Max(1, keyboardVelocity - 20); break;
             case VelocityUp: keyboardVelocity = Math.Min(127, keyboardVelocity + 20); break;
-            // Single notes (-1), then the scales, around.
-            case ScaleDown: scale = (scale + Scales.Length + 1) % (Scales.Length + 1) - 1; break;
-            case ScaleUp: scale = (scale + 2) % (Scales.Length + 1) - 1; break;
+            // B: single notes (-1); N: the next scale, around (the first one from single notes).
+            case ScaleOff: scale = -1; break;
+            case ScaleNext: scale = (scale + 1) % Scales.Length; break;
             case TonicDown: scaleKey = (scaleKey + 11) % 12; break;
             case TonicUp: scaleKey = (scaleKey + 1) % 12; break;
             case StepDown: scaleStep = Math.Max(1, Step - 1); break;
