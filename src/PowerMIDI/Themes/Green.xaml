@@ -1,4 +1,3 @@
-<!-- Green theme: the dark theme tinted green. Same keys as Dark.xaml; see Themes.cs. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!-- Surfaces -->
@@ -14,7 +13,6 @@
   <SolidColorBrush x:Key="TextBrush" Color="#E4F2E8"/>
   <SolidColorBrush x:Key="TextSoftBrush" Color="#AFCDB8"/>
   <SolidColorBrush x:Key="TextMutedBrush" Color="#86A792"/>
-  <!-- Text placed directly on the window (labels of the top bar, status line) -->
   <SolidColorBrush x:Key="WindowTextBrush" Color="#E4F2E8"/>
   <SolidColorBrush x:Key="WindowTextMutedBrush" Color="#86A792"/>
   <!-- States: value fixed by hand, activity / solo / loop, mute, insertion markers and keyboard channel, warnings -->
@@ -24,7 +22,4 @@
   <SolidColorBrush x:Key="AccentBrush" Color="#A6E35A"/>
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#E0A050"/>
-  <!-- On the light background of the hovered or pressed buttons, whatever the theme -->
-  <SolidColorBrush x:Key="OnLightTextBrush" Color="#1E1E1E"/>
-  <SolidColorBrush x:Key="OnLightFixedBrush" Color="#1F5FBF"/>
 </ResourceDictionary>

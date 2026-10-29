@@ -1,5 +1,3 @@
-<!-- SC-8850 theme: the silver body of the SC-8850 (window), its orange backlit LCD (panels) with the dark
-     brown of its segments (text), and the dark bezel of the display (lines). Same keys as Dark.xaml; see Themes.cs. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!-- Surfaces -->
@@ -10,12 +8,11 @@
   <SolidColorBrush x:Key="HeaderBrush" Color="#E38E28"/>
   <SolidColorBrush x:Key="TabHoverBrush" Color="#EFEDE7"/>
   <SolidColorBrush x:Key="TabSelectedBrush" Color="#F4A641"/>
-  <SolidColorBrush x:Key="InactiveBrush" Color="#B9741F"/>
+  <SolidColorBrush x:Key="InactiveBrush" Color="#B79366"/>
   <!-- Text -->
   <SolidColorBrush x:Key="TextBrush" Color="#1F1408"/>
   <SolidColorBrush x:Key="TextSoftBrush" Color="#3B2910"/>
   <SolidColorBrush x:Key="TextMutedBrush" Color="#54401F"/>
-  <!-- Text placed directly on the window (labels of the top bar, status line) -->
   <SolidColorBrush x:Key="WindowTextBrush" Color="#1F1408"/>
   <SolidColorBrush x:Key="WindowTextMutedBrush" Color="#54401F"/>
   <!-- States: value fixed by hand, activity / solo / loop, mute, insertion markers and keyboard channel, warnings -->
@@ -25,7 +22,4 @@
   <SolidColorBrush x:Key="AccentBrush" Color="#7A1A10"/>
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#FFFFFF"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#5A1E0A"/>
-  <!-- On the light background of the hovered or pressed buttons, whatever the theme -->
-  <SolidColorBrush x:Key="OnLightTextBrush" Color="#1E1E1E"/>
-  <SolidColorBrush x:Key="OnLightFixedBrush" Color="#1F5FBF"/>
 </ResourceDictionary>
