@@ -27,14 +27,14 @@ public sealed partial class MainViewModel
     {
         var source = settingsFile ?? current?.Path;
         if (source == null) { Status = "No current track to save."; return false; }
-        // Saving with the button: playback paused, where it is (it stays paused after the save).
-        if (reload && playback != null && playback.IsRunning) { PausePlayback(); UpdateNumbers(); }
         var (channels, modules, forceMode) = SettingsToWrite();
         if (channels.Count == 0 && forceMode == null && modules.Count == 0 && editedFile == null)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.");
             return false;
         }
+        // Saving with the button: playback paused, where it is (it stays paused after the save).
+        if (reload && playback != null && playback.IsRunning) { PausePlayback(); UpdateNumbers(); }
 
         // Suggested: the folder and name of the last save, otherwise of the track itself (as a .mid; the dialog asks
         // before replacing an existing file).

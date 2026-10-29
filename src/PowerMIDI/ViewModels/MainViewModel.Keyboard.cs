@@ -6,8 +6,8 @@ using PowerMIDI.Core;
 namespace PowerMIDI.ViewModels;
 
 // Keyboard mode: the computer keyboard plays a channel, chosen by a click on its number in the Mixer (click it
-// again, or Esc: off). Keys by physical position (scan codes), letters only, so that the layout does not matter
-// (shown here for AZERTY / QWERTY):
+// again, or Esc: off). Keys by physical position (scan codes), so that the layout does not matter; the status line
+// shows the characters of the layout (shown here for AZERTY / QWERTY):
 //   middle row  Q S D F G H J K L M / A S D F G H J K L ;   white keys C D E F G A B C D E
 //   upper row   Z E · T Y U · O P   / W E · T Y U · O P     black keys C# D# · F# G# A# · C# D#
 //   lower row   W X / Z X: octave − / +, C V: velocity − / +, B: scale off, N: next scale (the first one from off),
