@@ -322,13 +322,14 @@
                 </TextBlock.Style>
               </TextBlock>
 
-              <!-- Activity LED, in the accent color; dimmed while the channel is muted (its notes are played, not heard). -->
+              <!-- Activity LED, in ActivityBrush (the accent color, green with the light controls); dimmed while the channel is muted
+                   (its notes are played, not heard). -->
               <Ellipse Grid.Column="1" Width="9" Height="9" ToolTip="Activity (dim: muted)">
                 <Ellipse.Style>
                   <Style TargetType="Ellipse">
                     <Setter Property="Fill" Value="{DynamicResource InactiveBrush}"/>
                     <Style.Triggers>
-                      <DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="Fill" Value="{DynamicResource AccentBrush}"/></DataTrigger>
+                      <DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="Fill" Value="{DynamicResource ActivityBrush}"/></DataTrigger>
                       <MultiDataTrigger>
                         <MultiDataTrigger.Conditions>
                           <Condition Binding="{Binding IsActive}" Value="True"/>
@@ -652,7 +653,7 @@
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="5,0,0,0"/>
       </DockPanel>
-      <TextBlock DockPanel.Dock="Top" Margin="5,0,0,6" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">
+      <TextBlock DockPanel.Dock="Top" Margin="5,0,0,6" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">
         <TextBlock.Style>
           <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
             <Style.Triggers>
@@ -994,21 +995,10 @@
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0">
-          <!-- Badge of the standard, in its color. -->
-          <Border DockPanel.Dock="Left" CornerRadius="4" Padding="8,2" Margin="0,0,10,0">
-            <Border.Style>
-              <Style TargetType="Border">
-                <Setter Property="Background" Value="{DynamicResource InactiveBrush}"/>
-                <Style.Triggers>
-                  <DataTrigger Binding="{Binding CurrentStandard}" Value="GS"><Setter Property="Background" Value="#B33A3A"/></DataTrigger>
-                  <DataTrigger Binding="{Binding CurrentStandard}" Value="XG"><Setter Property="Background" Value="#2F6DB5"/></DataTrigger>
-                  <DataTrigger Binding="{Binding CurrentStandard}" Value="GM"><Setter Property="Background" Value="#4A7D3A"/></DataTrigger>
-                  <DataTrigger Binding="{Binding CurrentStandard}" Value="GM2"><Setter Property="Background" Value="#3A7D72"/></DataTrigger>
-                  <DataTrigger Binding="{Binding CurrentStandard}" Value="MT-32"><Setter Property="Background" Value="#9A6A2A"/></DataTrigger>
-                </Style.Triggers>
-              </Style>
-            </Border.Style>
-            <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="White"/>
+          <!-- Badge of the standard, in the color of the inactive parts of the theme (as with no track), its text in the one
+               of the text (white on the dark themes). -->
+          <Border DockPanel.Dock="Left" CornerRadius="4" Padding="8,2" Margin="0,0,10,0" Background="{DynamicResource InactiveBrush}">
+            <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
           </Border>
           <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the position bar. -->
           <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,0,1"/>

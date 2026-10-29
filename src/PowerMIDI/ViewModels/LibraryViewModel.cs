@@ -275,7 +275,6 @@ public sealed class LibraryViewModel : ObservableObject
     {
         if (catalog == null || !catalog.Folders.ContainsKey(path)) return;
         folder = path;
-        randomFrom = null;   // the next random file: from this folder
         Refresh();
     }
 
@@ -286,25 +285,20 @@ public sealed class LibraryViewModel : ObservableObject
         Navigate(slash >= 0 ? folder[..slash] : "");
     }
 
-    // Folder the random files are chosen from, while the list shows the folder of the last one (randomTo); null: the
-    // folder shown.
-    string randomFrom, randomTo;
-
     // A file of the folder and of its subfolders, shown by the filters, chosen at random, shown in the list (its folder
     // opened, the file selected; in a search or a played list: selected there) and played as with a double click (the
-    // Mixer tab shown). Again from the folder of that file: chosen again from the folder where it started.
+    // Mixer tab shown). Always from the folder shown: once the folder of the file is opened, the next one comes from it
+    // (up a folder to choose again from a larger one).
     void PlayRandom()
     {
         if (catalog == null) return;
-        var from = randomFrom != null && folder == randomTo ? randomFrom : folder;
-        var file = catalog.RandomFile(from, Filter);
+        var file = catalog.RandomFile(folder, Filter);
         if (file == null) { setStatus("No readable file here with these filters"); return; }
         if (!IsFlat)
         {
             folder = file.FolderPath;
             Refresh();
         }
-        (randomFrom, randomTo) = (from, folder);
         var row = rows.FirstOrDefault(r => r.File?.Path == file.Path) ?? FileRow(file);
         SelectedRow = row;
         setStatus($"Random: {file.Title}");
