@@ -11,7 +11,7 @@ namespace PowerMIDI.ViewModels;
 //   middle row  Q S D F G H J K L M / A S D F G H J K L ;   white keys C D E F G A B C D E
 //   upper row   Z E · T Y U · O P   / W E · T Y U · O P     black keys C# D# · F# G# A# · C# D#
 //   lower row   W X / Z X: octave − / +, C V: velocity − / +, B: scale off, N: next scale (the first one from off),
-//               , ; / M ,: key of the scale − / +, : ! / . /: step − / + (with a scale)
+//               , ; / M ,: step − / +, : ! / . /: key of the scale − / + (with a scale)
 // Scales (as the chord mode of the Korg iM1 / Kaossilator): with a scale chosen, the keys of the middle row play the
 // notes of the scale one after the other from its key (Japanese in C: C Db F G Ab, then C Db F G Ab an octave up),
 // each with two more notes taken in the scale: the step (5 at start) is the number of scale notes between them (Major,
@@ -31,7 +31,7 @@ public sealed partial class MainViewModel
         [0x11] = 1, [0x12] = 3, [0x14] = 6, [0x15] = 8, [0x16] = 10, [0x18] = 13, [0x19] = 15,
     };
     const int OctaveDown = 0x2C, OctaveUp = 0x2D, VelocityDown = 0x2E, VelocityUp = 0x2F, ScaleOff = 0x30, ScaleNext = 0x31;
-    const int TonicDown = 0x32, TonicUp = 0x33, StepDown = 0x34, StepUp = 0x35;   // after B N on the lower row
+    const int StepDown = 0x32, StepUp = 0x33, TonicDown = 0x34, TonicUp = 0x35;   // after B N on the lower row
     const int ScaleKeys = 0x1E, ScaleKeyCount = 10;                            // middle row: scale notes 1 to 10
     const int ChordNotes = 3, MaxStep = 7;
 
@@ -108,7 +108,7 @@ public sealed partial class MainViewModel
                       : Mixer.IsDrumChannel(c) ? $"{Keys(ScaleOff)}: scale off · {Keys(ScaleNext)}: {Scales[scale].Name} (not on drums)"
                       : $"{Keys(ScaleOff)}: scale off · {Keys(ScaleNext)}: {Scales[scale].Name} in {NoteNames[scaleKey]} " +
                         $"({string.Join(" ", Scales[scale].Notes.Select(n => NoteNames[(scaleKey + n) % 12]))}) · " +
-                        $"{Keys(TonicDown, TonicUp)}: key · {Keys(StepDown, StepUp)}: step {Step}";
+                        $"{Keys(StepDown, StepUp)}: step {Step} · {Keys(TonicDown, TonicUp)}: key";
         return $"Keyboard on channel {c + 1} ({name}): {Keys(OctaveDown, OctaveUp)}: octave {keyboardOctave} · " +
                $"{Keys(VelocityDown, VelocityUp)}: velocity {keyboardVelocity} · {scaleText} · Esc or click {c + 1} again: off";
     }
