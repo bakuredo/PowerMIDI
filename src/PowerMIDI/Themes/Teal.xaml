@@ -23,4 +23,10 @@
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#0B2628"/>
   <SolidColorBrush x:Key="ActivityBrush" Color="#62D8CC"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#E0A050"/>
+  <!-- LCD Screen -->
+  <SolidColorBrush x:Key="LcdBrush" Color="#0F2624"/>
+  <SolidColorBrush x:Key="LcdLineBrush" Color="#2A5552"/>
+  <SolidColorBrush x:Key="LcdDotBrush" Color="#17332F"/>
+  <SolidColorBrush x:Key="LcdTextBrush" Color="#62D8CC"/>
+  <SolidColorBrush x:Key="LcdSungBrush" Color="#E2FFFA"/>
 </ResourceDictionary>

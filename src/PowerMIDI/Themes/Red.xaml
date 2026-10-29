@@ -23,4 +23,10 @@
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
   <SolidColorBrush x:Key="ActivityBrush" Color="#FF6B81"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#E0A050"/>
+  <!-- Screen of the module (LCD): background, border, dots off, text and dots on, part of the lyrics already sung -->
+  <SolidColorBrush x:Key="LcdBrush" Color="#2A0E12"/>
+  <SolidColorBrush x:Key="LcdLineBrush" Color="#5A2630"/>
+  <SolidColorBrush x:Key="LcdDotBrush" Color="#3A161C"/>
+  <SolidColorBrush x:Key="LcdTextBrush" Color="#FF7A8C"/>
+  <SolidColorBrush x:Key="LcdSungBrush" Color="#FFE4E8"/>
 </ResourceDictionary>

@@ -1103,15 +1103,15 @@
              fixed size: the 16 × 16 dot picture (Sound Canvas, MU; all dots off for an MT-32) and the text (32 characters
              at most, centered) the file writes on it; otherwise the lyrics of a karaoke file, the part already sung
              brighter; shown when there is some (display button). -->
-        <Border Grid.Row="1" HorizontalAlignment="Center" Width="320" Height="58" Margin="0,10,0,0" Background="#1F2A14"
-                BorderBrush="#3D5226" BorderThickness="1" CornerRadius="3" Padding="4"
+        <Border Grid.Row="1" HorizontalAlignment="Center" Width="320" Height="58" Margin="0,10,0,0" Background="{DynamicResource LcdBrush}"
+                BorderBrush="{DynamicResource LcdLineBrush}" BorderThickness="1" CornerRadius="3" Padding="4"
                 ToolTip="Display of the module (text and picture sent by file, or lyrics)"
                 Visibility="{Binding DisplayShown, Converter={StaticResource BoolToVisibility}}">
           <DockPanel>
             <Image DockPanel.Dock="Left" Source="{Binding DisplayDots}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
-            <TextBlock FontFamily="Consolas" FontSize="13" Foreground="#A8E05F" xml:space="preserve"
+            <TextBlock FontFamily="Consolas" FontSize="13" Foreground="{DynamicResource LcdTextBrush}" xml:space="preserve"
                        VerticalAlignment="Center" Margin="8,0,6,0" TextAlignment="Center" TextTrimming="CharacterEllipsis"><Run
-                       Text="{Binding DisplaySung, Mode=OneWay}" Foreground="#F2FFD0" FontWeight="Bold"/><Run
+                       Text="{Binding DisplaySung, Mode=OneWay}" Foreground="{DynamicResource LcdSungBrush}" FontWeight="Bold"/><Run
                        Text="{Binding DisplayComing, Mode=OneWay}"/></TextBlock>
           </DockPanel>
         </Border>

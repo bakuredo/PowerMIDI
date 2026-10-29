@@ -523,20 +523,28 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // Dot picture the file draws on the screen of the module (Sound Canvas, MU: 16 × 16), lit dots in the color of the
-    // LCD text (all unlit until the file sends one). Updated with the LEDs (30 ms), fast enough for an animation.
+    // LCD text, the others in the one of the unlit dots (LcdTextBrush, LcdDotBrush of the theme; all unlit until the file
+    // sends one). Drawn in its colors, shown without smoothing: sharp dots. Updated with the LEDs (30 ms), fast enough
+    // for an animation, and when the theme changes.
     System.Windows.Media.Imaging.WriteableBitmap displayDots;
-    int shownDotsVersion = -1;
+    int shownDotsVersion = -1, shownOn = -1, shownOff = -1;
     public System.Windows.Media.ImageSource DisplayDots => displayDots;
+
+    // A color of the theme as 0xRRGGBB (the fallback when the theme does not give it).
+    static int ThemeRgb(string key, int fallback) =>
+        System.Windows.Application.Current?.TryFindResource(key) is System.Windows.Media.SolidColorBrush b
+            ? (b.Color.R << 16) | (b.Color.G << 8) | b.Color.B : fallback;
 
     void UpdateDisplayDots()
     {
+        int on = ThemeRgb("LcdTextBrush", 0xA8E05F), off = ThemeRgb("LcdDotBrush", 0x2C3A1D);
         int version = ModuleDisplay.DotsVersion;
-        if (version == shownDotsVersion) return;
-        shownDotsVersion = version;
+        if (version == shownDotsVersion && on == shownOn && off == shownOff) return;
+        (shownDotsVersion, shownOn, shownOff) = (version, on, off);
         displayDots ??= new System.Windows.Media.Imaging.WriteableBitmap(16, 16, 96, 96, System.Windows.Media.PixelFormats.Bgr32, null);
         var dots = ModuleDisplay.Dots();
         var pixels = new int[256];
-        for (int i = 0; i < 256; i++) pixels[i] = dots[i] ? 0xA8E05F : 0x2C3A1D;
+        for (int i = 0; i < 256; i++) pixels[i] = dots[i] ? on : off;
         displayDots.WritePixels(new System.Windows.Int32Rect(0, 0, 16, 16), pixels, 16 * 4, 0);
         OnPropertyChanged(nameof(DisplayDots));
         NotifyDisplay();
