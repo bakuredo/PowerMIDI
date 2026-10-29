@@ -192,6 +192,13 @@ public sealed class MixerViewModel : ObservableObject
         }
     }
 
+    // Sliders only, with the LEDs (30 ms) while playing, so that they follow the fades of the file smoothly (the rest
+    // with Refresh, 200 ms). Nothing is done for a slider whose value has not changed (RefreshController).
+    public void RefreshSliders()
+    {
+        foreach (var ch in Channels) RefreshController(ch);
+    }
+
     // Activity LEDs (fast timer, 30 ms): an LED stays lit for 100 ms after each Note On,
     // longer than the update interval, so that even a very short note is visible.
     // heldChannel: channel with a note held on the computer keyboard (lit meanwhile), -1 if none.
