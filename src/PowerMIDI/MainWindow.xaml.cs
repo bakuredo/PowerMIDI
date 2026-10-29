@@ -282,6 +282,7 @@ public partial class MainWindow : Window, IMainView
     {
         Themes.ApplyControls(RightTabs.Resources);
         if (eventWindow != null) Themes.ApplyControls(eventWindow.Resources);
+        Themes.ApplyHover();
     }
 
     void OnPreviewKeyUp(object sender, KeyEventArgs e)

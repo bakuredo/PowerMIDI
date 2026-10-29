@@ -102,9 +102,8 @@
       <Setter Property="Width" Value="44"/>
       <Setter Property="Height" Value="36"/>
     </Style>
-    <!-- Transport bar toggle buttons (shuffle, repeat, module display): option enabled = blue icon, the button itself drawn
-         as the others (not pressed); hovered as the other buttons. The blue of the theme for text (FixedBrush), the dark
-         one on the light background of a hovered button. -->
+    <!-- Transport bar toggle buttons (shuffle, repeat, module display): option enabled = blue icon (FixedBrush), the button
+         itself drawn as the others (not pressed); under the mouse as the other buttons (HoverBrush, icon in HoverTextBrush). -->
     <Style x:Key="TransportToggle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
       <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
       <Setter Property="FontSize" Value="16"/>
@@ -119,20 +118,14 @@
               <ContentPresenter x:Name="Cp" HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="True"/>
             </Border>
             <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="Bd" Property="Background" Value="#BEE6FD"/>
-                <Setter TargetName="Bd" Property="BorderBrush" Value="#3C7FB1"/>
-              </Trigger>
               <Trigger Property="IsChecked" Value="True">
                 <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource FixedBrush}"/>
               </Trigger>
-              <MultiTrigger>
-                <MultiTrigger.Conditions>
-                  <Condition Property="IsChecked" Value="True"/>
-                  <Condition Property="IsMouseOver" Value="True"/>
-                </MultiTrigger.Conditions>
-                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource OnLightFixedBrush}"/>
-              </MultiTrigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource HoverLineBrush}"/>
+                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource HoverTextBrush}"/>
+              </Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
               </Trigger>
@@ -375,7 +368,7 @@
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding InstrumentState}" Value="Unused"><Setter Property="Foreground" Value="{DynamicResource ControlMutedBrush}"/></DataTrigger>
                       <DataTrigger Binding="{Binding InstrumentState}" Value="Manual">
-                        <Setter Property="Foreground" Value="{DynamicResource ControlFixedBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource ControlManualBrush}"/>
                         <Setter Property="FontWeight" Value="SemiBold"/>
                       </DataTrigger>
                       <!-- XG instrument set by a Multi Part SysEx of the file. -->
@@ -394,7 +387,7 @@
                   <MouseBinding MouseAction="RightClick" Command="{Binding ClearControllerCommand}"/>
                 </Slider.InputBindings>
                 <Slider.Style>
-                  <Style TargetType="Slider">
+                  <Style TargetType="Slider" BasedOn="{StaticResource {x:Type Slider}}">
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding IsMuted}" Value="True"><Setter Property="Opacity" Value="0.4"/></DataTrigger>
                     </Style.Triggers>
@@ -402,14 +395,14 @@
                 </Slider.Style>
               </Slider>
 
-              <!-- Value: blue and bold when fixed. -->
+              <!-- Value: in the accent color and bold when fixed. -->
               <TextBlock Grid.Column="5" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right" Margin="0,0,6,0">
                 <TextBlock.Style>
                   <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                     <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding IsFixed}" Value="True">
-                        <Setter Property="Foreground" Value="{DynamicResource FixedBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                         <Setter Property="FontWeight" Value="Bold"/>
                       </DataTrigger>
                     </Style.Triggers>
@@ -417,7 +410,8 @@
                 </TextBlock.Style>
               </TextBlock>
 
-              <!-- Mute (click) / solo (right click): red when muted, green "S" when soloed. -->
+              <!-- Mute (click) / solo (right click): muted, pressed in the accent color, "M" in bold in the color of its text; green
+                   "S" when soloed. -->
               <ToggleButton Grid.Column="6" Content="{Binding MuteText}" IsChecked="{Binding IsMuted}" ToolTip="{Binding MuteToolTip}"
                             Width="24" Height="20" Padding="0" FontSize="11">
                 <ToggleButton.InputBindings>
@@ -427,13 +421,15 @@
                   <Style TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
                     <Style.Triggers>
                       <DataTrigger Binding="{Binding IsMuted}" Value="True">
-                        <Setter Property="Foreground" Value="{DynamicResource MuteBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PressedTextBrush}"/>
                         <Setter Property="FontWeight" Value="Bold"/>
                       </DataTrigger>
                       <DataTrigger Binding="{Binding IsSolo}" Value="True">
                         <Setter Property="Foreground" Value="{DynamicResource GreenBrush}"/>
                         <Setter Property="FontWeight" Value="Bold"/>
                       </DataTrigger>
+                      <!-- Under the mouse: the text in the color of the hovered buttons (readable on it). -->
+                      <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource HoverTextBrush}"/></Trigger>
                     </Style.Triggers>
                   </Style>
                 </ToggleButton.Style>
@@ -470,7 +466,7 @@
                 <Style.Triggers>
                   <DataTrigger Binding="{Binding ValueText}" Value=""><Setter Property="Grid.ColumnSpan" Value="2"/></DataTrigger>
                   <DataTrigger Binding="{Binding IsFixed}" Value="True">
-                    <Setter Property="Foreground" Value="{DynamicResource ControlFixedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource ControlManualBrush}"/>
                     <Setter Property="FontWeight" Value="Bold"/>
                   </DataTrigger>
                 </Style.Triggers>
@@ -491,7 +487,7 @@
         </Grid>
       </DataTemplate>
 
-      <!-- Numeric parameter: label · slider · value with unit (blue when fixed, gray when "auto").
+      <!-- Numeric parameter: label · slider · value with unit (in the accent color when fixed, gray when "auto").
            Minimum and Maximum come before Value, so that the value is never clipped by the default range. -->
       <DataTemplate DataType="{x:Type vm:EffectSliderViewModel}">
         <Grid Height="26" Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
@@ -515,7 +511,7 @@
                 <Style.Triggers>
                   <DataTrigger Binding="{Binding ValueState}" Value="Auto"><Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/></DataTrigger>
                   <DataTrigger Binding="{Binding ValueState}" Value="Fixed">
-                    <Setter Property="Foreground" Value="{DynamicResource FixedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                     <Setter Property="FontWeight" Value="Bold"/>
                   </DataTrigger>
                 </Style.Triggers>
@@ -558,7 +554,7 @@
         </DockPanel>
       </DataTemplate>
 
-      <!-- EFX on a channel: pressed = the part goes through the EFX; blue when fixed (dark if pressed, on a light background). -->
+      <!-- EFX on a channel: pressed = the part goes through the EFX; in the accent color when fixed (PressedTextBrush if pressed). -->
       <DataTemplate DataType="{x:Type vm:EffectChannelViewModel}">
         <ToggleButton Content="{Binding Number}" IsChecked="{Binding IsChecked}" ToolTip="{Binding ToolTip}"
                       Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}"
@@ -570,7 +566,7 @@
             <Style TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
               <Style.Triggers>
                 <DataTrigger Binding="{Binding IsFixed}" Value="True">
-                  <Setter Property="Foreground" Value="{DynamicResource FixedBrush}"/>
+                  <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                   <Setter Property="FontWeight" Value="Bold"/>
                 </DataTrigger>
                 <MultiDataTrigger>
@@ -578,8 +574,10 @@
                     <Condition Binding="{Binding IsFixed}" Value="True"/>
                     <Condition Binding="{Binding IsChecked}" Value="True"/>
                   </MultiDataTrigger.Conditions>
-                  <Setter Property="Foreground" Value="{DynamicResource OnLightFixedBrush}"/>
+                  <Setter Property="Foreground" Value="{DynamicResource PressedTextBrush}"/>
                 </MultiDataTrigger>
+                <!-- Under the mouse: the text in the color of the hovered buttons (readable on it). -->
+                <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource HoverTextBrush}"/></Trigger>
               </Style.Triggers>
             </Style>
           </ToggleButton.Style>

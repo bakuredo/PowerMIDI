@@ -10,8 +10,9 @@
     <Setter Property="Padding" Value="10,4"/>
     <Setter Property="Margin" Value="0,0,6,0"/>
     <Setter Property="Cursor" Value="Hand"/>
-    <!-- Own template, with the colors of the Windows one under the mouse and pressed (light blue); disabled: the colors
-         of the theme dimmed (the Windows one turns light grey whatever the theme). -->
+    <!-- Own template: under the mouse HoverBrush, pressed PressedBrush (Themes.cs: the accent color of the theme, the light
+         blue of Windows with the light controls), their text in HoverTextBrush / PressedTextBrush; disabled: the colors of
+         the theme dimmed (the Windows one turns light grey whatever the theme). -->
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
@@ -22,34 +23,60 @@
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Bd" Property="Background" Value="#FFBEE6FD"/>
-              <Setter TargetName="Bd" Property="BorderBrush" Value="#FF3C7FB1"/>
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource HoverLineBrush}"/>
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Bd" Property="Background" Value="#FFC4E5F6"/>
-              <Setter TargetName="Bd" Property="BorderBrush" Value="#FF2C628B"/>
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PressedBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PressedLineBrush}"/>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.45"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>
     </Setter>
-    <!-- Hover / click: light background, so text turns black to stay readable. -->
+    <!-- Under the mouse and pressed: the text in the color made for HoverBrush / PressedBrush, to stay readable. -->
     <Style.Triggers>
-      <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-      <Trigger Property="IsPressed" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
+      <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource HoverTextBrush}"/></Trigger>
+      <Trigger Property="IsPressed" Value="True"><Setter Property="Foreground" Value="{DynamicResource PressedTextBrush}"/></Trigger>
     </Style.Triggers>
   </Style>
-  <!-- Toggle buttons (mixer M / S, EFX channels): same rules, and black text when
-       pressed (light background). State colors (red mute, green solo, blue fixed) take precedence. -->
+  <!-- Toggle buttons (Append, mixer M / S, EFX channels): the same template as the buttons; pressed (checked) in PressedBrush
+       (text in PressedTextBrush), under the mouse as the buttons (HoverBrush). State colors of the text (red mute,
+       green solo, accent fixed) set by their own styles. -->
   <Style TargetType="ToggleButton">
     <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
     <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
     <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" SnapsToDevicePixels="True">
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True" Focusable="False"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PressedBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PressedLineBrush}"/>
+            </Trigger>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+              <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource HoverLineBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.45"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
     <Style.Triggers>
-      <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
-      <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource OnLightTextBrush}"/></Trigger>
+      <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="{DynamicResource PressedTextBrush}"/></Trigger>
+      <Trigger Property="IsMouseOver" Value="True"><Setter Property="Foreground" Value="{DynamicResource HoverTextBrush}"/></Trigger>
     </Style.Triggers>
   </Style>
   <!-- Drop-down lists, in the colors of the theme (the Windows ones stay light whatever the theme). Closed: the colors of
@@ -322,6 +349,61 @@
               <Setter TargetName="PART_HeaderGripper" Property="BorderBrush" Value="Transparent"/>
             </Trigger>
           </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <!-- Sliders drawn as the Windows ones (same rail, same thumb, same colors), their thumb under the mouse and dragged in
+       ControlSliderHoverBrush (Themes.cs: the accent color with the theme, the light blue of Windows with the light
+       controls). The parts of the rail beside the thumb are transparent repeat buttons (a click there moves it). -->
+  <Style x:Key="SliderRailButton" TargetType="RepeatButton">
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="IsTabStop" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style TargetType="Slider">
+    <Setter Property="SnapsToDevicePixels" Value="True"/>
+    <Setter Property="UseLayoutRounding" Value="True"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Grid Height="18" Background="Transparent">
+            <Border Height="4" Margin="5,0" VerticalAlignment="Center" Background="#FFE7EAEA" BorderBrush="#FFD6D6D6" BorderThickness="1"/>
+            <Track x:Name="PART_Track">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Style="{StaticResource SliderRailButton}" Command="Slider.DecreaseLarge"/>
+              </Track.DecreaseRepeatButton>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Style="{StaticResource SliderRailButton}" Command="Slider.IncreaseLarge"/>
+              </Track.IncreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb Width="11" Height="18" Focusable="False">
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Border x:Name="Knob" Background="#FFF0F0F0" BorderBrush="#FFACACAC" BorderThickness="1"/>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="Knob" Property="Background" Value="{DynamicResource ControlSliderHoverBrush}"/>
+                          <Setter TargetName="Knob" Property="BorderBrush" Value="{DynamicResource ControlSliderHoverLineBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                          <Setter TargetName="Knob" Property="Background" Value="{DynamicResource ControlSliderHoverBrush}"/>
+                          <Setter TargetName="Knob" Property="BorderBrush" Value="{DynamicResource ControlSliderHoverLineBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                          <Setter TargetName="Knob" Property="BorderBrush" Value="#FFD9D9D9"/>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </Grid>
         </ControlTemplate>
       </Setter.Value>
     </Setter>

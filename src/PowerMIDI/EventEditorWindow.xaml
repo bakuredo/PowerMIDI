@@ -22,12 +22,12 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Styles.xaml"/>
       </ResourceDictionary.MergedDictionaries>
-      <!-- An event replaced by a value fixed in the Mixer or Effects tab is blue, as the value there; the tooltip says by what. -->
+      <!-- An event replaced by a value fixed in the Mixer or Effects tab is in the accent color, as the value there; the tooltip says by what. -->
       <Style TargetType="ListViewItem" BasedOn="{StaticResource ThemedListViewItem}">
         <EventSetter Event="MouseDoubleClick" Handler="OnRowDoubleClick"/>
         <Style.Triggers>
           <DataTrigger Binding="{Binding IsFixed}" Value="True">
-            <Setter Property="Foreground" Value="{DynamicResource FixedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="ToolTip" Value="{Binding FixedText}"/>
           </DataTrigger>
         </Style.Triggers>

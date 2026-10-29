@@ -35,28 +35,36 @@ public static class Themes
 
     // Colors of the controls (Styles.xaml): those of the theme (set with it), or the light ones (those of the Windows
     // lists). Background, border, text, under the mouse, selected or pressed, arrow and disabled text, then the state
-    // colors (value set by hand, sound missing, set by a SysEx), the text of a disabled list, then the open list:
+    // colors (sound missing, set by a SysEx), the text of a disabled list, then the open list:
     // background, border, item under the mouse and its frame, item selected and its frame (frames: light ones only, none
-    // with the theme), and the background of the search boxes. A disabled list is dimmed with the colors of the theme
-    // (ControlDisabledOpacity), kept light otherwise.
+    // with the theme), the background of the search boxes, the instrument or value chosen by hand (the accent
+    // color with the theme, blue with the light controls), then the thumb of a slider under the mouse and its frame (the
+    // accent color with the theme, the light blue of Windows with the light controls). A disabled
+    // list is dimmed with the colors of the theme (ControlDisabledOpacity), kept light otherwise.
     static readonly string[] ControlKeys =
         { "ControlBrush", "ControlLineBrush", "ControlTextBrush", "ControlHoverBrush", "ControlSelectedBrush", "ControlMutedBrush",
-          "ControlFixedBrush", "ControlMissingBrush", "ControlSysExBrush", "ControlDisabledTextBrush",
+          "ControlMissingBrush", "ControlSysExBrush", "ControlDisabledTextBrush",
           "ControlPopupBrush", "ControlPopupLineBrush", "ControlItemHoverBrush", "ControlItemHoverLineBrush", "ControlItemSelectedBrush",
-          "ControlItemSelectedLineBrush", "ControlFieldBrush" };
+          "ControlItemSelectedLineBrush", "ControlFieldBrush", "ControlManualBrush", "ControlSliderHoverBrush", "ControlSliderHoverLineBrush" };
     // Of the theme (null: none).
     static readonly string[] ThemeControlKeys =
-        { "ButtonBrush", "LineBrush", "TextBrush", "TabHoverBrush", "TabSelectedBrush", "TextMutedBrush", "FixedBrush", "MuteBrush", "GreenBrush", "TextBrush",
-          "ButtonBrush", "LineBrush", "TabHoverBrush", null, "TabSelectedBrush", null, "ButtonBrush" };
+        { "ButtonBrush", "LineBrush", "TextBrush", "TabHoverBrush", "TabSelectedBrush", "TextMutedBrush", "MuteBrush", "GreenBrush", "TextBrush",
+          "ButtonBrush", "LineBrush", "TabHoverBrush", null, "TabSelectedBrush", null, "ButtonBrush", "AccentBrush", "AccentBrush", "AccentBrush" };
     static readonly string[] LightControlColors =
-        { "#FFEDEDED", "#FFACACAC", "#FF1E1E1E", "#FFE5F1FB", "#FFCCE4F7", "#FF606060", "#FF1F5FBF", "#FFC62828", "#FF2E7D32", "#FF8A8A8A",
-          "#FFFFFFFF", "#FF646464", "#FFB8E0F3", "#FF26A0DA", "#FFF6F6F6", "#FFDADADA", "#FFFFFFFF" };
+        { "#FFEDEDED", "#FFACACAC", "#FF1E1E1E", "#FFE5F1FB", "#FFCCE4F7", "#FF606060", "#FFC62828", "#FF2E7D32", "#FF8A8A8A",
+          "#FFFFFFFF", "#FF646464", "#FFB8E0F3", "#FF26A0DA", "#FFF6F6F6", "#FFDADADA", "#FFFFFFFF", "#FF1F5FBF", "#FFDCECFC", "#FF7EB4EA" };
 
     static void SetControlColors(ResourceDictionary dictionary)
     {
         for (int i = 0; i < ControlKeys.Length; i++)
             dictionary[ControlKeys[i]] = ThemeControlKeys[i] is { } key ? dictionary[key] : Brushes.Transparent;
         dictionary["ControlDisabledOpacity"] = 0.5;
+        dictionary["HoverBrush"] = dictionary["AccentBrush"];   // buttons under the mouse (see WindowsHover)
+        dictionary["HoverLineBrush"] = dictionary["AccentBrush"];
+        dictionary["HoverTextBrush"] = dictionary["OnAccentTextBrush"];
+        dictionary["PressedBrush"] = dictionary["AccentBrush"];   // buttons pressed or toggled on
+        dictionary["PressedLineBrush"] = dictionary["AccentBrush"];
+        dictionary["PressedTextBrush"] = dictionary["OnAccentTextBrush"];
         // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls nor with
         // InstrumentIcons off: NoInstrumentIcons).
         dictionary["InstrumentIconsVisibility"] = Visibility.Visible;
@@ -88,6 +96,36 @@ public static class Themes
         ["InstrumentIconsVisibility"] = Visibility.Collapsed,
         ["InstrumentTextMargin"] = new Thickness(6, 0, 20, 0),
     };
+
+    // Buttons under the mouse or pressed, and thumbs of the sliders under the mouse, everywhere (Styles.xaml): HoverBrush,
+    // PressedBrush, their frames and their texts, set with the theme (the accent color, SetControlColors); with the light
+    // controls, the light blue of Windows for the whole window (this dictionary, merged in the application after the
+    // theme).
+    static ResourceDictionary windowsHover;
+
+    static ResourceDictionary WindowsHover()
+    {
+        if (windowsHover != null) return windowsHover;
+        var dictionary = new ResourceDictionary();
+        foreach (var (key, color) in new[] { ("HoverBrush", "#FFBEE6FD"), ("HoverLineBrush", "#FF3C7FB1"), ("HoverTextBrush", "#FF1E1E1E"),
+                                             ("PressedBrush", "#FFC4E5F6"), ("PressedLineBrush", "#FF2C628B"), ("PressedTextBrush", "#FF1E1E1E"),
+                                             ("ControlSliderHoverBrush", "#FFDCECFC"), ("ControlSliderHoverLineBrush", "#FF7EB4EA") })
+        {
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+            brush.Freeze();
+            dictionary[key] = brush;
+        }
+        return windowsHover = dictionary;
+    }
+
+    // The colors under the mouse and pressed of the whole window: those of Windows with the light controls, else those of
+    // the theme.
+    public static void ApplyHover()
+    {
+        var merged = Application.Current.Resources.MergedDictionaries;
+        merged.Remove(WindowsHover());
+        if (LightControls) merged.Add(WindowsHover());
+    }
 
     // Puts the light colors of the controls in these resources (tabs of the main window, Event Editor), or takes them
     // away without LightControls; the same for the instrument icons hidden (InstrumentIcons). The other merged
