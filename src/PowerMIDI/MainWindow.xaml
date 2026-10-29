@@ -1024,14 +1024,14 @@
               </ContextMenu>
             </Slider.ContextMenu>
           </Slider>
-          <!-- Loop of a video game track (loopStart / loopEnd, [ / ], CC111): green markers above the bar, at its
+          <!-- Loop of a video game track (loopStart / loopEnd, [ / ], CC111): markers in the accent color above the bar, at its
                start and end. -->
           <Canvas x:Name="LoopCanvas" VerticalAlignment="Top" Height="9" Margin="0,1,0,0"
                   Visibility="{Binding HasLoop, Converter={StaticResource BoolToVisibility}}">
             <Canvas.Resources>
               <b:FractionToOffset x:Key="LoopOffset"/>
             </Canvas.Resources>
-            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource GreenBrush}" ToolTip="{Binding LoopToolTip}">
+            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource AccentBrush}" ToolTip="{Binding LoopToolTip}">
               <Canvas.Left>
                 <MultiBinding Converter="{StaticResource LoopOffset}">
                   <Binding Path="LoopStartFraction"/>
@@ -1039,7 +1039,7 @@
                 </MultiBinding>
               </Canvas.Left>
             </Path>
-            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource GreenBrush}" ToolTip="{Binding LoopToolTip}">
+            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource AccentBrush}" ToolTip="{Binding LoopToolTip}">
               <Canvas.Left>
                 <MultiBinding Converter="{StaticResource LoopOffset}">
                   <Binding Path="LoopEndFraction"/>
@@ -1048,13 +1048,13 @@
               </Canvas.Left>
             </Path>
           </Canvas>
-          <!-- Temporary loop (right click on the bar): orange markers, over the green ones. -->
+          <!-- Temporary loop (right click on the bar): markers in the color of the text, over those of the loop of the track. -->
           <Canvas x:Name="TempLoopCanvas" VerticalAlignment="Top" Height="9" Margin="0,1,0,0"
                   Visibility="{Binding HasTempLoop, Converter={StaticResource BoolToVisibility}}">
             <Canvas.Resources>
               <b:FractionToOffset x:Key="TempLoopOffset"/>
             </Canvas.Resources>
-            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource WarningBrush}" ToolTip="{Binding TempLoopToolTip}">
+            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource TextBrush}" ToolTip="{Binding TempLoopToolTip}">
               <Canvas.Left>
                 <MultiBinding Converter="{StaticResource TempLoopOffset}">
                   <Binding Path="TempLoopStartFraction"/>
@@ -1062,7 +1062,7 @@
                 </MultiBinding>
               </Canvas.Left>
             </Path>
-            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource WarningBrush}" ToolTip="{Binding TempLoopToolTip}">
+            <Path Data="M0,0 L8,0 L4,8 Z" Fill="{DynamicResource TextBrush}" ToolTip="{Binding TempLoopToolTip}">
               <Canvas.Left>
                 <MultiBinding Converter="{StaticResource TempLoopOffset}">
                   <Binding Path="TempLoopEndFraction"/>

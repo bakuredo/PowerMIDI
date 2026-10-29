@@ -27,6 +27,8 @@ public sealed partial class MainViewModel
     {
         var source = settingsFile ?? current?.Path;
         if (source == null) { Status = "No current track to save."; return false; }
+        // Saving with the button: playback paused, where it is (it stays paused after the save).
+        if (reload && playback != null && playback.IsRunning) { PausePlayback(); UpdateNumbers(); }
         var (channels, modules, forceMode) = SettingsToWrite();
         if (channels.Count == 0 && forceMode == null && modules.Count == 0 && editedFile == null)
         {
@@ -51,15 +53,11 @@ public sealed partial class MainViewModel
 
         savedSignature = GetSettingsSignature();
         lastSavedTarget = target;
-        bool wasPlaying = state == "playing";
         // Saved over the track being played: its settings and changed events are now in the file. It is loaded again,
         // with nothing pending (otherwise the next save would write the settings twice).
         if (reload && current != null && SamePath(target, current.Path) && SamePath(source, current.Path)) SwitchToSavedFile(target);
         Status = $"Saved: {target}";
         view.ShowMessage($"File saved:\n{target}\n\n{string.Join("\n", report.Where(s => !string.IsNullOrEmpty(s)))}");
-        // Playing during the save: the track starts again from its beginning (once the report is closed), as it is now
-        // (not when the track is being left: reload false).
-        if (reload && wasPlaying && current != null) StartTrack(current);
         return true;
     }
 
