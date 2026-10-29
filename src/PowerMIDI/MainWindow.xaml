@@ -102,8 +102,9 @@
       <Setter Property="Width" Value="44"/>
       <Setter Property="Height" Value="36"/>
     </Style>
-    <!-- Transport bar toggle buttons (shuffle, repeat, module display): option enabled = blue icon (FixedBrush), the button
-         itself drawn as the others (not pressed); under the mouse as the other buttons (HoverBrush, icon in HoverTextBrush). -->
+    <!-- Transport bar toggle buttons (shuffle, repeat, module display): option enabled = icon in ActiveIconBrush (Themes.cs:
+         the accent color, the blue of the theme with the light controls), the button itself drawn as the others (not
+         pressed); under the mouse as the other buttons (HoverBrush, icon in HoverTextBrush). -->
     <Style x:Key="TransportToggle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
       <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
       <Setter Property="FontSize" Value="16"/>
@@ -119,7 +120,7 @@
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsChecked" Value="True">
-                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource FixedBrush}"/>
+                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource ActiveIconBrush}"/>
               </Trigger>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
@@ -321,19 +322,19 @@
                 </TextBlock.Style>
               </TextBlock>
 
-              <!-- Activity LED: orange while the channel is muted (its notes are played, not heard). -->
-              <Ellipse Grid.Column="1" Width="9" Height="9" ToolTip="Activity (orange: muted)">
+              <!-- Activity LED, in the accent color; dimmed while the channel is muted (its notes are played, not heard). -->
+              <Ellipse Grid.Column="1" Width="9" Height="9" ToolTip="Activity (dim: muted)">
                 <Ellipse.Style>
                   <Style TargetType="Ellipse">
                     <Setter Property="Fill" Value="{DynamicResource InactiveBrush}"/>
                     <Style.Triggers>
-                      <DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="Fill" Value="{DynamicResource GreenBrush}"/></DataTrigger>
+                      <DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="Fill" Value="{DynamicResource AccentBrush}"/></DataTrigger>
                       <MultiDataTrigger>
                         <MultiDataTrigger.Conditions>
                           <Condition Binding="{Binding IsActive}" Value="True"/>
                           <Condition Binding="{Binding IsMuted}" Value="True"/>
                         </MultiDataTrigger.Conditions>
-                        <Setter Property="Fill" Value="{DynamicResource WarningBrush}"/>
+                        <Setter Property="Opacity" Value="0.35"/>
                       </MultiDataTrigger>
                     </Style.Triggers>
                   </Style>
@@ -1010,14 +1011,15 @@
             <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="White"/>
           </Border>
           <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the position bar. -->
-          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,5,1"/>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
           <TextBlock Text="{Binding Title}" ToolTip="{Binding TitleToolTip}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom"/>
         </DockPanel>
         <!-- Position: the jump happens when the mouse button is released. -->
         <Grid Grid.Row="2">
-          <!-- Mouse down / up handlers: added in MainWindow.xaml.cs (they must also get the clicks the slider handles). -->
+          <!-- Mouse down / up handlers: added in MainWindow.xaml.cs (they must also get the clicks the slider handles). Its rail
+               from end to end (Padding 0), as the badge of the mode and the transport buttons. -->
           <!-- Right click: the loop of the track (loopStart / loopEnd markers), at the bar clicked (MainViewModel.Loop.cs). -->
-          <Slider x:Name="PositionBar" Margin="0,10" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
+          <Slider x:Name="PositionBar" Margin="0,10" Padding="0" Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}"
                   IsMoveToPointEnabled="True" IsEnabled="{Binding HasTrack}">
             <Slider.ContextMenu>
               <ContextMenu>

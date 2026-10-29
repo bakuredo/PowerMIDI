@@ -45,7 +45,8 @@
         <Setter Property="Margin" Value="12,0,6,0"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSoftBrush}"/>
       </Style>
-      <Style x:Key="Field" TargetType="TextBox">
+      <!-- Fields of the selected event: as the search boxes, in the colors of the theme (light with the light controls). -->
+      <Style x:Key="Field" TargetType="TextBox" BasedOn="{StaticResource SearchBox}">
         <Setter Property="Width" Value="70"/>
         <Setter Property="Padding" Value="2,1"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -164,7 +165,8 @@
           </Button>
           <DockPanel Visibility="{Binding HasText, Converter={StaticResource BoolToVisibility}}">
             <TextBlock Text="{Binding TextLabel}" Style="{StaticResource Label}"/>
-            <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Padding="2,1" VerticalAlignment="Center"
+            <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SearchBox}" Padding="2,1" VerticalAlignment="Center"
+                     VerticalContentAlignment="Center"
                      FontFamily="Consolas" IsEnabled="{Binding CanApply}"/>
           </DockPanel>
         </DockPanel>

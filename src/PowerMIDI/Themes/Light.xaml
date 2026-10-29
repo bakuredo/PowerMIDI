@@ -21,8 +21,8 @@
   <SolidColorBrush x:Key="FixedBrush" Color="#1F5FBF"/>
   <SolidColorBrush x:Key="GreenBrush" Color="#2E9E3F"/>
   <SolidColorBrush x:Key="MuteBrush" Color="#D03535"/>
-  <SolidColorBrush x:Key="AccentBrush" Color="#D9980F"/>
-  <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
+  <SolidColorBrush x:Key="AccentBrush" Color="#1E78D7"/>
+  <SolidColorBrush x:Key="OnAccentTextBrush" Color="#FFFFFF"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#A8650A"/>
   <!-- On the light background of the hovered or pressed buttons, whatever the theme -->
   <SolidColorBrush x:Key="OnLightTextBrush" Color="#1E1E1E"/>

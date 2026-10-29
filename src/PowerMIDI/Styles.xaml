@@ -368,11 +368,13 @@
   <Style TargetType="Slider">
     <Setter Property="SnapsToDevicePixels" Value="True"/>
     <Setter Property="UseLayoutRounding" Value="True"/>
+    <!-- The rail half a thumb inside each end (as Windows); Padding="0": from end to end. -->
+    <Setter Property="Padding" Value="5,0"/>
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Slider">
           <Grid Height="18" Background="Transparent">
-            <Border Height="4" Margin="5,0" VerticalAlignment="Center" Background="#FFE7EAEA" BorderBrush="#FFD6D6D6" BorderThickness="1"/>
+            <Border Height="4" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" Background="#FFE7EAEA" BorderBrush="#FFD6D6D6" BorderThickness="1"/>
             <Track x:Name="PART_Track">
               <Track.DecreaseRepeatButton>
                 <RepeatButton Style="{StaticResource SliderRailButton}" Command="Slider.DecreaseLarge"/>

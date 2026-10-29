@@ -65,6 +65,7 @@ public static class Themes
         dictionary["PressedBrush"] = dictionary["AccentBrush"];   // buttons pressed or toggled on
         dictionary["PressedLineBrush"] = dictionary["AccentBrush"];
         dictionary["PressedTextBrush"] = dictionary["OnAccentTextBrush"];
+        dictionary["ActiveIconBrush"] = dictionary["AccentBrush"];   // icon of an enabled option (transport bar)
         // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls nor with
         // InstrumentIcons off: NoInstrumentIcons).
         dictionary["InstrumentIconsVisibility"] = Visibility.Visible;
@@ -119,12 +120,15 @@ public static class Themes
     }
 
     // The colors under the mouse and pressed of the whole window: those of Windows with the light controls, else those of
-    // the theme.
+    // the theme; the icon of an enabled option (shuffle, repeat, module display) then in the blue of the theme. Also
+    // called by Apply, for that blue.
     public static void ApplyHover()
     {
         var merged = Application.Current.Resources.MergedDictionaries;
         merged.Remove(WindowsHover());
-        if (LightControls) merged.Add(WindowsHover());
+        if (!LightControls) return;
+        if (merged.Count > 0 && merged[0]["FixedBrush"] is Brush blue) WindowsHover()["ActiveIconBrush"] = blue;
+        merged.Add(WindowsHover());
     }
 
     // Puts the light colors of the controls in these resources (tabs of the main window, Event Editor), or takes them
@@ -160,5 +164,6 @@ public static class Themes
         var merged = Application.Current.Resources.MergedDictionaries;
         if (merged.Count > 0) merged[0] = dictionary; else merged.Add(dictionary);
         Current = name;
+        ApplyHover();
     }
 }
