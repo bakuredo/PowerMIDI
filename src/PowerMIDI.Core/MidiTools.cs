@@ -173,6 +173,26 @@ public static class MidiTools
         return DefaultStandard;
     }
 
+    // Does a SysEx change a sound of the module, in the standard of the file? Choosing a preset sound does not count.
+    // - MT-32: patch table, Memory timbres, timbre of a part (see Mt32Patches).
+    // - XG: drum setup (notes of a kit), voice of a part edited (Multi Part 15-1C: vibrato, filter, envelope).
+    // - GS: drum map (notes of a kit), tone of a part modified (Part 30-37: vibrato, filter, envelope).
+    public static bool IsCustomSoundSysEx(byte[] d, string standard)
+    {
+        // Does a parameter message write an address between first and last (data from its first data byte to F7)?
+        static bool Covers(int address, int dataCount, int first, int last) => address <= last && address + dataCount - 1 >= first;
+        return standard switch
+        {
+            "MT-32" => Mt32Patches.IsCustomPatch(d),
+            "XG" => XgDrumSetup.SetupOf(d) >= 0 ||
+                    d.Length >= 8 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0x08 && Covers(d[5], d.Length - 7, 0x15, 0x1C),
+            "GS" => GsDrumMap.IsDrumMapSysEx(d) ||
+                    d.Length >= 10 && d[0] == 0x41 && d[2] == 0x42 && d[3] == 0x12 && d[4] == 0x40 && (d[5] & 0xF0) == 0x10 &&
+                    Covers(d[6], d.Length - 9, 0x30, 0x37),
+            _ => false,
+        };
+    }
+
     public static TimeSpan GetDuration(MidiFile file) => (TimeSpan)file.GetDuration<MetricTimeSpan>();
 
     // Loop of a video game track, in ticks: markers "loopStart" / "loopEnd" (any case, spaces or "_" allowed;
@@ -310,7 +330,116 @@ public static class MidiTools
     // character per byte), so that a saved file keeps them as they were, and decoded for display only (DecodeText).
     static readonly Encoding ByteEncoding = Encoding.Latin1;
 
-    public static MidiFile ReadFile(string path) => ReadBytes(File.ReadAllBytes(path));
+    // A file on disk: with the SysEx of its .syx file, if it has one (see AddSyxFile). A .syx that cannot be read (locked,
+    // no access) is left out: the file still plays.
+    public static MidiFile ReadFile(string path)
+    {
+        var file = ReadBytes(File.ReadAllBytes(path));
+        if (SyxFileOf(path) is { } syx)
+        {
+            try { AddSyxFile(file, syx); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        }
+        return file;
+    }
+
+    // .syx file whose messages ReadFile adds to a MIDI file (status line), or null: none, unreadable, or already in the
+    // file (saved by PowerMIDI with them).
+    public static string AddedSyxFile(string midiPath)
+    {
+        if (SyxFileOf(midiPath) is not { } syx) return null;
+        try { return ContainsAll(ReadBytes(File.ReadAllBytes(midiPath)), ReadSyxFile(syx)) ? null : syx; }
+        catch (Exception) { return null; }
+    }
+
+    // Does a file have all these SysEx (data compared byte for byte)?
+    static bool ContainsAll(MidiFile file, List<byte[]> messages)
+    {
+        var present = file.GetTrackChunks().SelectMany(c => c.Events).OfType<SysExEvent>().Select(e => Convert.ToHexString(e.Data)).ToHashSet();
+        return messages.All(m => present.Contains(Convert.ToHexString(m)));
+    }
+
+    // SysEx file sent with a MIDI file: same folder and name, extension .syx (any case). Null if there is none.
+    public static string SyxFileOf(string midiPath)
+    {
+        var folder = Path.GetDirectoryName(Path.GetFullPath(midiPath));
+        var name = Path.GetFileNameWithoutExtension(midiPath) + ".syx";
+        // As written on disk (MI2_1.SYX), for the status line.
+        return Directory.Exists(folder) ? Directory.EnumerateFiles(folder, name).FirstOrDefault() : null;
+    }
+
+    // Messages of a .syx file: the F0 … F7 messages one after the other (DryWetMIDI data: without F0, with F7). Bytes
+    // outside a message are skipped, and so is a message cut short (another status byte before its F7: the next message
+    // starts there).
+    public static List<byte[]> ReadSyxFile(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        var messages = new List<byte[]>();
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            if (bytes[i] != 0xF0) continue;
+            int end = i + 1;
+            while (end < bytes.Length && bytes[end] < 0x80) end++;   // data bytes
+            if (end == bytes.Length) break;
+            if (bytes[end] == 0xF7)
+            {
+                if (end > i + 1) messages.Add(bytes[(i + 1)..(end + 1)]);
+                i = end;
+            }
+            else i = end - 1;   // cut short: read again from that status byte
+        }
+        return messages;
+    }
+
+    // Time the module needs for a SysEx: its transmission at 31250 bauds (3125 bytes per second) and 40 ms to process it
+    // (an MT-32 loses the messages sent faster).
+    static double SysExMilliseconds(byte[] data) => (data.Length + 1) * 1000.0 / 3125 + 40;
+
+    // The SysEx of a .syx file (MT-32 patches and timbres, GS / XG settings…: what the player had to send before the file)
+    // are put at the start of the file, spaced by the time the module needs for each one (see SysExMilliseconds); the
+    // rest of the file is shifted by that time, except its meta events at the very start (tempo, time signature, names),
+    // which stay there to set the tempo of the lead-in, and its resets at the very start (GS Reset, XG System On…), which
+    // would otherwise clear the settings of the .syx. Any mode: GetStandard then finds it from the messages. Not again if
+    // the file already has all of them (saved by PowerMIDI with them). Returns the number of messages added.
+    public static int AddSyxFile(MidiFile file, string syxPath)
+    {
+        var messages = ReadSyxFile(syxPath);
+        var chunks = file.GetTrackChunks().ToList();
+        if (messages.Count == 0 || chunks.Count == 0 || ContainsAll(file, messages)) return 0;
+
+        // Lead-in in ticks, at the tempo of the start of the file.
+        var tempo = chunks[0].GetTimedEvents().Where(t => t.Time == 0).Select(t => t.Event).OfType<SetTempoEvent>().FirstOrDefault();
+        var tempoMap = TempoMap.Create(file.TimeDivision, tempo != null ? new Tempo(tempo.MicrosecondsPerQuarterNote) : Tempo.Default);
+        long ToTicks(double ms) => TimeConverter.ConvertFrom(new MetricTimeSpan(TimeSpan.FromMilliseconds(ms)), tempoMap);
+        // Resets at the start of the file: before the messages, which wait for the module to restart (as SendReset).
+        bool resetFirst = chunks.Any(c => c.GetTimedEvents().Any(t => t.Time == 0 && MidiFileEditor.IsReset(t.Event)));
+        var times = new List<long>();
+        double elapsed = resetFirst ? 250 : 0;
+        foreach (var m in messages) { times.Add(ToTicks(elapsed)); elapsed += SysExMilliseconds(m); }
+        long shift = ToTicks(elapsed);
+
+        // Events kept at the start: the meta events describing the file (the markers, texts and lyrics belong to the song:
+        // a loop start at 0 must not replay the lead-in), the resets.
+        static bool StaysAtStart(MidiEvent e) =>
+            e is MetaEvent && e is not (MarkerEvent or CuePointEvent or TextEvent or LyricEvent) || MidiFileEditor.IsReset(e);
+        for (int k = 0; k < chunks.Count; k++)
+        {
+            var timed = chunks[k].GetTimedEvents().Select(t => (Time: t.Time == 0 && StaysAtStart(t.Event) ? 0 : t.Time + shift, t.Event)).ToList();
+            // In the first track, after the meta events at 0 (the sort below is stable).
+            if (k == 0) timed.AddRange(messages.Select((m, i) => (times[i], (MidiEvent)new NormalSysExEvent(m))));
+            var events = new List<MidiEvent>();
+            long previous = 0;
+            foreach (var (time, e) in timed.OrderBy(t => t.Time))   // stable: same order at the same time
+            {
+                e.DeltaTime = time - previous;
+                previous = time;
+                events.Add(e);
+            }
+            chunks[k].Events.Clear();
+            chunks[k].Events.AddRange(events);
+        }
+        return messages.Count;
+    }
 
     public static MidiFile ReadFile(Stream stream)
     {

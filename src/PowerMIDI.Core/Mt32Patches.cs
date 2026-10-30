@@ -51,9 +51,15 @@ public static class Mt32Patches
         return -1;
     }
 
-    internal static void Read(byte[] d)
+    internal static void Read(byte[] d) => Read(d, true);
+
+    // Does a SysEx redefine sounds (patch table, Memory timbres, timbre of a part)? Nothing is changed.
+    public static bool IsCustomPatch(byte[] d) => Read(d, false);
+
+    // apply false: only tells whether the message changes a sound (at its first such value).
+    static bool Read(byte[] d, bool apply)
     {
-        if (d.Length < 10 || d[0] != 0x41 || d[2] != 0x16 || d[3] != 0x12) return;
+        if (d.Length < 10 || d[0] != 0x41 || d[2] != 0x16 || d[3] != 0x12) return false;
         int address = (d[4] << 14) | (d[5] << 7) | d[6];
         bool changed = false;
         for (int pos = 7; pos < d.Length - 2; pos++, address++)   // … data, checksum, F7
@@ -63,24 +69,30 @@ public static class Mt32Patches
             if (area == PatchMemory && offset < 128 * PatchSize)
             {
                 int patch = offset / PatchSize, field = offset % PatchSize;
-                if (field == 0) patchGroup[patch] = v & 3; else if (field == 1) patchNumber[patch] = v & 63; else continue;
+                if (field > 1) continue;
+                if (!apply) return true;
+                if (field == 0) patchGroup[patch] = v & 3; else patchNumber[patch] = v & 63;
             }
             else if (area == TimbreMemory && offset < 64 * TimbreSize)
             {
                 int timbre = offset / TimbreSize, field = offset % TimbreSize;
                 if (field >= NameSize) continue;
+                if (!apply) return true;
                 (memoryNames[timbre] ??= new string(' ', NameSize).ToCharArray())[field] = (char)v;
             }
             else if (area == PatchTemp && offset < Parts * PatchTempSize)
             {
                 int part = offset / PatchTempSize, field = offset % PatchTempSize;
-                if (field == 0) partGroup[part] = v & 3; else if (field == 1) partNumber[part] = v & 63; else continue;
+                if (field > 1) continue;
+                if (!apply) return true;
+                if (field == 0) partGroup[part] = v & 3; else partNumber[part] = v & 63;
                 partSource[part] = 1;
             }
             else if (area == TimbreTemp && offset < Parts * TimbreTempSize)
             {
                 int part = offset / TimbreTempSize, field = offset % TimbreTempSize;
                 if (field >= NameSize) continue;
+                if (!apply) return true;
                 (partNames[part] ??= new string(' ', NameSize).ToCharArray())[field] = (char)v;
                 partSource[part] = 2;
             }
@@ -88,6 +100,7 @@ public static class Mt32Patches
             changed = true;
         }
         if (changed) Version++;
+        return changed;
     }
 
     // Name of a memory timbre (0-63) loaded by the file, or null.

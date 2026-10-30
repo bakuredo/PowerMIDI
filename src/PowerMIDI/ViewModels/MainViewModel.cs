@@ -749,9 +749,14 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedTrack = item;
         UpdateNumbers();
         // Status line: only what is worth knowing (the port and the mode are shown elsewhere): the loop of the track, where
-        // a file of the Library tab is.
+        // a file of the Library tab is, the sounds the file changes by SysEx (MT-32 timbres, XG / GS drum kits and part
+        // tones: see IsCustomSoundSysEx) and the .syx file sent with it.
         var parts = new List<string>();
         if (LoopStatus is { } loopText) parts.Add(loopText);
+        bool custom = midi.GetTrackChunks().SelectMany(c => c.Events).OfType<SysExEvent>().Any(e => MidiTools.IsCustomSoundSysEx(e.Data, std));
+        var syxName = MidiTools.AddedSyxFile(item.Path) is { } syx ? Path.GetFileName(syx) : null;
+        if (custom) parts.Add(syxName != null ? $"Custom SysEx patches detected ({syxName})" : "Custom SysEx patches detected");
+        else if (syxName != null) parts.Add($"SysEx from {syxName}");
         if (item.Library is { } libraryKey) parts.Add(Library.ShownPath(libraryKey));
         Status = string.Join(" — ", parts);
     }
