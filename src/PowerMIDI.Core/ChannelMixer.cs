@@ -32,11 +32,45 @@ public static class ChannelMixer
     static readonly int[] filePortamento = new int[16];
     public const int PortamentoSwitch = 65, PortamentoOn = 127;
     public static int PortamentoSwitchValue(int channel) =>
-        CcOverride[PortamentoTime, channel] ? PortamentoSwitchFor(OverrideCc[PortamentoTime, channel]) : filePortamento[channel];
+        IsActive(PortamentoTime, channel) ? PortamentoSwitchFor(OverrideCc[PortamentoTime, channel]) : filePortamento[channel];
     public static int PortamentoSwitchFor(int time) => time > 0 ? PortamentoOn : 0;
     static readonly int[,] FileCc = new int[Controllers, 16];       // last value sent by file
     static readonly bool[,] CcOverride = new bool[Controllers, 16]; // value fixed in interface?
     static readonly int[,] OverrideCc = new int[Controllers, 16];   // fixed value
+
+    // A fixed value replaces the file's in the first passage of its controller (see ControllerPassages), or in the whole
+    // track (CcWholeTrack: chosen in the Mixer tab, or set past the first passage, where it would otherwise not be heard).
+    public static readonly bool[,] CcWholeTrack = new bool[Controllers, 16];
+    static readonly bool[,] ccFirst = new bool[Controllers, 16];      // playback in the first passage of the controller?
+    // First passages of the track being played (null: the whole track is one passage).
+    public static volatile ControllerPassages CcPassages;
+
+    // The first passage is followed at each value of the controller read in the file (rawTime: its tick).
+    static void ReadPassage(int k, int channel, long rawTime) => ccFirst[k, channel] = CcPassages?.InFirst(k, channel, rawTime) ?? true;
+
+    // Does the fixed value replace the file's now? (fixed, and in its first passage or for the whole track)
+    public static bool IsActive(int k, int channel) => CcOverride[k, channel] && (CcWholeTrack[k, channel] || ccFirst[k, channel]);
+
+    // Does the fixed value replace a value of the file at a tick? (Event Editor)
+    public static bool IsActiveAt(int k, int channel, long tick) =>
+        CcOverride[k, channel] && (CcWholeTrack[k, channel] || (CcPassages?.InFirst(k, channel, tick) ?? true));
+
+    // Playback past the first passage of the controller (the file's values play again)?
+    public static bool IsPastFirst(int k, int channel) => !ccFirst[k, channel];
+
+    // Playback goes on from a tick without reading the events before it (loop restart): the first passages there; a
+    // fixed value active again is sent, one no longer active gets the file's value back.
+    public static void EnterPassagesAt(IOutputDevice device, long tick)
+    {
+        for (int k = 0; k < Controllers; k++)
+            for (int c = 0; c < 16; c++)
+            {
+                bool first = CcPassages?.InFirst(k, c, tick) ?? true;
+                if (first == ccFirst[k, c]) continue;
+                ccFirst[k, c] = first;
+                if (device != null && CcOverride[k, c] && !CcWholeTrack[k, c]) ApplyController(device, k, c);
+            }
+    }
 
     public static int ControllerIndex(int number)
     {
@@ -225,7 +259,7 @@ public static class ChannelMixer
     {
         for (int i = 0; i < 16; i++)
         {
-            for (int k = 0; k < Controllers; k++) FileCc[k, i] = ControllerDefaults[k];
+            for (int k = 0; k < Controllers; k++) { FileCc[k, i] = ControllerDefaults[k]; ccFirst[k, i] = true; }
             filePortamento[i] = 0;
             fileMasterVolume = 127;
             Program[i] = 0;
@@ -317,10 +351,10 @@ public static class ChannelMixer
     public static bool IsFixed(int k, int channel) { return CcOverride[k, channel]; }
     public static int FixedValue(int k, int channel) { return OverrideCc[k, channel]; }
 
-    // Value shown on slider: one fixed in interface, otherwise file's.
+    // Value shown on slider: one fixed in interface (while it replaces the file's), otherwise file's.
     public static int Value(int k, int channel)
     {
-        return CcOverride[k, channel] ? OverrideCc[k, channel] : FileCc[k, channel];
+        return IsActive(k, channel) ? OverrideCc[k, channel] : FileCc[k, channel];
     }
 
     // Value actually sent to module (volume 0 if channel is muted).
@@ -407,14 +441,14 @@ public static class ChannelMixer
     }
 
     // Multi Part SysEx sent by the file: stores its values; returns the message to play (null = unchanged).
-    static MidiEvent ReadMultiPart(byte[] d)
+    static MidiEvent ReadMultiPart(byte[] d, long rawTime)
     {
         int channel = MultiPartChannel(d);
         if (channel < 0) return null;
         for (int pos = 6; pos < d.Length - 1; pos++)
         {
             int address = d[5] + pos - 6, k = MultiPartController(address);
-            if (k >= 0) FileCc[k, channel] = d[pos];
+            if (k >= 0) { FileCc[k, channel] = d[pos]; ReadPassage(k, channel, rawTime); }
             else if (address == 0x01) BankMsb[channel] = d[pos];
             else if (address == 0x02) BankLsb[channel] = d[pos];
             else if (address == 0x03) Program[channel] = d[pos];
@@ -467,10 +501,20 @@ public static class ChannelMixer
         if (GsMode && GsDefaultMapOverride >= 1) SendGsDefaultMap(device, GsDefaultMapOverride);
     }
 
+    // Fixes a value. Set past the first passage of the controller, it is for the whole track (otherwise it would not be
+    // heard until a jump back).
     public static void SetController(IOutputDevice device, int k, int channel, int value)
     {
         OverrideCc[k, channel] = value;
+        if (!ccFirst[k, channel]) CcWholeTrack[k, channel] = true;
         CcOverride[k, channel] = true;
+        if (device != null) ApplyController(device, k, channel);
+    }
+
+    // A fixed value for the whole track, or only in the first passage of the controller (see ControllerPassages).
+    public static void SetWholeTrack(IOutputDevice device, int k, int channel, bool wholeTrack)
+    {
+        CcWholeTrack[k, channel] = wholeTrack;
         if (device != null) ApplyController(device, k, channel);
     }
 
@@ -478,6 +522,7 @@ public static class ChannelMixer
     public static void ClearController(IOutputDevice device, int k, int channel)
     {
         CcOverride[k, channel] = false;
+        CcWholeTrack[k, channel] = false;
         if (device != null) ApplyController(device, k, channel);
     }
 
@@ -513,6 +558,7 @@ public static class ChannelMixer
                 case 78:
                     int k = ControllerIndex(cc.ControlNumber);
                     FileCc[k, channel] = cc.ControlValue;
+                    ReadPassage(k, channel, rawTime);
                     return Cc(channel, cc.ControlNumber, Sent(k, channel));
                 // Bank select: played as it is; the one of an instrument chosen for the passage goes with its Program
                 // Change (it may start another passage).
@@ -668,7 +714,7 @@ public static class ChannelMixer
                 var eq = XgPartParams.Read(d);
                 if (eq != null) { d = eq; e = new NormalSysExEvent(eq); }
             }
-            var multiPart = ReadMultiPart(d);
+            var multiPart = ReadMultiPart(d, rawTime);
             if (multiPart != null) return multiPart;
             var effect = GsXgEffects.Read(d);
             if (effect != null) return effect;

@@ -147,9 +147,9 @@ public static class MidiEventList
             case ProgramChangeEvent when Chosen(c) != null:
             case ControlChangeEvent bank when (int)bank.ControlNumber is 0 or 32 && Chosen(c) != null:
                 return Instrument(c);
-            case ControlChangeEvent cc when ChannelMixer.ControllerIndex(cc.ControlNumber) is int k and >= 0 && ChannelMixer.IsFixed(k, c):
+            case ControlChangeEvent cc when ChannelMixer.ControllerIndex(cc.ControlNumber) is int k and >= 0 && ChannelMixer.IsActiveAt(k, c, row.Tick):
                 return $"Fixed in Mixer tab: {ChannelMixer.FixedValue(k, c)}";
-            case ControlChangeEvent cc when (int)cc.ControlNumber == ChannelMixer.PortamentoSwitch && ChannelMixer.IsFixed(ChannelMixer.PortamentoTime, c):
+            case ControlChangeEvent cc when (int)cc.ControlNumber == ChannelMixer.PortamentoSwitch && ChannelMixer.IsActiveAt(ChannelMixer.PortamentoTime, c, row.Tick):
                 return $"Portamento time fixed in Mixer tab: switch {ChannelMixer.PortamentoSwitchValue(c)}";
             case ControlChangeEvent cc when (int)cc.ControlNumber is 126 or 127:
                 return (ChannelMixer.GsMode ? GsPartParams.FixMonoPoly(cc) : ChannelMixer.XgMode ? XgPartParams.FixMonoPoly(cc) : null) != null
@@ -166,7 +166,7 @@ public static class MidiEventList
                 if (ChannelMixer.MultiPartChannel(d) is int mp and >= 0)
                 {
                     if (Chosen(mp) is { } chosen && ChannelMixer.ReplaceMultiPart(d, chosen, k => -1) != null) return Instrument(mp);
-                    if (ChannelMixer.ReplaceMultiPart(d, null, k => ChannelMixer.IsFixed(k, mp) ? ChannelMixer.FixedValue(k, mp) : -1, XgDrumSetup.PartModeOverride[mp]) != null)
+                    if (ChannelMixer.ReplaceMultiPart(d, null, k => ChannelMixer.IsActiveAt(k, mp, row.Tick) ? ChannelMixer.FixedValue(k, mp) : -1, XgDrumSetup.PartModeOverride[mp]) != null)
                         return "Fixed in Mixer tab (Multi Part)";
                 }
                 if (ChannelMixer.RhythmPartChannel(d) is int part and >= 0 && ChannelMixer.RhythmOverride[part] >= 0) return "Drum part chosen in Mixer tab";

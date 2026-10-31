@@ -72,18 +72,20 @@ public sealed partial class MainViewModel
         // Fixed values per controller: arrays [controller][channel].
         var applyCc = new bool[controllers][];
         var ccValues = new int[controllers][];
-        for (int k = 0; k < controllers; k++) { applyCc[k] = new bool[16]; ccValues[k] = new int[16]; }
+        var wholeTrack = new bool[controllers][];   // otherwise until the first change of the controller (ControllerPassages)
+        for (int k = 0; k < controllers; k++) { applyCc[k] = new bool[16]; ccValues[k] = new int[16]; wholeTrack[k] = new bool[16]; }
         foreach (int c in channels)
         {
             for (int k = 0; k < controllers; k++)
             {
                 applyCc[k][c] = ChannelMixer.IsFixed(k, c);
                 ccValues[k][c] = ChannelMixer.FixedValue(k, c);
+                wholeTrack[k][c] = ChannelMixer.CcWholeTrack[k, c];
             }
         }
 
         var report = new List<string>();
-        report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode));
+        report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode, wholeTrack));
         // Effects tab: effects, Part and Drums pages (the XG part modes and drum setups share one writer).
         foreach (var write in modules.Select(m => m.Write).Distinct()) report.Add(write(midi));
         // Forced mode: last, so that the new reset comes before all the settings inserted above.
@@ -122,7 +124,7 @@ public sealed partial class MainViewModel
         {
             if (ChannelMixer.RhythmOverride[c] >= 0) parts.Add($"r{c}={ChannelMixer.RhythmOverride[c]}");
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
-                if (ChannelMixer.IsFixed(k, c)) parts.Add($"c{k}/{c}={ChannelMixer.FixedValue(k, c)}");
+                if (ChannelMixer.IsFixed(k, c)) parts.Add($"c{k}/{c}={ChannelMixer.FixedValue(k, c)}{(ChannelMixer.CcWholeTrack[k, c] ? "w" : "")}");
         }
         foreach (var m in ModuleSettings.All)
             foreach (var (key, v) in m.Fixed()) parts.Add($"{m.Name}{key.A}/{key.B}/{key.C}={v}");

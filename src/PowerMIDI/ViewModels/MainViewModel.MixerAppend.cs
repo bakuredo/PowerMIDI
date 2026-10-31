@@ -74,6 +74,7 @@ public sealed partial class MainViewModel
         if (EditBlocked is { } blocked) { Status = blocked; return; }
         var (events, description) = BuildInsertion();
         if (events.Count == 0) { Status = "No setting changed: nothing written"; return; }
+        var written = ActiveControllers();   // the controllers written (see BuildInsertion)
         long position = playback != null ? Math.Max(CurrentTick(), tick) : tick;
         Edit(file =>
         {
@@ -88,7 +89,7 @@ public sealed partial class MainViewModel
         }, position, false);
         // The file's values as they are now at the position (with the events written), sent as the settings are freed.
         RebuildFileState(editedFile, position, CurrentStandard);
-        ClearWrittenSettings();
+        ClearWrittenSettings(written);
         Mixer.Refresh();
         Effects.Refresh();
         Status = $"Appended at {BarBeat(tick)}: {description} (Ctrl+Z in Event Editor: undo)";

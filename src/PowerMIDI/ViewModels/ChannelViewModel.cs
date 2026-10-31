@@ -20,6 +20,7 @@ public sealed class ChannelViewModel : ObservableObject
         this.mixer = mixer;
         Channel = channel;
         ClearControllerCommand = new RelayCommand(() => mixer.Run(() => mixer.ClearController(Channel)));
+        WholeTrackCommand = new RelayCommand(() => mixer.Run(() => mixer.ToggleWholeTrack(Channel)));
         SoloCommand = new RelayCommand(() => mixer.Run(() => mixer.ToggleSolo(Channel)));
         InstrumentWheelCommand = new RelayCommand(p => mixer.Run(() => mixer.StepInstrumentOrMap(Channel, (WheelStep)p)));
         MapWheelCommand = new RelayCommand(p => mixer.Run(() => mixer.StepMap(Channel, ((WheelStep)p).Direction)));
@@ -68,6 +69,16 @@ public sealed class ChannelViewModel : ObservableObject
 
     bool isFixed;
     public bool IsFixed { get => isFixed; internal set => Set(ref isFixed, value); }
+
+    // Fixed for the whole track, not only until the first change of the controller (value underlined).
+    bool isWholeTrack;
+    public bool IsWholeTrack { get => isWholeTrack; internal set => Set(ref isWholeTrack, value); }
+
+    // Right click on the value: whole track or until the first change (see MixerViewModel.ToggleWholeTrack).
+    public ICommand WholeTrackCommand { get; }
+
+    string valueToolTip;
+    public string ValueToolTip { get => valueToolTip; internal set => Set(ref valueToolTip, value); }
 
     string sliderToolTip;
     public string SliderToolTip { get => sliderToolTip; internal set => Set(ref sliderToolTip, value); }

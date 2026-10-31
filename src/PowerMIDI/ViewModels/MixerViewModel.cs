@@ -234,28 +234,35 @@ public sealed class MixerViewModel : ObservableObject
     string FormatShownValue(int k, int value) =>
         !IsReversedPan(k) ? FormatControllerValue(k, value) : value == 64 ? "C" : value < 64 ? $"R{64 - value}" : $"L{value - 64}";
 
-    // Slider and displayed value: fixed value (in blue) or last value from the file.
+    // Slider and displayed value: fixed value (in blue, underlined for the whole track) while it replaces the file's,
+    // otherwise last value from the file.
     void RefreshController(ChannelViewModel ch)
     {
         int k = shownController, c = ch.Channel;
         int value = ChannelMixer.Value(k, c);
-        bool isFixed = ChannelMixer.IsFixed(k, c);
-        int fileValue = ChannelMixer.FileValue(k, c);
+        bool isFixed = ChannelMixer.IsActive(k, c), hasFixed = ChannelMixer.IsFixed(k, c), wholeTrack = hasFixed && ChannelMixer.CcWholeTrack[k, c];
+        int fileValue = ChannelMixer.FileValue(k, c), fixedValue = ChannelMixer.FixedValue(k, c);
         int position = ToSlider(k, value);
-        var key = $"{k}/{value}/{isFixed}/{fileValue}/{IsReversedPan(k)}";
+        var key = $"{k}/{value}/{isFixed}/{hasFixed}/{wholeTrack}/{fixedValue}/{fileValue}/{IsReversedPan(k)}";
         if (key == ch.ShownKey && (int)Math.Round(ch.Value) == position) return;
         ch.ShownKey = key;
 
         var text = FormatShownValue(k, value);
+        var fixedText = FormatShownValue(k, fixedValue);
         var name = ControllerNames[k];
+        var scope = wholeTrack ? "for whole track" : "until first change";
         Update(ch, () =>
         {
             ch.Value = position;
             ch.ValueText = text;
             ch.IsFixed = isFixed;
-            ch.SliderToolTip = isFixed ? $"{name} fixed at {text} (file: {FormatShownValue(k, fileValue)})" : $"{name} from the file: {text}";
+            ch.IsWholeTrack = isFixed && wholeTrack;
+            ch.SliderToolTip = isFixed ? $"{name} fixed at {text} {scope} (file: {FormatShownValue(k, fileValue)})"
+                             : hasFixed ? $"{name} from the file: {text} (fixed at {fixedText} until first change, passed)"
+                             : $"{name} from the file: {text}";
             if (k == ChannelMixer.PortamentoTime)
                 ch.SliderToolTip += isFixed ? $"\nPortamento {(value > 0 ? "on" : "off")} (CC65)" : "\nMoving slider turns portamento on (CC65), 0 turns it off";
+            ch.ValueToolTip = hasFixed ? $"Fixed {scope}. Right click: {(wholeTrack ? "until first change" : "for whole track")}" : null;
         });
     }
 
@@ -735,7 +742,8 @@ public sealed class MixerViewModel : ObservableObject
 
     // ---------- Controllers ----------
 
-    // Moved by the user: the value of the displayed controller is fixed, the file no longer changes it.
+    // Moved by the user: the value of the displayed controller is fixed, the file no longer changes it until the first
+    // change of that controller in the music (see ControllerPassages), or in the whole track.
     internal void SetController(int c, int position)
     {
         ChannelMixer.SetController(output(), shownController, c, FromSlider(shownController, position));
@@ -746,6 +754,15 @@ public sealed class MixerViewModel : ObservableObject
     internal void ClearController(int c)
     {
         ChannelMixer.ClearController(output(), shownController, c);
+        RefreshController(Channels[c]);
+    }
+
+    // Right click on the value: a fixed value for the whole track, or until the first change again.
+    internal void ToggleWholeTrack(int c)
+    {
+        int k = shownController;
+        if (!ChannelMixer.IsFixed(k, c)) return;
+        ChannelMixer.SetWholeTrack(output(), k, c, !ChannelMixer.CcWholeTrack[k, c]);
         RefreshController(Channels[c]);
     }
 

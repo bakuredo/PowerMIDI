@@ -7,7 +7,9 @@ namespace PowerMIDI.Core;
 // Writes the settings chosen in the interface into a MIDI file:
 // - instrument of a passage of a channel (see InstrumentPassages): its bank selects (CC0, CC32) and Program Changes are
 //   replaced by the choice; the next passage, if it is not chosen, gets the file's bank again;
-// - fixed controller of a channel (volume, pan, sends…): all its events of that controller are removed;
+// - fixed controller of a channel (volume, pan, sends…): its events of that controller are removed, in the first passages
+//   of the controller (see ControllerPassages) or in the whole track, and the value written at the start and after each
+//   reset;
 // - drum part of a channel (GS): its Use for Rhythm Part messages are removed;
 // - XG Multi Part SysEx that write one of these values: corrected in place (they may write other values too);
 // then the chosen value is inserted once, right after the reset at the start (ApplyChanges; an instrument: the one of
@@ -31,15 +33,16 @@ public static class MidiFileEditor
     }
 
 
-    // Controller index (see ChannelMixer.ControllerNumbers) if event must be replaced, otherwise -1.
-    static int ControllerToReplace(MidiEvent e, bool[][] apply)
+    // Controller index (see ChannelMixer.ControllerNumbers) if event must be replaced, otherwise -1. apply(k, channel):
+    // is the value of controller k fixed there?
+    static int ControllerToReplace(MidiEvent e, Func<int, int, bool> apply)
     {
         var cc = e as ControlChangeEvent;
         if (cc == null) return -1;
         // The portamento switch goes with a fixed Portamento Time (on, off at 0: see ChannelMixer.PortamentoSwitchValue).
-        if (cc.ControlNumber == ChannelMixer.PortamentoSwitch && apply[ChannelMixer.PortamentoTime][cc.Channel]) return ChannelMixer.PortamentoTime;
+        if (cc.ControlNumber == ChannelMixer.PortamentoSwitch && apply(ChannelMixer.PortamentoTime, cc.Channel)) return ChannelMixer.PortamentoTime;
         int k = ChannelMixer.ControllerIndex(cc.ControlNumber);
-        return k >= 0 && apply[k][cc.Channel] ? k : -1;
+        return k >= 0 && apply(k, cc.Channel) ? k : -1;
     }
 
     class Item
@@ -54,11 +57,16 @@ public static class MidiFileEditor
     // rhythm[channel]: drum part chosen in the interface (GS Use for Rhythm Part: 0 = normal, 1 / 2 = drum part),
     // -1 = the file's. The file's Use for Rhythm Part messages of such a channel are replaced too.
     // followResets: false in a forced mode (see InstrumentPassages.Read).
+    // wholeTrack[k][channel]: the fixed value replaces the file's in the whole track; otherwise only in the first passages
+    // of the controller (see ControllerPassages). Null: whole track for all.
     public static string ApplyChanges(MidiFile file, IEnumerable<(int Channel, long Passage, int Msb, int Lsb, int Program)> instruments,
-                                      bool[][] applyCc, int[][] ccValues, int[] rhythm, bool followResets = true)
+                                      bool[][] applyCc, int[][] ccValues, int[] rhythm, bool followResets = true, bool[][] wholeTrack = null)
     {
         var chosen = instruments.ToDictionary(x => (x.Channel, x.Passage), x => (x.Msb, x.Lsb, x.Program));
         var passages = InstrumentPassages.Read(file, followResets);
+        var ccPassages = ControllerPassages.Read(file, followResets);
+        // Is the value of controller k fixed on a channel at a tick?
+        bool FixedAt(int k, int c, long tick) => applyCc[k][c] && (wholeTrack == null || wholeTrack[k][c] || ccPassages.InFirst(k, c, tick));
         int controllers = ChannelMixer.ControllerNumbers.Length;
         int tpqn = 480;
         var division = file.TimeDivision as TicksPerQuarterNoteTimeDivision;
@@ -70,7 +78,9 @@ public static class MidiFileEditor
 
         // 1. Scan: last reset, first note and home track of each channel.
         long resetTime = -1;
+        var resetTimes = new SortedSet<long>();
         var firstNote = new long[16];
+        var noteTimes = Enumerable.Range(0, 16).Select(_ => new List<long>()).ToArray();
         var host = new int[16];
         var timedByChunk = new List<List<TimedEvent>>();
         for (int c = 0; c < 16; c++) { firstNote[c] = -1; host[c] = -1; }
@@ -80,16 +90,31 @@ public static class MidiFileEditor
             timedByChunk.Add(list);
             foreach (var t in list)
             {
-                if (IsReset(t.Event) && t.Time > resetTime) resetTime = t.Time;
+                if (IsReset(t.Event)) { resetTimes.Add(t.Time); if (t.Time > resetTime) resetTime = t.Time; }
                 var ce = t.Event as ChannelEvent;
                 if (ce == null) continue;
                 int ch = ce.Channel;
                 if (host[ch] < 0) host[ch] = k;
                 var on = t.Event as NoteOnEvent;
-                if (on != null && on.Velocity > 0 && (firstNote[ch] < 0 || t.Time < firstNote[ch])) firstNote[ch] = t.Time;
+                if (on == null || on.Velocity == 0) continue;
+                noteTimes[ch].Add(t.Time);
+                if (firstNote[ch] < 0 || t.Time < firstNote[ch]) firstNote[ch] = t.Time;
             }
         }
         if (chunkIndexes.Count == 0) return "No track in file.";
+        foreach (var times in noteTimes) times.Sort();
+
+        // The fixed controllers are written at the start and again after each reset of the file (which sets them back to
+        // their defaults): 1/8 of a quarter note after it, but never after the first note of the channel there. In a forced
+        // mode, after the first reset only (the reset of the mode replaces it, see ForceReset).
+        var segments = (followResets ? resetTimes : resetTimes.Take(1)).ToList();
+        if (segments.Count == 0 || segments[0] > 0) segments.Insert(0, -1);   // -1: the start, without a reset
+        long ControllerTime(int ch, long start)
+        {
+            long time = start < 0 ? 0 : start + tpqn / 8;
+            long note = noteTimes[ch].FirstOrDefault(n => n >= Math.Max(start, 0), -1);
+            return note >= 0 && time > note ? Math.Max(note, Math.Max(start, 0)) : time;
+        }
 
         // The instrument of the first passage is inserted after the reset if the channel plays a note before its first
         // Program Change there (or has none); otherwise that Program Change is replaced.
@@ -138,7 +163,7 @@ public static class MidiFileEditor
                         continue;
                     }
                 }
-                int cck = ControllerToReplace(t.Event, applyCc);
+                int cck = ControllerToReplace(t.Event, (n, c) => FixedAt(n, c, t.Time));
                 if (cck >= 0)
                 {
                     removedCc[cck][((ChannelEvent)t.Event).Channel]++;
@@ -157,7 +182,7 @@ public static class MidiFileEditor
                 {
                     var d = sysEx.Data;
                     (int, int, int)? instrument = passages.Of(k, i) is { } partInfo && chosen.TryGetValue((part, partInfo.Passage), out var x) ? x : null;
-                    var data = ChannelMixer.ReplaceMultiPart(d, instrument, c => applyCc[c][part] ? ccValues[c][part] : -1);
+                    var data = ChannelMixer.ReplaceMultiPart(d, instrument, c => FixedAt(c, part, t.Time) ? ccValues[c][part] : -1);
                     if (data != null)
                     {
                         for (int pos = 6; pos < d.Length - 1; pos++)
@@ -191,14 +216,23 @@ public static class MidiFileEditor
                     events.Add(new ControlChangeEvent((SevenBitNumber)(byte)32, (SevenBitNumber)(byte)lsb) { Channel = (FourBitNumber)(byte)ch });
                     events.Add(new ProgramChangeEvent((SevenBitNumber)(byte)program) { Channel = (FourBitNumber)(byte)ch });
                 }
-                for (int c = 0; c < controllers; c++)
-                    if (applyCc[c][ch])
-                        events.Add(new ControlChangeEvent((SevenBitNumber)(byte)ChannelMixer.ControllerNumbers[c],
-                                                          (SevenBitNumber)(byte)ccValues[c][ch]) { Channel = (FourBitNumber)(byte)ch });
-                if (applyCc[ChannelMixer.PortamentoTime][ch])
-                    events.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(ccValues[ChannelMixer.PortamentoTime][ch])) { Channel = (FourBitNumber)(byte)ch });
                 foreach (var e in events)
                     items.Add(new Item { Event = new TimedEvent(e, time), Priority = 1, Index = items.Count });
+                if (!anyCc) continue;
+                // The controllers, after the instrument at the same time (see segments).
+                foreach (long start in segments)
+                {
+                    long at = ControllerTime(ch, start);
+                    var values = new List<MidiEvent>();
+                    for (int c = 0; c < controllers; c++)
+                        if (applyCc[c][ch])
+                            values.Add(new ControlChangeEvent((SevenBitNumber)(byte)ChannelMixer.ControllerNumbers[c],
+                                                              (SevenBitNumber)(byte)ccValues[c][ch]) { Channel = (FourBitNumber)(byte)ch });
+                    if (applyCc[ChannelMixer.PortamentoTime][ch])
+                        values.Add(new ControlChangeEvent((SevenBitNumber)ChannelMixer.PortamentoSwitch, (SevenBitNumber)ChannelMixer.PortamentoSwitchFor(ccValues[ChannelMixer.PortamentoTime][ch])) { Channel = (FourBitNumber)(byte)ch });
+                    foreach (var e in values)
+                        items.Add(new Item { Event = new TimedEvent(e, at), Priority = 1, Index = items.Count });
+                }
             }
 
             // Stable sort: time, then priority, then original order.
@@ -235,8 +269,9 @@ public static class MidiFileEditor
                                                    count > 1 ? $" in {count} passages" : "", removed[ch]));
             for (int c = 0; c < controllers; c++)
                 if (applyCc[c][ch])
-                    parts.Add(string.Format("{0} {1} ({2} CC{3} or SysEx value(s) replaced)", ChannelMixer.ControllerNames[c],
-                                            ccValues[c][ch], removedCc[c][ch], ChannelMixer.ControllerNumbers[c]));
+                    parts.Add(string.Format("{0} {1}{2} ({3} CC{4} or SysEx value(s) replaced)", ChannelMixer.ControllerNames[c],
+                                            ccValues[c][ch], wholeTrack == null || wholeTrack[c][ch] ? "" : " until first change",
+                                            removedCc[c][ch], ChannelMixer.ControllerNumbers[c]));
             if (parts.Count > 0) report.Add(string.Format("channel {0}: {1}", ch + 1, string.Join(", ", parts.ToArray())));
         }
         return string.Join("\n", report.ToArray());

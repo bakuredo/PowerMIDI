@@ -66,11 +66,14 @@ public sealed partial class MainViewModel
         // The drum setups (XG) and drum maps (GS) after the instruments: the Program Change of a drum part sets them back
         // to the kit's values (e.g. Rosenoelfee.mid, channel 11: its kit tuned by 89 drum setup messages).
         var inOrder = sysEx.Values.OrderBy(x => x.Order).Select(x => x.Event).ToList();
+        // The values sent again are the file's just before the position: in the first passage of their controller or not
+        // as there (see ControllerPassages).
+        long before = Math.Max(tick - 1, 0);
         bool IsDrumSetup(SysExEvent e) => XgDrumSetup.SetupOf(e.Data) >= 0 || GsDrumMap.IsDrumMapSysEx(e.Data);
         void Send(IEnumerable<SysExEvent> events)
         {
             foreach (var e in events)
-                if (ChannelMixer.Callback(e.Clone(), 0, TimeSpan.Zero) is { } played) output.SendEvent(played);
+                if (ChannelMixer.Callback(e.Clone(), before, TimeSpan.Zero) is { } played) output.SendEvent(played);
         }
         Send(inOrder.Where(e => !IsDrumSetup(e)));
         for (int c = 0; c < 16; c++)
@@ -100,7 +103,7 @@ public sealed partial class MainViewModel
             events.Add(MidiTools.Cc(c, 100, 127));
         }
         foreach (var e in events)
-            if (ChannelMixer.Callback(e, 0, TimeSpan.Zero) is { } played) output.SendEvent(played);
+            if (ChannelMixer.Callback(e, before, TimeSpan.Zero) is { } played) output.SendEvent(played);
         ApplyMixerState();
     }
 

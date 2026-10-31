@@ -212,6 +212,8 @@ public sealed partial class MainViewModel
                 int number = TransposeNote(new NotePlaybackData((SevenBitNumber)note, (SevenBitNumber)0, (SevenBitNumber)0, (FourBitNumber)channel)).NoteNumber;
                 device.SendEvent(new NoteOffEvent((SevenBitNumber)number, (SevenBitNumber)0) { Channel = (FourBitNumber)channel });
             }
+            // The values fixed until the first change of their controller: in force again if the loop starts before it.
+            ChannelMixer.EnterPassagesAt(device, active.Start);
             foreach (var e in events)
             {
                 var sent = ChannelMixer.Callback(e, active.Start, TimeSpan.Zero);

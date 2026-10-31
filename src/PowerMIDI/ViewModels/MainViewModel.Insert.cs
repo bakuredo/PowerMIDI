@@ -31,6 +31,8 @@ public sealed partial class MainViewModel
         var (tagged, description) = BuildInsertion();
         if (tagged.Count == 0) return null;
         var events = tagged.Select(e => e.Event).ToList();
+        // The controllers written: those whose fixed value is heard here (see BuildInsertion).
+        var written = ActiveControllers();
         long position = CurrentTick();
         bool wasPlaying = state == "playing";
         Edit(file =>
@@ -40,7 +42,7 @@ public sealed partial class MainViewModel
         }, position, false);
         // The file's values as they are now at the position (with the events written), sent as the settings are freed.
         RebuildFileState(editedFile, position, CurrentStandard);
-        ClearWrittenSettings();
+        ClearWrittenSettings(written);
         Mixer.Refresh();
         Effects.Refresh();
         if (wasPlaying) { playback.Start(); SetState("playing"); UpdateNumbers(); }
@@ -82,8 +84,15 @@ public sealed partial class MainViewModel
         Effects.Refresh();
     }
 
-    // The settings written (see BuildInsertion) go back to the file's values, sent to the module.
-    void ClearWrittenSettings()
+    // Controllers whose fixed value replaces the file's at the position (not those fixed until a first change already
+    // passed: not heard there).
+    static List<(int K, int Channel)> ActiveControllers() =>
+        Enumerable.Range(0, 16).SelectMany(c => Enumerable.Range(0, MixerViewModel.ControllerCount)
+                                                          .Where(k => ChannelMixer.IsActive(k, c)).Select(k => (k, c))).ToList();
+
+    // The settings written (see BuildInsertion) go back to the file's values, sent to the module. controllers: the
+    // controllers written (the others keep their value for their first passage); null: all (Append / Replace cancelled).
+    void ClearWrittenSettings(List<(int K, int Channel)> controllers = null)
     {
         for (int c = 0; c < 16; c++)
         {
@@ -91,7 +100,7 @@ public sealed partial class MainViewModel
             // All passages: the first click wrote the earlier choices in the track (the passages may have moved since).
             if (ChannelMixer.HasInstruments(c)) ChannelMixer.ClearOverride(output, c, true);
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
-                if (ChannelMixer.IsFixed(k, c)) ChannelMixer.ClearController(output, k, c);
+                if (ChannelMixer.IsFixed(k, c) && (controllers == null || controllers.Contains((k, c)))) ChannelMixer.ClearController(output, k, c);
         }
         foreach (var m in ModuleSettings.All)
             if (m.HasFixed) m.ClearAll(m.IsActive() ? output : null);
@@ -215,7 +224,7 @@ public sealed partial class MainViewModel
             }
             for (int k = 0; k < MixerViewModel.ControllerCount; k++)
             {
-                if (!ChannelMixer.IsFixed(k, c)) continue;
+                if (!ChannelMixer.IsActive(k, c)) continue;   // fixed until a first change already passed: not heard here
                 int v = ChannelMixer.FixedValue(k, c);
                 events.Add((c, new ControlChangeEvent((SevenBitNumber)ChannelMixer.ControllerNumbers[k], (SevenBitNumber)v) { Channel = (FourBitNumber)c }));
                 if (k == ChannelMixer.PortamentoTime)   // heard only with the portamento on (off at 0)

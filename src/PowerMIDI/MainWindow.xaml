@@ -397,8 +397,13 @@
                 </Slider.Style>
               </Slider>
 
-              <!-- Value: in the accent color and bold when fixed. -->
-              <TextBlock Grid.Column="5" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right" Margin="0,0,6,0">
+              <!-- Value: in the accent color and bold when fixed, underlined when fixed for the whole track (right click: whole
+                   track or until the first change of the controller). -->
+              <TextBlock Grid.Column="5" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right" Margin="0,0,6,0"
+                         Background="Transparent" ToolTip="{Binding ValueToolTip}">
+                <TextBlock.InputBindings>
+                  <MouseBinding MouseAction="RightClick" Command="{Binding WholeTrackCommand}"/>
+                </TextBlock.InputBindings>
                 <TextBlock.Style>
                   <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                     <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -406,6 +411,9 @@
                       <DataTrigger Binding="{Binding IsFixed}" Value="True">
                         <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                         <Setter Property="FontWeight" Value="Bold"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding IsWholeTrack}" Value="True">
+                        <Setter Property="TextDecorations" Value="Underline"/>
                       </DataTrigger>
                     </Style.Triggers>
                   </Style>

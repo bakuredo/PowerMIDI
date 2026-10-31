@@ -305,7 +305,8 @@ public sealed class EventEditorViewModel : ObservableObject
                 yield return (c, "Mixer", ChannelMixer.RhythmOverride[c] == 0 ? "Part: normal" : $"Part: drum part {ChannelMixer.RhythmOverride[c]}");
             for (int k = 0; k < ChannelMixer.ControllerNames.Length; k++)
                 if (ChannelMixer.IsFixed(k, c))
-                    yield return (c, "Mixer", $"{char.ToUpperInvariant(ChannelMixer.ControllerNames[k][0])}{ChannelMixer.ControllerNames[k][1..]}: {ChannelMixer.FixedValue(k, c)}");
+                    yield return (c, "Mixer", $"{char.ToUpperInvariant(ChannelMixer.ControllerNames[k][0])}{ChannelMixer.ControllerNames[k][1..]}: {ChannelMixer.FixedValue(k, c)}" +
+                                              (ChannelMixer.CcWholeTrack[k, c] ? "" : " until first change"));
         }
         // The maps chosen in the Mixer tab play only in their mode (see ChannelMixer.ApplyVoiceMap, ApplyGsDefaultMap).
         if (ChannelMixer.XgMode && ChannelMixer.VoiceMapOverride >= 0) yield return (-1, "Mixer", $"XG voice map: {MixerViewModel.VoiceMapNames[2 - ChannelMixer.VoiceMapOverride]}");
