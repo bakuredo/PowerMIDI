@@ -258,8 +258,8 @@ public sealed class MixerViewModel : ObservableObject
             ch.IsFixed = isFixed;
             ch.IsWholeTrack = isFixed && wholeTrack;
             ch.SliderToolTip = isFixed ? $"{name} fixed at {text} {scope} (file: {FormatShownValue(k, fileValue)})"
-                             : hasFixed ? $"{name} from the file: {text} (fixed at {fixedText} until first change, passed)"
-                             : $"{name} from the file: {text}";
+                             : hasFixed ? $"{name} from file: {text} (fixed at {fixedText} until first change, passed)"
+                             : $"{name} from file: {text}";
             if (k == ChannelMixer.PortamentoTime)
                 ch.SliderToolTip += isFixed ? $"\nPortamento {(value > 0 ? "on" : "off")} (CC65)" : "\nMoving slider turns portamento on (CC65), 0 turns it off";
             ch.ValueToolTip = hasFixed ? $"Fixed {scope}. Right click: {(wholeTrack ? "until first change" : "for whole track")}" : null;
@@ -521,9 +521,9 @@ public sealed class MixerViewModel : ObservableObject
             if (source >= 0)
                 ChannelMixer.SetOverride(null, c, ChannelMixer.OverrideMsb[source], ChannelMixer.OverrideLsb[source], ChannelMixer.OverrideProgram[source]);
             ChannelMixer.SetRhythmOverride(output(), c, part);
-            setStatus(part == 0 ? $"Channel {c + 1}: normal part — choose its sound in the list"
+            setStatus(part == 0 ? $"Channel {c + 1}: normal part — choose its sound in list"
                     : source >= 0 ? $"Channel {c + 1}: drum part {part}, with its kit (chosen on channel {source + 1})"
-                    : $"Channel {c + 1}: drum part {part} — choose its drum kit in the list");
+                    : $"Channel {c + 1}: drum part {part} — choose its drum kit in list");
         }
         else if (item.AssignXgBank is int bank)
         {
@@ -581,11 +581,11 @@ public sealed class MixerViewModel : ObservableObject
         if (BankKind(c, ChannelMixer.BankMsb[c]) == bank)
         {
             ChannelMixer.ClearOverride(output(), c);
-            setStatus($"Channel {c + 1}: {KindName(bank)} — the file's instrument");
+            setStatus($"Channel {c + 1}: {KindName(bank)} — file instrument");
             return;
         }
         ChannelMixer.SetOverride(output(), c, bank, 0, 0);
-        setStatus($"Channel {c + 1}: {KindName(bank)} — choose it in the list");
+        setStatus($"Channel {c + 1}: {KindName(bank)} — choose it in list");
     }
 
     // Channels currently assigned to a GS drum part (1 or 2).

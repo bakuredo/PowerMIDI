@@ -507,7 +507,7 @@ public sealed class EventEditorViewModel : ObservableObject
             EditKind = "";
             HasChannel = false;
             TextLabel = null;
-            NotEditable = selectedRow != null ? "Setting: change it in Mixer / Effects tab" : "Select an event";
+            NotEditable = selectedRow != null ? "Setting: change it in Mixer / Effects tab" : "Select event";
             return;
         }
         EditKind = form.Kind;

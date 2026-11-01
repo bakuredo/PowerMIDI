@@ -104,8 +104,10 @@
     </Style>
     <!-- Transport bar toggle buttons (shuffle, repeat, module display): option enabled = icon in ActiveIconBrush (Themes.cs:
          the accent color, the blue of the theme with the light controls), the button itself drawn as the others (not
-         pressed); under the mouse as the other buttons (HoverBrush, icon in HoverTextBrush). -->
+         pressed); under the mouse as the other buttons (HoverBrush, icon in HoverTextBrush). Tag: the color of the enabled
+         icon (the module display: DisplayIconBrush, the text color of the screen). -->
     <Style x:Key="TransportToggle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
+      <Setter Property="Tag" Value="{DynamicResource ActiveIconBrush}"/>
       <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
       <Setter Property="FontSize" Value="16"/>
       <Setter Property="Width" Value="44"/>
@@ -120,7 +122,7 @@
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsChecked" Value="True">
-                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{DynamicResource ActiveIconBrush}"/>
+                <Setter TargetName="Cp" Property="TextElement.Foreground" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
               </Trigger>
               <Trigger Property="IsMouseOver" Value="True">
                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
@@ -183,7 +185,7 @@
              the settings changed in between written as events at the playback position; same state as the Append of the
              Event Editor). -->
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
-                Padding="8,2" FontSize="12" ToolTip="Back to the file's settings">
+                Padding="8,2" FontSize="12" ToolTip="Back to file settings">
           <Button.Style>
             <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
               <Style.Triggers>
@@ -208,34 +210,34 @@
         <TextBlock Text="&#xE9E9;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
                    ToolTip="Sliders" AutomationProperties.Name="Sliders"/>
         <ComboBox DockPanel.Dock="Left" Width="180" SelectedIndex="{Binding ShownMenuIndex}"
-                  ToolTip="Controller set by the sliders">
+                  ToolTip="Controller set by sliders">
           <!-- Order of the menu: see MixerViewModel.MenuOrder -->
           <ComboBoxItem Content="Modulation (CC1)"
                         ToolTip="Modulation wheel (usually vibrato)"/>
           <ComboBoxItem Content="Volume (CC7)"/>
           <ComboBoxItem Content="Expression (CC11)"
-                        ToolTip="Volume within the channel volume (dynamics)"/>
+                        ToolTip="Volume within channel volume (dynamics)"/>
           <ComboBoxItem Content="Pan (CC10)"/>
           <ComboBoxItem Content="Reverb (CC91)"/>
           <ComboBoxItem Content="Chorus (CC93)"/>
           <ComboBoxItem Content="Variation / Delay (CC94)"
                         ToolTip="Variation send in XG, Delay send in GS"/>
           <ComboBoxItem Content="Attack Time (CC73)"
-                        ToolTip="Envelope attack, relative to the original sound"/>
+                        ToolTip="Envelope attack, relative to original sound"/>
           <ComboBoxItem Content="Decay Time (CC75)"
-                        ToolTip="Envelope decay, relative to the original sound"/>
+                        ToolTip="Envelope decay, relative to original sound"/>
           <ComboBoxItem Content="Release Time (CC72)"
-                        ToolTip="Envelope release, relative to the original sound"/>
+                        ToolTip="Envelope release, relative to original sound"/>
           <ComboBoxItem Content="Filter Cutoff (CC74)"
-                        ToolTip="Filter cutoff (brightness), relative to the original sound"/>
+                        ToolTip="Filter cutoff (brightness), relative to original sound"/>
           <ComboBoxItem Content="Filter Resonance (CC71)"
-                        ToolTip="Filter resonance, relative to the original sound"/>
+                        ToolTip="Filter resonance, relative to original sound"/>
           <ComboBoxItem Content="Vibrato Rate (CC76)"
-                        ToolTip="Vibrato rate, relative to the original sound"/>
+                        ToolTip="Vibrato rate, relative to original sound"/>
           <ComboBoxItem Content="Vibrato Depth (CC77)"
-                        ToolTip="Vibrato depth, relative to the original sound"/>
+                        ToolTip="Vibrato depth, relative to original sound"/>
           <ComboBoxItem Content="Vibrato Delay (CC78)"
-                        ToolTip="Delay before the vibrato, relative to the original sound"/>
+                        ToolTip="Delay before vibrato, relative to original sound"/>
           <ComboBoxItem Content="Portamento Time (CC5)"
                         ToolTip="Glide time between notes. Moving slider turns portamento on (CC65), 0 turns it off"/>
         </ComboBox>
@@ -637,9 +639,9 @@
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
         <!-- Reset, or Cancel in its place while an Append is in progress (Append, MainViewModel.MixerAppend.cs: two clicks,
              the effects changed in between written as events at the playback position; same state as the Append of the
-             Event Editor). -->
+             Event Editor). Height 24: as in the Mixer tab, where the drop-down list of the row sets it. -->
         <Button DockPanel.Dock="Right" Content="Reset" Command="{Binding ResetCommand}" Margin="0"
-                Padding="8,2" FontSize="12" ToolTip="Back to the file's effects">
+                Padding="8,2" Height="24" FontSize="12" ToolTip="Back to file effects">
           <Button.Style>
             <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
               <Style.Triggers>
@@ -650,16 +652,16 @@
             </Style>
           </Button.Style>
         </Button>
-        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0" Padding="8,2" FontSize="12"
+        <Button DockPanel.Dock="Right" Content="Cancel" Margin="0" Padding="8,2" Height="24" FontSize="12"
                 Command="{Binding DataContext.CancelInsertCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                 Visibility="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"
                 ToolTip="Drops settings changed since Append was clicked"/>
-        <ToggleButton DockPanel.Dock="Right" Content="Append" Margin="0,0,6,0" Padding="8,2" FontSize="12"
+        <ToggleButton DockPanel.Dock="Right" Content="Append" Margin="0,0,6,0" Padding="8,2" Height="24" FontSize="12"
                       Command="{Binding DataContext.MixerAppendCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsChecked="{Binding DataContext.IsInsertPending, RelativeSource={RelativeSource AncestorType=Window}}"
                       IsEnabled="{Binding DataContext.CanMixerAppend, RelativeSource={RelativeSource AncestorType=Window}}"
                       ToolTip="Click (playback paused), change settings, click again: written as events at start of beat"/>
-        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="5,0,0,0"/>
+        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="5,0,0,0" VerticalAlignment="Center"/>
       </DockPanel>
       <TextBlock DockPanel.Dock="Top" Margin="5,0,0,6" Foreground="{DynamicResource AccentBrush}" TextWrapping="Wrap" Text="{Binding InfoText}">
         <TextBlock.Style>
@@ -699,14 +701,16 @@
       <!-- Collection, Download (files not downloaded yet; Cancel while downloading, with its progress under the row) and
            Delete downloaded files. -->
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
-        <Button DockPanel.Dock="Right" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" Padding="7,4" Margin="6,0,0,0"
+        <Button DockPanel.Dock="Right" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
                 Command="{Binding DeleteDownloadedCommand}" IsEnabled="{Binding IsDownloaded}"
                 ToolTip="Delete downloaded files of collection (zip and files taken from it; downloaded again when needed)"/>
         <Button DockPanel.Dock="Right" Content="Download" Padding="10,2" Margin="6,0,0,0" Command="{Binding DownloadCommand}"
                 Visibility="{Binding NeedsDownload, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding DownloadText}"/>
         <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,2" Margin="6,0,0,0" Command="{Binding CancelDownloadCommand}"
                 Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="Stop download"/>
-        <TextBlock Text="Collection:" FontWeight="SemiBold" Margin="0,0,8,0" VerticalAlignment="Center"/>
+        <!-- Collection icon (a list with a note, as the sliders icon of the Mixer tab), in place of a "Collection" label. -->
+        <TextBlock Text="&#xE90B;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
+                   ToolTip="Collection" AutomationProperties.Name="Collection"/>
         <ComboBox ItemsSource="{Binding Collections}" SelectedItem="{Binding SelectedCollection}" DisplayMemberPath="Name" ToolTip="{Binding CollectionToolTip}"/>
       </DockPanel>
       <ProgressBar DockPanel.Dock="Top" Height="4" Margin="0,-2,0,6" Maximum="1" Value="{Binding DownloadProgress, Mode=OneWay}"
@@ -740,9 +744,9 @@
         </Grid>
       </DockPanel>
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6" IsEnabled="{Binding HasCollection}">
-        <Button DockPanel.Dock="Left" Content="&#xE74A;" FontFamily="Segoe MDL2 Assets" Padding="6,3" Command="{Binding UpCommand}"
+        <Button DockPanel.Dock="Left" Content="&#xE74A;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="5,2,4,1" UseLayoutRounding="True" Command="{Binding UpCommand}"
                 ToolTip="Parent folder (Backspace)"/>
-        <Button DockPanel.Dock="Left" Content="&#xE8B1;" FontFamily="Segoe MDL2 Assets" Padding="6,3" Command="{Binding RandomCommand}"
+        <Button DockPanel.Dock="Left" Content="&#xE8B1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="5,2,5,1" UseLayoutRounding="True" Command="{Binding RandomCommand}"
                 ToolTip="Play random file of this folder and below (filters applied)"/>
         <ItemsControl ItemsSource="{Binding Crumbs}" VerticalAlignment="Center" ClipToBounds="True">
           <ItemsControl.ItemsPanel>
@@ -814,9 +818,11 @@
         </ListView.ContextMenu>
         <ListView.View>
           <GridView>
-            <GridViewColumn Header="" Width="26">
+            <GridViewColumn Header="" Width="32">
               <GridViewColumn.CellTemplate>
-                <DataTemplate><TextBlock Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" Foreground="{DynamicResource TextSoftBrush}"/></DataTemplate>
+                <DataTemplate><TextBlock Text="{Binding Icon}" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="16" Height="16" LineHeight="16"
+                                          LineStackingStrategy="BlockLineHeight" UseLayoutRounding="True"
+                                          VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/></DataTemplate>
               </GridViewColumn.CellTemplate>
             </GridViewColumn>
             <GridViewColumn x:Name="LibraryTitleColumn" Header="File" Width="280">
@@ -848,13 +854,10 @@
          (set in MainWindow.xaml.cs from the version of the program). -->
     <TabItem Header="About">
     <DockPanel>
-      <!-- Color theme (Themes.cs) and light controls, remembered in PowerMIDI.ini. -->
+      <!-- Color theme (Themes.cs), remembered in PowerMIDI.ini (the light controls: LightControls=1 there only). -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
         <TextBlock Text="Theme" Margin="0,0,8,0"/>
-        <ComboBox x:Name="ThemeBox" Width="110" SelectionChanged="OnThemeChanged" ToolTip="Colors of the window"/>
-        <CheckBox x:Name="LightControlsBox" Content="Light controls" Margin="16,0,0,0" VerticalAlignment="Center"
-                  Foreground="{DynamicResource TextBrush}" Click="OnLightControlsClick"
-                  ToolTip="Drop-down lists of tabs drawn light, whatever the theme"/>
+        <ComboBox x:Name="ThemeBox" Width="110" SelectionChanged="OnThemeChanged" ToolTip="Window colors"/>
       </StackPanel>
       <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
         <Viewbox Width="128" Height="128">
@@ -875,22 +878,27 @@
                      Foreground="{DynamicResource AccentBrush}" ToolTip="https://melanchall.github.io/drywetmidi/">DryWetMIDI</Hyperlink>
         </TextBlock>
         <!-- The project page (source code, releases): the GitHub mark, in the text color of the theme (brighter under the
-             mouse). -->
+             mouse). The whole disc is clickable (a transparent circle under the mark: its cut-out cat too). -->
         <TextBlock HorizontalAlignment="Center" Margin="0,10,0,0">
           <Hyperlink NavigateUri="https://github.com/bakuredo/PowerMIDI" RequestNavigate="OnLinkNavigate" TextDecorations="{x:Null}"
                      ToolTip="GitHub project (https://github.com/bakuredo/PowerMIDI)">
             <InlineUIContainer BaselineAlignment="Center">
               <Viewbox Width="28" Height="28" Cursor="Hand">
-                <Path Data="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z">
-                  <Path.Style>
-                    <Style TargetType="Path">
-                      <Setter Property="Fill" Value="{DynamicResource TextSoftBrush}"/>
-                      <Style.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True"><Setter Property="Fill" Value="{DynamicResource TextBrush}"/></Trigger>
-                      </Style.Triggers>
-                    </Style>
-                  </Path.Style>
-                </Path>
+                <Grid Width="16" Height="16">
+                  <Ellipse Fill="Transparent"/>
+                  <Path Data="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z">
+                    <Path.Style>
+                      <Style TargetType="Path">
+                        <Setter Property="Fill" Value="{DynamicResource TextSoftBrush}"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Grid}}" Value="True">
+                            <Setter Property="Fill" Value="{DynamicResource TextBrush}"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Path.Style>
+                  </Path>
+                </Grid>
               </Viewbox>
             </InlineUIContainer>
           </Hyperlink>
@@ -985,7 +993,7 @@
       <Button Content="Remove" Command="{Binding RemoveCommand}" CommandParameter="{Binding SelectedItems, ElementName=PlaylistView}"/>
       <Button Content="Clear" Command="{Binding ClearCommand}"/>
       <Button Content="Save MIDI file…" Command="{Binding SaveCommand}"
-              ToolTip="Saves the track with its settings (right click: choose another file).">
+              ToolTip="Saves track with its settings (right click: choose another file)">
         <Button.InputBindings>
           <MouseBinding Gesture="RightClick" Command="{Binding SaveAsCommand}"/>
         </Button.InputBindings>
@@ -1094,13 +1102,13 @@
             <!-- Shows / hides the screen of the module (text and dot picture sent by the file, see above); released while the
                  file has sent nothing. -->
             <ToggleButton Style="{StaticResource TransportToggle}" Content="&#xE7F4;" Margin="6,0,0,0" IsChecked="{Binding DisplayButton}"
-                          ToolTip="Module display: text and picture sent by the file"/>
+                          Tag="{DynamicResource DisplayIconBrush}" ToolTip="Module display: text and picture sent by file"/>
             <!-- Event Editor window: the events of the track (see EventEditorViewModel). -->
             <Button Style="{StaticResource Transport}" Content="&#xE8FD;" Margin="6,0,0,0" Command="{Binding EventsCommand}"
                     ToolTip="Event list of track"/>
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-            <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" Margin="0,0,6,0" VerticalAlignment="Center"/>
+            <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center" UseLayoutRounding="True"/>
             <Slider Width="90" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
             <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>
@@ -1113,7 +1121,7 @@
              brighter; shown when there is some (display button). -->
         <Border Grid.Row="1" HorizontalAlignment="Center" Width="320" Height="58" Margin="0,10,0,0" Background="{DynamicResource LcdBrush}"
                 BorderBrush="{DynamicResource LcdLineBrush}" BorderThickness="1" CornerRadius="3" Padding="4"
-                ToolTip="Display of the module (text and picture sent by file, or lyrics)"
+                ToolTip="Module display (text and picture sent by file, or lyrics)"
                 Visibility="{Binding DisplayShown, Converter={StaticResource BoolToVisibility}}">
           <DockPanel>
             <Image DockPanel.Dock="Left" Source="{Binding DisplayDots}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor"/>

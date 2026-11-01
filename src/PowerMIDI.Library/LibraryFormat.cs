@@ -84,7 +84,7 @@ public static class LibraryFormat
         else if (VersionOf(connection) != Version)
         {
             connection.Dispose();
-            throw new InvalidDataException($"{path}: not a library database of version {Version}");
+            throw new InvalidDataException($"{path}: not library database of version {Version}");
         }
         return connection;
     }

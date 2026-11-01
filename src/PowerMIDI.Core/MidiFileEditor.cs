@@ -464,7 +464,7 @@ public static class MidiFileEditor
         foreach (bool a in apply) if (a) inserted++;
         string text = string.Format("effects: {0} parameter(s) written, {1} effect SysEx removed from file, {2} corrected",
                                     inserted, removed, corrected);
-        if (reinserted > 0) text += string.Format(", {0} reinserted after a type change", reinserted);
+        if (reinserted > 0) text += string.Format(", {0} reinserted after type change", reinserted);
         return text;
     }
 
@@ -478,7 +478,7 @@ public static class MidiFileEditor
         var (written, corrected) = WriteFixedSysEx(file,
             (d, positions) => Mt32Effects.ApplyBytes(d, values, channels, positions) != Mt32Effects.Changes.None,
             Mt32Effects.WithFixedValues, Mt32Effects.FixedEvents);
-        return string.Format("MT-32 reverb: {0} SysEx written after the reset, {1} SysEx of the file corrected", written, corrected);
+        return string.Format("MT-32 reverb: {0} SysEx written after reset, {1} SysEx of file corrected", written, corrected);
     }
 
     // MT-32 mode: writes the rhythm setup values fixed in the interface (Mt32DrumParams, Effects tab, Drums page) as
@@ -488,7 +488,7 @@ public static class MidiFileEditor
         var (written, corrected) = WriteFixed(file, e =>
             (e is SysExEvent sysEx && Mt32DrumParams.WithFixedValues(sysEx.Data) is { } data ? new NormalSysExEvent(data) : null,
              Enumerable.Empty<MidiEvent>()), Mt32DrumParams.FixedEvents);
-        return string.Format("MT-32 rhythm setup: {0} SysEx written after the reset, {1} SysEx of the file corrected", written, corrected);
+        return string.Format("MT-32 rhythm setup: {0} SysEx written after reset, {1} SysEx of file corrected", written, corrected);
     }
 
     // MT-32 mode: writes the part values fixed in the interface (Mt32PartParams, Effects tab, Part page) as MT-32 SysEx:
@@ -504,7 +504,7 @@ public static class MidiFileEditor
             ProgramChangeEvent pc when Mt32PartParams.PartOf(pc.Channel) is int part and >= 0 => (null, Mt32PartParams.FixedPatchEvents(part)),
             _ => (null, none),
         }, Mt32PartParams.FixedEvents);
-        return string.Format("MT-32 part settings: {0} SysEx written, {1} SysEx of the file corrected", written, corrected);
+        return string.Format("MT-32 part settings: {0} SysEx written, {1} SysEx of file corrected", written, corrected);
     }
 
     // GM2 mode: same for the GM2 reverb / chorus values fixed in the interface (Gm2Effects), as GM2 SysEx.
@@ -517,7 +517,7 @@ public static class MidiFileEditor
                 .SelectMany(Gm2Effects.FixedParamEvents);
         var (written, corrected) = WriteFixedSysEx(file, (d, positions) => Gm2Effects.ApplyBytes(d, values, positions),
                                                    Gm2Effects.WithFixedValues, Gm2Effects.FixedEvents, AfterType);
-        return string.Format("GM2 effects: {0} SysEx written after the reset, {1} SysEx of the file corrected", written, corrected);
+        return string.Format("GM2 effects: {0} SysEx written after reset, {1} SysEx of file corrected", written, corrected);
     }
 
     // XG mode: writes the drum setup values fixed in the interface (XgDrumSetup):
@@ -560,7 +560,7 @@ public static class MidiFileEditor
             }
             return (null, Enumerable.Empty<MidiEvent>());
         }, () => XgDrumSetup.PartModeEvents().Concat(XgDrumSetup.FixedEvents()));
-        return string.Format("XG drum setup: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
+        return string.Format("XG drum setup: {0} SysEx written, {1} message(s) of file corrected", written, corrected);
     }
 
     // GS mode: writes the drum map values fixed in the interface (GsDrumMap): right after the reset, and again after
@@ -591,7 +591,7 @@ public static class MidiFileEditor
             }
             return (null, none);
         }, GsDrumMap.FixedEvents);
-        return string.Format("GS drum map: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
+        return string.Format("GS drum map: {0} SysEx written, {1} message(s) of file corrected", written, corrected);
     }
 
     // GS mode: writes the part values fixed in the interface (GsPartParams, Effects tab, Part page) as DT1 right after
@@ -608,7 +608,7 @@ public static class MidiFileEditor
             ControlChangeEvent cc when nrpn.Read(cc) is { } entry => (GsPartParams.FixDataEntry(cc, entry), none),
             _ => (null, none),
         }, GsPartParams.FixedEvents);
-        return string.Format("GS part settings: {0} SysEx written after the reset, {1} message(s) of the file corrected", written, corrected);
+        return string.Format("GS part settings: {0} SysEx written after reset, {1} message(s) of file corrected", written, corrected);
     }
 
     // GM2 mode: writes the Key-Based Instrument Control values fixed in the interface (Gm2DrumParams): right after the
@@ -623,7 +623,7 @@ public static class MidiFileEditor
             ProgramChangeEvent pc when Gm2DrumParams.IsChannelFixed(pc.Channel) => (null, Gm2DrumParams.FixedEvents(pc.Channel)),
             _ => (null, none),
         }, Gm2DrumParams.FixedEvents);
-        return string.Format("GM2 drum settings: {0} SysEx written, {1} SysEx of the file corrected", written, corrected);
+        return string.Format("GM2 drum settings: {0} SysEx written, {1} SysEx of file corrected", written, corrected);
     }
 
     // GM2 mode: writes the RPN values fixed in the interface (Gm2PartParams, Effects tab, Part page) right after the
@@ -642,7 +642,7 @@ public static class MidiFileEditor
             return (fixedCc, lsbAfter ? new MidiEvent[] { new ControlChangeEvent((SevenBitNumber)38,
                 (SevenBitNumber)(Gm2PartParams.FixedValue(cc.Channel, p) & 0x7F)) { Channel = cc.Channel } } : none);
         }, Gm2PartParams.FixedEvents);
-        return string.Format("GM2 part settings: {0} message(s) written, {1} message(s) of the file corrected", written, corrected);
+        return string.Format("GM2 part settings: {0} message(s) written, {1} message(s) of file corrected", written, corrected);
     }
 
     // XG mode: writes the part values fixed in the interface (XgPartParams, Effects tab, Part page) as SysEx right after
@@ -666,7 +666,7 @@ public static class MidiFileEditor
             }
             return (null, none);
         }, XgPartParams.FixedEvents);
-        return string.Format("XG part settings: {0} SysEx written, {1} message(s) of the file corrected", written, corrected);
+        return string.Format("XG part settings: {0} SysEx written, {1} message(s) of file corrected", written, corrected);
     }
 
     // Writes SysEx effect values fixed in the interface: the messages of fixedEvents right after the last reset,

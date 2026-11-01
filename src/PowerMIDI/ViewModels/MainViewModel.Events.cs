@@ -70,7 +70,7 @@ public sealed partial class MainViewModel : IEventEditing
     // ---------- Changes (IEventEditing) ----------
 
     public string EditBlocked =>
-        current == null || settingsFile == null ? "Play a track first." : null;
+        current == null || settingsFile == null ? "Play track first." : null;
 
     public void PlayNote(int channel, int note, int velocity, TimeSpan length) => MidiTools.PlayNote(output, channel, note, velocity, length);
 

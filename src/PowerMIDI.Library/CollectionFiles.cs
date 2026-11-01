@@ -51,7 +51,7 @@ public sealed class CollectionFiles : IDisposable
             bytes = memory.ToArray();
         }
         if (Convert.ToHexStringLower(SHA1.HashData(bytes)) != file.Sha1)
-            throw new InvalidDataException($"File of zip differs from the one of the library database: {file.Path}");
+            throw new InvalidDataException($"File of zip differs from library database: {file.Path}");
         Directory.CreateDirectory(Path.GetDirectoryName(local));
         File.WriteAllBytes(local, bytes);
         return Given(local, file.Path);
@@ -122,7 +122,7 @@ public sealed class CollectionFiles : IDisposable
                 }
             }
             var problem = await Task.Run(() => CheckZip(part, info), cancel);
-            if (problem != null) throw new InvalidDataException($"Download of {info.ZipName} is not the expected file: {problem}");
+            if (problem != null) throw new InvalidDataException($"Download of {info.ZipName} is not expected file: {problem}");
             Close();
             File.Move(part, ZipPath, true);
         }

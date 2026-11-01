@@ -110,7 +110,7 @@ public sealed partial class MainViewModel
     // end alone from its start. Set while the playback is past its end: back to its start at once.
     void SetTempLoopPoint(MidiTools.LoopPoint point, long? tick)
     {
-        if (current == null || tempoMap == null) { Status = "Play a track first."; return; }
+        if (current == null || tempoMap == null) { Status = "Play track first."; return; }
         if (tick is not long at)
         {
             if (tempLoop == null) return;

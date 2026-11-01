@@ -29,7 +29,7 @@ public sealed class ChannelViewModel : ObservableObject
 
     public int Channel { get; }
     public string Number => $"{Channel + 1,2}";
-    public string NumberToolTip => $"Click to play channel {Channel + 1}{(Channel == 9 ? " (drums)" : "")} with the computer keyboard";
+    public string NumberToolTip => $"Click to play channel {Channel + 1}{(Channel == 9 ? " (drums)" : "")} with computer keyboard";
 
     // Click on the number: keyboard mode on this channel (see MainViewModel.Keyboard.cs).
     public ICommand KeyboardCommand { get; }

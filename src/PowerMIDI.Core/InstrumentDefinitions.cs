@@ -452,7 +452,7 @@ public sealed class InstrumentDefinitions
         // GM / GM2, or missing definition files: General MIDI names, drums on channel 10.
         // GM has one drum kit: another program on channel 10 is a kit of a larger standard.
         bool gmMissing = channel == 9 ? GmDrums.Count > 0 && !GmDrums.ContainsKey(program) : GmVoices.Count > 0 && !GmVoices.ContainsKey(program);
-        return new InstrumentInfo(GmInstrumentName(channel, program), $"GM · {pcText}{(gmMissing ? " · not in the GM list" : "")}", channel == 9, gmMissing);
+        return new InstrumentInfo(GmInstrumentName(channel, program), $"GM · {pcText}{(gmMissing ? " · not in GM list" : "")}", channel == 9, gmMissing);
     }
 
     // Instruments offered for a channel, sorted by program then bank. Cached per (standard, type, map).

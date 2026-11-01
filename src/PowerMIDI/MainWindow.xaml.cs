@@ -268,14 +268,6 @@ public partial class MainWindow : Window, IMainView
         });
     }
 
-    // Light controls (About tab): applied at once and remembered.
-    void OnLightControlsClick(object sender, RoutedEventArgs e) => Run(() =>
-    {
-        Themes.LightControls = LightControlsBox.IsChecked == true;
-        ApplyControlColors();
-        if (IsLoaded) SaveSettings();
-    });
-
     // The controls of the tabs (right panel) and of the Event Editor light or in the colors of the theme (see
     // Themes.LightControls).
     void ApplyControlColors()
@@ -485,13 +477,12 @@ public partial class MainWindow : Window, IMainView
         }
         if (ini.Get("Window", "Maximized") == "1") WindowState = WindowState.Maximized;
 
-        // Color theme and light controls (About tab); a missing or unknown name gives the default theme. Instrument
-        // icons of the Mixer: in the INI only, shown unless 0.
+        // Color theme (About tab); a missing or unknown name gives the default theme. Light controls and instrument
+        // icons of the Mixer: in the INI only (LightControls=1; icons shown unless InstrumentIcons=0).
         Themes.LightControls = ini.Get("Window", "LightControls") == "1";
         Themes.InstrumentIcons = ini.Get("Window", "InstrumentIcons") != "0";
         ApplyControlColors();
         Themes.Apply(ini.Get("Window", "Theme"));
-        LightControlsBox.IsChecked = Themes.LightControls;
         ThemeBox.ItemsSource = Themes.Names;
         ThemeBox.SelectedItem = Themes.Current;
         themeReady = true;

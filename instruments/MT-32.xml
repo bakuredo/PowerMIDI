@@ -407,8 +407,8 @@
 	</InstrumentList>
 	<DrumSetList>
 		<Map Name="MT-32 Rhythm">
-			<PC Name="Rhythm (MT-32 / CM-32L)" PC="1">
-				<Bank Name="Rhythm (MT-32 / CM-32L)" MSB="0" LSB="0">
+			<PC Name="Rhythm" PC="1">
+				<Bank Name="Rhythm" MSB="0" LSB="0">
 					<Tone Name="Acou BD" Key="35" />
 					<Tone Name="Acou BD" Key="36" />
 					<Tone Name="Rim Shot" Key="37" />

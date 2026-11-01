@@ -84,7 +84,7 @@ public class MidiEventEditsTests
         var sysEx = MidiEventForm.New("SysEx", 0, 480);
         var gs = (SysExEvent)MidiEventForm.Read(sysEx, 0, Array.Empty<string>(), "F0 41 10 42 12 40 01 30 04 00").Event;
         Assert.Equal("41 10 42 12 40 01 30 04 0B", MidiEventList.Hex(gs.Data));   // F7 added, Roland checksum worked out
-        Assert.Equal("Not a byte: ZZ", MidiEventForm.Read(sysEx, 0, Array.Empty<string>(), "41 ZZ").Error);
+        Assert.Equal("Invalid byte: ZZ", MidiEventForm.Read(sysEx, 0, Array.Empty<string>(), "41 ZZ").Error);
 
         var marker = (MarkerEvent)MidiEventForm.Read(MidiEventForm.New("Marker", 0, 480), 0, Array.Empty<string>(), "Boucle é").Event;
         Assert.Equal("Boucle é", MidiTools.DecodeText(marker.Text));   // UTF-8 in the file, read back

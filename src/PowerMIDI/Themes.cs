@@ -23,10 +23,10 @@ public static class Themes
 
     public static string Current { get; private set; } = Default;
 
-    // Light controls (About tab, PowerMIDI.ini; off by default): the drop-down lists of the tabs (right panel) and of the
-    // Event Editor drawn light, as Windows draws them, whatever the theme (otherwise in the colors of the theme); the rest
-    // of the windows keeps the colors of the theme. ApplyControls then puts LightControlBrushes in the resources of the
-    // tabs and of the Event Editor (they are found there before those of the theme).
+    // Light controls (PowerMIDI.ini only: LightControls=1; off by default): the drop-down lists of the tabs (right panel)
+    // and of the Event Editor drawn light, as Windows draws them, whatever the theme (otherwise in the colors of the
+    // theme); the rest of the windows keeps the colors of the theme. ApplyControls then puts LightControlBrushes in the
+    // resources of the tabs and of the Event Editor (they are found there before those of the theme).
     public static bool LightControls { get; set; }
 
     // Icons before the instrument of each channel in the Mixer (PowerMIDI.ini only, Window/InstrumentIcons; on by
@@ -66,6 +66,7 @@ public static class Themes
         dictionary["PressedLineBrush"] = dictionary["AccentBrush"];
         dictionary["PressedTextBrush"] = dictionary["OnAccentTextBrush"];
         dictionary["ActiveIconBrush"] = dictionary["AccentBrush"];   // icon of an enabled option (transport bar)
+        dictionary["DisplayIconBrush"] = dictionary["LcdTextBrush"];   // the module display shown: in the text color of the screen
         // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with the light controls nor with
         // InstrumentIcons off: NoInstrumentIcons).
         dictionary["InstrumentIconsVisibility"] = Visibility.Visible;
@@ -120,14 +121,14 @@ public static class Themes
     }
 
     // The colors under the mouse and pressed of the whole window: those of Windows with the light controls, else those of
-    // the theme; the icon of an enabled option (shuffle, repeat, module display) then in the blue of the theme, the
-    // activity LEDs in its green. Also called by Apply, for those colors.
+    // the theme; the icon of an enabled option (shuffle, repeat, module display: on the light buttons) then in the blue
+    // of the theme, the activity LEDs in its green. Also called by Apply, for those colors.
     public static void ApplyHover()
     {
         var merged = Application.Current.Resources.MergedDictionaries;
         merged.Remove(WindowsHover());
         if (!LightControls) return;
-        if (merged.Count > 0 && merged[0]["FixedBrush"] is Brush blue) WindowsHover()["ActiveIconBrush"] = blue;
+        if (merged.Count > 0 && merged[0]["FixedBrush"] is Brush blue) WindowsHover()["ActiveIconBrush"] = WindowsHover()["DisplayIconBrush"] = blue;
         if (merged.Count > 0 && merged[0]["GreenBrush"] is Brush green) WindowsHover()["ActivityBrush"] = green;
         merged.Add(WindowsHover());
     }

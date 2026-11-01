@@ -248,7 +248,7 @@ public sealed class LibraryViewModel : ObservableObject
     void DeleteDownloaded()
     {
         if (files == null || !files.IsDownloaded && !Directory.Exists(files.CacheFolder)) return;
-        if (view.AskYesNoCancel($"Delete downloaded files of {selectedCollection.Name}?\n{files.ZipPath} ({Megabytes(selectedCollection.SourceSize)}) and the files taken from it.\nThey can be downloaded again.") != true) return;
+        if (view.AskYesNoCancel($"Delete downloaded files of {selectedCollection.Name}?\n{files.ZipPath} ({Megabytes(selectedCollection.SourceSize)}) and files taken from it.\nThey can be downloaded again.") != true) return;
         files.DeleteDownloaded();
         UpdateDownload();
         setStatus($"{selectedCollection.Name}: downloaded files deleted");

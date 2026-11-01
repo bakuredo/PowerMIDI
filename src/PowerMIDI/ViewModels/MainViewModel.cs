@@ -119,7 +119,7 @@ public sealed partial class MainViewModel : ObservableObject
     public ICommand MixerAppendCommand { get; }  // Append of the Mixer / Effects tabs (MainViewModel.MixerAppend.cs)
     public ICommand CancelInsertCommand { get; }
 
-    string status = "Drop MIDI files or a folder onto the window.";
+    string status = "Drop MIDI files or folder onto window.";
     public string Status { get => status; set => Set(ref status, value); }
 
     PlaylistItem selectedTrack;
@@ -333,7 +333,7 @@ public sealed partial class MainViewModel : ObservableObject
                 added++;
             }
             UpdateNumbers();
-            Status = $"{added} file(s) added — {Playlist.Count} in the playlist.";
+            Status = $"{added} file(s) added — {Playlist.Count} in playlist.";
         }
         finally { view.SetBusy(false); }
 

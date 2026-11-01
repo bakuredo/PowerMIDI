@@ -387,7 +387,7 @@ public sealed partial class EffectsViewModel : ObservableObject
         "GS" => "GS effects",
         _ => $"{standard} effects",
     };
-    public string InfoText => IsAvailable ? null : $"No effect settings in {standard} mode (GS, XG, GM2 and MT-32 only).";
+    public string InfoText => IsAvailable ? null : $"No effect settings in {standard} mode";
 
     // Runs a user action; an error is shown instead of crashing.
     internal void Run(Action action)
@@ -614,8 +614,8 @@ public sealed partial class EffectsViewModel : ObservableObject
         {
             int v = Gm2Effects.Value(p), fileValue = Gm2Effects.FileValue(p);
             bool isFixed = Gm2Effects.IsFixed(p);
-            var toolTip = isFixed ? $"Fixed (file: {(fileValue < 0 ? "the type's default" : FormatGm2(p, fileValue))})"
-                        : fileValue < 0 ? "Set by the module according to the type" : "File value";
+            var toolTip = isFixed ? $"Fixed (file: {(fileValue < 0 ? "type default" : FormatGm2(p, fileValue))})"
+                        : fileValue < 0 ? "Set by module according to type" : "File value";
             gm2Params[p].Show($"{v}/{isFixed}/{fileValue}", v, isFixed, toolTip, FormatGm2(p, v), autoPosition: null);
         }
     }
@@ -699,7 +699,7 @@ public sealed partial class EffectsViewModel : ObservableObject
         {
             int v = GsXgEffects.Value(button.Index);
             bool on = v == button.Part, isFixed = on && GsXgEffects.IsFixed(button.Index);
-            button.Show($"{on}/{isFixed}", on, isFixed, $"Part {button.Part + 1}: " + (on ? "goes through the effect" : "no effect"));
+            button.Show($"{on}/{isFixed}", on, isFixed, $"Part {button.Part + 1}: " + (on ? "goes through effect" : "no effect"));
         }
     }
 
@@ -736,7 +736,7 @@ public sealed partial class EffectsViewModel : ObservableObject
                     // EFX on a channel: button pressed if the part goes through the EFX.
                     channel.IsChecked = v == 1;
                     bool eq = fx >= EqChannelFirst;
-                    channel.ToolTip = $"Channel {ButtonChannel(fx) + 1}: " + (v == 1 ? (eq ? "goes through the EQ" : "goes through the EFX") : (eq ? "no EQ" : "no EFX"));
+                    channel.ToolTip = $"Channel {ButtonChannel(fx) + 1}: " + (v == 1 ? (eq ? "goes through EQ" : "goes through EFX") : (eq ? "no EQ" : "no EFX"));
                     continue;
                 }
 
@@ -768,8 +768,8 @@ public sealed partial class EffectsViewModel : ObservableObject
                 var fileText = def != null && fileValue < 0 ? $"{FormatEfxParam(def, def.Default)} (type default)"
                              : def != null ? FormatEfxParam(def, fileValue) : FormatEffectValue(fx, fileValue);
                 p.ToolTip = isFixed ? $"Fixed (file: {fileText})"
-                          : fileValue < 0 && def != null ? "Default value of the type"
-                          : fileValue < 0 ? "Set by the module according to the type"
+                          : fileValue < 0 && def != null ? "Default value of type"
+                          : fileValue < 0 ? "Set by module according to type"
                           : "File value";
             }
             finally { p.Updating = false; }

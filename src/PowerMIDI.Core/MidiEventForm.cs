@@ -137,7 +137,7 @@ public static class MidiEventForm
         var bytes = new List<byte>();
         foreach (var p in parts)
         {
-            if (!byte.TryParse(p, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte b)) { error = $"Not a byte: {p}"; return null; }
+            if (!byte.TryParse(p, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out byte b)) { error = $"Invalid byte: {p}"; return null; }
             bytes.Add(b);
         }
         if (bytes.Count == 0 || (bytes.Count == 1 && bytes[0] == 0xF7)) { error = "Bytes: none"; return null; }
