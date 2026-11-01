@@ -10,10 +10,10 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 
 ## Features
 
-- **Player**: Playback speed, transposition, play a channel with keyboard ! (click on a channel number in Mixer page)
+- **Player**: Playback speed, transposition, play a channel on your keyboard with normal or scale notes.
 - **Playlist**: Files and folders, drag and drop, shuffle, repeat modes...
 - **Library**: Browse and play MIDI collections downloaded from archive.org (see Credits) with folder navigation, filters, random function...
-- **Modes**: GM, GM2, GS, XG and MT-32, detected from file or forced with matching reset. Custom SysEx patches detected from XG and MT-32 modes.
+- **Modes**: GM, GM2, GS, XG and MT-32, detected from file or forced with matching reset. Custom SysEx patches detected from MIDI or SYX file.
 - **Mixer**: Mute/Solo, activity and controller slider per channel (modulation, volume, pan, reverb,
   chorus, delay/variation, filter and envelope settings) with full instrument names for each mode.
 - **Effects**: Reverb, Chorus, Delay, EQ, EFX, Drums, Part in GS mode - Reverb, Chorus, Variation, Insertion, Multi-EQ, Drums, Part in XG -
@@ -49,6 +49,6 @@ dotnet publish -c Release
 
 - MIDI playback and file handling: [DryWetMIDI](https://melanchall.github.io/drywetmidi/) by Maxim Dobroselsky.
 - Module definition files: based on XML files of [Domino](http://takabosoft.com/) by Takabo Soft.
-- Sources for archive.org: [VGMusic Archive (2018)](https://archive.org/details/31581VideogameMusicMIDIFileswReplayGain8mbgmsfx.sf2) of [VGMusic.com](https://www.vgmusic.com/), [Sound Canvas MIDI Collection](https://archive.org/details/sound_canvas_midi_collection) and [Yamaha XG Free Data Collection](https://archive.org/details/yamaha-xg-free-data)
+- Sources for archive.org: [VGMusic.com 2018 archive](https://archive.org/details/31581VideogameMusicMIDIFileswReplayGain8mbgmsfx.sf2), [Sound Canvas MIDI Collection](https://archive.org/details/sound_canvas_midi_collection) and [Yamaha XG Free Data Collection](https://archive.org/details/yamaha-xg-free-data)
 
 See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for details.
