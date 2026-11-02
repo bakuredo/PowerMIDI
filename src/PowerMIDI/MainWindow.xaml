@@ -699,8 +699,8 @@
     <TabItem Header="Library" DataContext="{Binding Library}" d:DataContext="{d:DesignInstance vm:LibraryViewModel}">
     <DockPanel>
       <!-- Collection, Download (files not downloaded yet; Cancel while downloading, with its progress under the row) and
-           Delete downloaded files. -->
-      <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+           Delete downloaded files. 8 px under it, as the first channel under the list of the Mixer tab. -->
+      <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
         <Button DockPanel.Dock="Right" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
                 Command="{Binding DeleteDownloadedCommand}" IsEnabled="{Binding IsDownloaded}"
                 ToolTip="Delete downloaded files of collection (zip and files taken from it; downloaded again when needed)"/>
@@ -711,7 +711,10 @@
         <!-- Collection icon (a list with a note, as the sliders icon of the Mixer tab), in place of a "Collection" label. -->
         <TextBlock Text="&#xE90B;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
                    ToolTip="Collection" AutomationProperties.Name="Collection"/>
-        <ComboBox ItemsSource="{Binding Collections}" SelectedItem="{Binding SelectedCollection}" DisplayMemberPath="Name" ToolTip="{Binding CollectionToolTip}"/>
+        <!-- Padding: its text 1 px higher than the default one, measured 1 px lower than in the other lists otherwise (as the
+             list of the Mixer tab and the filters below; a rounding of the layout). -->
+        <ComboBox ItemsSource="{Binding Collections}" SelectedItem="{Binding SelectedCollection}" DisplayMemberPath="Name" ToolTip="{Binding CollectionToolTip}"
+                  Padding="6,2,2,4"/>
       </DockPanel>
       <ProgressBar DockPanel.Dock="Top" Height="4" Margin="0,-2,0,6" Maximum="1" Value="{Binding DownloadProgress, Mode=OneWay}"
                    Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding DownloadText}"/>
@@ -794,7 +797,8 @@
                 SelectedItem="{Binding SelectedRow}" SelectionChanged="OnLibrarySelectionChanged"
                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                 GridViewColumnHeader.Click="OnLibraryHeaderClick" PreviewKeyDown="OnLibraryKeyDown"
-                PreviewMouseLeftButtonDown="OnLibraryMouseDown" PreviewMouseMove="OnLibraryMouseMove">
+                PreviewMouseLeftButtonDown="OnLibraryMouseDown" PreviewMouseMove="OnLibraryMouseMove"
+                ContextMenuOpening="OnLibraryContextMenuOpening">
         <ListView.ItemContainerStyle>
           <Style TargetType="ListViewItem" BasedOn="{StaticResource ThemedListViewItem}">
             <EventSetter Event="MouseDoubleClick" Handler="OnLibraryItemDoubleClick"/>
@@ -810,7 +814,7 @@
           <ContextMenu>
             <MenuItem Header="Play" Command="{Binding PlayCommand}"
                       CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-            <MenuItem Header="Add to playlist" Command="{Binding AddToPlaylistCommand}"
+            <MenuItem x:Name="LibraryAddMenuItem" Header="Add to playlist" Command="{Binding AddToPlaylistCommand}"
                       CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
             <MenuItem Header="Favorite" Command="{Binding FavoriteCommand}"
                       CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
@@ -835,8 +839,18 @@
                 <DataTemplate><TextBlock Text="{Binding FolderText}" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextSoftBrush}"/></DataTemplate>
               </GridViewColumn.CellTemplate>
             </GridViewColumn>
-            <GridViewColumn Header="Format" Width="60" DisplayMemberBinding="{Binding Format}"/>
-            <GridViewColumn Header="Time" Width="50" DisplayMemberBinding="{Binding Time}"/>
+            <!-- Format and Time: values 2 px right of their header (chosen by eye: round G and digits against the
+                 straight F and T). -->
+            <GridViewColumn Header="Format" Width="60">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate><TextBlock Text="{Binding Format}" Margin="2,0,-2,0"/></DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="Time" Width="50">
+              <GridViewColumn.CellTemplate>
+                <DataTemplate><TextBlock Text="{Binding Time}" Margin="2,0,-2,0"/></DataTemplate>
+              </GridViewColumn.CellTemplate>
+            </GridViewColumn>
             <GridViewColumn Header="★" Width="28">
               <GridViewColumn.CellTemplate>
                 <DataTemplate>
@@ -980,20 +994,30 @@
           <GridViewColumn Header="#" Width="44" DisplayMemberBinding="{Binding Index}"/>
           <!-- Width: the space the other columns leave (OnPlaylistScrollChanged), so that no horizontal scroll bar is needed. -->
           <GridViewColumn x:Name="PlaylistFileColumn" Header="File" Width="360" DisplayMemberBinding="{Binding Name}"/>
-          <GridViewColumn Header="Format" Width="80" DisplayMemberBinding="{Binding Standard}"/>
-          <GridViewColumn Header="Duration" Width="80" DisplayMemberBinding="{Binding Duration}"/>
+          <!-- Format and Duration: values 1 px right of their header (its F and D start with a straight stroke, the values
+               mostly with a round one, G or 0, which looks 1 px further left otherwise). -->
+          <GridViewColumn Header="Format" Width="80">
+            <GridViewColumn.CellTemplate>
+              <DataTemplate><TextBlock Text="{Binding Standard}" Margin="1,0,-1,0"/></DataTemplate>
+            </GridViewColumn.CellTemplate>
+          </GridViewColumn>
+          <GridViewColumn Header="Duration" Width="80">
+            <GridViewColumn.CellTemplate>
+              <DataTemplate><TextBlock Text="{Binding Duration}" Margin="1,0,-1,0"/></DataTemplate>
+            </GridViewColumn.CellTemplate>
+          </GridViewColumn>
         </GridView>
       </ListView.View>
     </ListView>
 
-    <!-- Playlist management -->
-    <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,12">
+    <!-- Playlist management (2 px right of the playlist frame, chosen by eye) -->
+    <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="2,8,0,12">
       <Button Content="Add files…" Command="{Binding AddFilesCommand}"/>
       <Button Content="Add folder…" Command="{Binding AddFolderCommand}"/>
       <Button Content="Remove" Command="{Binding RemoveCommand}" CommandParameter="{Binding SelectedItems, ElementName=PlaylistView}"/>
       <Button Content="Clear" Command="{Binding ClearCommand}"/>
       <Button Content="Save MIDI file…" Command="{Binding SaveCommand}"
-              ToolTip="Saves track with its settings (right click: choose another file)">
+              ToolTip="Saves track with its settings (right click: save as, also without changes)">
         <Button.InputBindings>
           <MouseBinding Gesture="RightClick" Command="{Binding SaveAsCommand}"/>
         </Button.InputBindings>
@@ -1012,8 +1036,9 @@
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0">
           <!-- Badge of the standard, in the color of the inactive parts of the theme (as with no track), its text in the one
-               of the text (white on the dark themes). -->
-          <Border DockPanel.Dock="Left" CornerRadius="4" Padding="8,2" Margin="0,0,10,0" Background="{DynamicResource InactiveBrush}">
+               of the text (white on the dark themes). 1 px left of the position bar and the buttons: its rounded corners
+               make it look further right otherwise (the title stays in place). -->
+          <Border DockPanel.Dock="Left" CornerRadius="4" Padding="8,2" Margin="-1,0,11,0" Background="{DynamicResource InactiveBrush}">
             <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
           </Border>
           <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the position bar. -->
@@ -1101,8 +1126,15 @@
                           ToolTip="{Binding RepeatToolTip}"/>
             <!-- Shows / hides the screen of the module (text and dot picture sent by the file, see above); released while the
                  file has sent nothing. -->
-            <ToggleButton Style="{StaticResource TransportToggle}" Content="&#xE7F4;" Margin="6,0,0,0" IsChecked="{Binding DisplayButton}"
-                          Tag="{DynamicResource DisplayIconBrush}" ToolTip="Module display: text and picture sent by file"/>
+            <!-- Its icon 1 px lower: the screen stands on a foot, its body would look higher than the other icons. The icon
+                 takes the color the template gives (enabled, under the mouse): a text of the content would otherwise
+                 inherit the one of the button. -->
+            <ToggleButton Style="{StaticResource TransportToggle}" Margin="6,0,0,0" IsChecked="{Binding DisplayButton}"
+                          Tag="{DynamicResource DisplayIconBrush}" ToolTip="Module display: text and picture sent by file">
+              <TextBlock Text="&#xE7F4;" Foreground="{Binding (TextElement.Foreground), RelativeSource={RelativeSource AncestorType=ContentPresenter}}">
+                <TextBlock.RenderTransform><TranslateTransform Y="1"/></TextBlock.RenderTransform>
+              </TextBlock>
+            </ToggleButton>
             <!-- Event Editor window: the events of the track (see EventEditorViewModel). -->
             <Button Style="{StaticResource Transport}" Content="&#xE8FD;" Margin="6,0,0,0" Command="{Binding EventsCommand}"
                     ToolTip="Event list of track"/>

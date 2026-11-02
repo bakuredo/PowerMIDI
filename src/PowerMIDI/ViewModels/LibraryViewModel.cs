@@ -12,7 +12,7 @@ namespace PowerMIDI.ViewModels;
 // A file of the playlist that comes from a collection of the Library tab: its plays are counted there.
 public sealed record LibraryKey(string CollectionId, string Path);
 
-// A row of the Library list: a folder (with its number of files), or a file.
+// A row of the Library list: a folder (its number of files after its name), or a file.
 public sealed class LibraryRow : ObservableObject
 {
     public LibraryFolder Folder { get; init; }
@@ -445,7 +445,7 @@ public sealed class LibraryViewModel : ObservableObject
         };
         var comparer = Comparer<object>.Create((a, b) => a is string x && b is string y ? StringComparer.CurrentCultureIgnoreCase.Compare(x, y)
                                                                                       : Comparer<object>.Default.Compare(a, b));
-        var folders = list.Where(r => r.IsFolder).OrderBy(r => r.Title, StringComparer.CurrentCultureIgnoreCase);
+        var folders = list.Where(r => r.IsFolder).OrderBy(r => r.Folder.Shown, StringComparer.CurrentCultureIgnoreCase);
         var filesSorted = sortDescending ? list.Where(r => !r.IsFolder).OrderByDescending(key, comparer) : list.Where(r => !r.IsFolder).OrderBy(key, comparer);
         return folders.Concat(filesSorted.ThenBy(r => r.Title, StringComparer.CurrentCultureIgnoreCase)).ToList();
     }
@@ -492,7 +492,7 @@ public sealed class LibraryViewModel : ObservableObject
                 if (count == 0) continue;
                 list.Add(new LibraryRow
                 {
-                    Folder = child, Title = child.Shown, Time = count.ToString(),
+                    Folder = child, Title = $"{child.Shown} ({count})",   // its number of files after its name
                     ToolTip = $"{child.Path}\n{count} file{(count > 1 ? "s" : "")}" + (child.DisplayName != null ? $" · folder {child.Name}" : ""),
                 });
                 folderCount++;
@@ -565,14 +565,26 @@ public sealed class LibraryViewModel : ObservableObject
             Download(then, showMixer);
     }
 
+    // Above this many files, adding them asks first: each one is taken from the zip (the first time) and read by the
+    // playlist, the window waiting meanwhile (2 140 files of the SC-88Pro folder: about 12 s here; it depends on the
+    // computer and the disk, so no time is announced).
+    const int ManyFiles = 1000;
+
+    // The files chosen, and those of the folders chosen (their subfolders included, with the filters of the list), added
+    // to the playlist; the unreadable ones left out.
     void AddToPlaylist(IReadOnlyList<LibraryRow> selected)
     {
-        var chosen = selected.Where(r => !r.IsFolder && !r.Unreadable).ToList();
+        var chosen = selected.Where(r => !r.IsFolder).Select(r => r.File).ToList();
+        if (catalog != null)
+            foreach (var row in selected.Where(r => r.IsFolder)) chosen.AddRange(catalog.Files(row.Folder.Path, true, Filter));
+        chosen = chosen.Where(f => f.Error == null).DistinctBy(f => f.Path).ToList();
         if (chosen.Count == 0) return;
-        if (chosen.Any(r => !IsAvailable(r))) { OfferDownload(null); return; }
+        if (chosen.Count > ManyFiles &&
+            view.AskYesNoCancel($"Add {chosen.Count} files to playlist?") != true) return;
+        if (!files.IsDownloaded && chosen.Any(f => !File.Exists(files.OnDisk(f.Path)))) { OfferDownload(null); return; }
         view.SetBusy(true);
         List<string> paths;
-        try { paths = chosen.Select(r => files.Get(r.File)).ToList(); }
+        try { paths = chosen.Select(f => files.Get(f)).ToList(); }
         finally { view.SetBusy(false); }
         addToPlaylist(paths);
     }

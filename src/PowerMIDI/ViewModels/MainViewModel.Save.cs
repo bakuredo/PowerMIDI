@@ -20,7 +20,7 @@ public sealed partial class MainViewModel
     // Returns true if the file was written. The source file is the one the settings apply to
     // (even if it was removed from the playlist in the meantime).
     // The file is chosen the first time; afterwards it is saved again to the same file, unless ask is true
-    // (right click on the button: the dialog again).
+    // (right click on the button: the dialog again, and a copy of the track even with nothing changed).
     // reload: saved over the track being played, the file is loaded again (its settings are now in it); false when
     // the track is being left anyway.
     bool SaveModifiedMidi(bool ask = false, bool reload = true)
@@ -28,19 +28,24 @@ public sealed partial class MainViewModel
         var source = settingsFile ?? current?.Path;
         if (source == null) { Status = "No current track to save."; return false; }
         var (channels, modules, forceMode) = SettingsToWrite();
-        if (channels.Count == 0 && forceMode == null && modules.Count == 0 && editedFile == null)
+        // Nothing changed: saved only with the right click (a copy of the track, e.g. a file of the Library tab, with
+        // its .syx file in it).
+        bool unchanged = channels.Count == 0 && forceMode == null && modules.Count == 0 && editedFile == null;
+        if (unchanged && !ask)
         {
-            view.ShowMessage("No instrument, setting or effect has been changed.");
+            view.ShowMessage("No instrument, setting or effect has been changed.\nRight click: save copy of track anyway.");
             return false;
         }
         // Saving with the button: playback paused, where it is (it stays paused after the save).
         if (reload && playback != null && playback.IsRunning) { PausePlayback(); UpdateNumbers(); }
 
         // Suggested: the folder and name of the last save, otherwise of the track itself (as a .mid; the dialog asks
-        // before replacing an existing file).
+        // before replacing an existing file); a file of the Library tab (in its cache): the last folder files were added
+        // from, rather than the cache.
         var suggested = lastSavedTarget ?? source;
+        var folder = lastSavedTarget == null && current?.Library != null && Directory.Exists(lastFolder) ? lastFolder : Path.GetDirectoryName(suggested);
         var target = !ask && lastSavedTarget != null ? lastSavedTarget
-                   : view.PickSaveFile(Path.GetDirectoryName(suggested), Path.GetFileNameWithoutExtension(suggested) + ".mid");
+                   : view.PickSaveFile(folder, Path.GetFileNameWithoutExtension(suggested) + ".mid");
         if (target == null) return false;
 
         // Re-read from disk, or the copy changed in the Event Editor: the original file is never modified in memory or
@@ -48,7 +53,9 @@ public sealed partial class MainViewModel
         var midi = editedFile?.Clone() ?? MidiTools.ReadFile(source);
         var report = new List<string>();
         if (editedFile != null) report.Add("events changed in Event Editor (and written with Append / Replace)");
-        report.AddRange(WriteSettings(midi, channels, modules, forceMode));
+        // Unchanged: the copy has the SysEx of the .syx file of the track, if it was added (see MidiTools.ReadFile).
+        if (unchanged) report.Add(MidiTools.AddedSyxFile(source) is { } syx ? $"copy of track with {Path.GetFileName(syx)} file" : "copy of track, no change");
+        else report.AddRange(WriteSettings(midi, channels, modules, forceMode));
         MidiTools.WriteFile(midi, target);
 
         savedSignature = GetSettingsSignature();

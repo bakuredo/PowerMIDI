@@ -99,6 +99,18 @@ public partial class MainWindow : Window, IMainView
         e.Handled = true;
     }
 
+    // The menu of the list: Add to playlist for files and folders (their files, see LibraryViewModel.AddToPlaylist), Play
+    // and Favorite for files only (greyed with folders only); not opened with nothing selected. The item is known by its
+    // name: the commands of the menu are bound only once it has been shown (not yet at its first opening).
+    void OnLibraryContextMenuOpening(object sender, System.Windows.Controls.ContextMenuEventArgs e)
+    {
+        var rows = LibraryView.SelectedItems.OfType<LibraryRow>().ToList();
+        if (rows.Count == 0) { e.Handled = true; return; }
+        bool hasFile = rows.Any(r => !r.IsFolder);
+        foreach (var item in LibraryView.ContextMenu.Items.OfType<System.Windows.Controls.MenuItem>())
+            item.IsEnabled = hasFile || item == LibraryAddMenuItem;
+    }
+
     // Enter: opens the selected row (folder entered, file played); Backspace: parent folder.
     void OnLibraryKeyDown(object sender, KeyEventArgs e)
     {

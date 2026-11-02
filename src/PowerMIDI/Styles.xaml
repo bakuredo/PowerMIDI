@@ -410,4 +410,67 @@
       </Setter.Value>
     </Setter>
   </Style>
+
+  <!-- Scroll bars (lists, playlist, Event Editor, open drop-down lists, Effects tab) in the colors of the controls of the
+       theme (light with the light controls): no arrows, a rounded thumb in the line color (11 px wide), lighter under the
+       mouse, in the accent color while dragged; a click on the bar scrolls by a page. Width / height of the Windows ones,
+       so that nothing moves (the File column of the playlist takes the space left). -->
+  <Style x:Key="ScrollPageButton" TargetType="RepeatButton">
+    <Setter Property="OverridesDefaultStyle" Value="True"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="IsTabStop" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="ScrollThumb" TargetType="Thumb">
+    <Setter Property="OverridesDefaultStyle" Value="True"/>
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="IsTabStop" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Thumb">
+          <Border x:Name="Bd" CornerRadius="3" Background="{DynamicResource ControlLineBrush}"/>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlMutedBrush}"/></Trigger>
+            <Trigger Property="IsDragging" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <ControlTemplate x:Key="VerticalScrollBar" TargetType="ScrollBar">
+    <Border Background="{TemplateBinding Background}">
+      <Track x:Name="PART_Track" IsDirectionReversed="True">
+        <Track.DecreaseRepeatButton><RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageUpCommand"/></Track.DecreaseRepeatButton>
+        <Track.IncreaseRepeatButton><RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageDownCommand"/></Track.IncreaseRepeatButton>
+        <Track.Thumb><Thumb Style="{StaticResource ScrollThumb}" Margin="3,3"/></Track.Thumb>
+      </Track>
+    </Border>
+  </ControlTemplate>
+  <ControlTemplate x:Key="HorizontalScrollBar" TargetType="ScrollBar">
+    <Border Background="{TemplateBinding Background}">
+      <Track x:Name="PART_Track">
+        <Track.DecreaseRepeatButton><RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageLeftCommand"/></Track.DecreaseRepeatButton>
+        <Track.IncreaseRepeatButton><RepeatButton Style="{StaticResource ScrollPageButton}" Command="ScrollBar.PageRightCommand"/></Track.IncreaseRepeatButton>
+        <Track.Thumb><Thumb Style="{StaticResource ScrollThumb}" Margin="3,3"/></Track.Thumb>
+      </Track>
+    </Border>
+  </ControlTemplate>
+  <Style TargetType="ScrollBar">
+    <Setter Property="OverridesDefaultStyle" Value="True"/>
+    <Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
+    <Setter Property="Width" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>
+    <Setter Property="Height" Value="NaN"/>
+    <Setter Property="Template" Value="{StaticResource VerticalScrollBar}"/>
+    <Style.Triggers>
+      <Trigger Property="Orientation" Value="Horizontal">
+        <Setter Property="Width" Value="NaN"/>
+        <Setter Property="Height" Value="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarHeightKey}}"/>
+        <Setter Property="Template" Value="{StaticResource HorizontalScrollBar}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
 </ResourceDictionary>
