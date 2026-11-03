@@ -1035,6 +1035,20 @@
           <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0">
+          <!-- Loop markers above the position bar (track's or temporary): the line raised by 3 px, so that they do not touch
+               the badge (chosen by eye). A transform: the layout below stays in place. -->
+          <DockPanel.Style>
+            <Style TargetType="DockPanel">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding HasLoop}" Value="True">
+                  <Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="-3"/></Setter.Value></Setter>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasTempLoop}" Value="True">
+                  <Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="-3"/></Setter.Value></Setter>
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </DockPanel.Style>
           <!-- Badge of the standard, in the color of the inactive parts of the theme (as with no track), its text in the one
                of the text (white on the dark themes). 1 px left of the position bar and the buttons: its rounded corners
                make it look further right otherwise (the title stays in place). -->
@@ -1140,7 +1154,14 @@
                     ToolTip="Event list of track"/>
           </StackPanel>
           <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-            <TextBlock Text="&#xE767;" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center" UseLayoutRounding="True"/>
+            <!-- Speaker icon: a click mutes / restores the volume; the muted icon at 0. Transparent background: clickable
+                 between the strokes too. -->
+            <TextBlock Text="{Binding VolumeGlyph}" FontFamily="Segoe MDL2 Assets" FontSize="16" Margin="0,0,6,0" VerticalAlignment="Center" UseLayoutRounding="True"
+                       Background="Transparent" Cursor="Hand" ToolTip="Mute / unmute">
+              <TextBlock.InputBindings>
+                <MouseBinding Gesture="LeftClick" Command="{Binding MuteCommand}"/>
+              </TextBlock.InputBindings>
+            </TextBlock>
             <Slider Width="90" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
             <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>

@@ -2,7 +2,8 @@
      theme (Themes.cs). -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:b="clr-namespace:PowerMIDI.Behaviors">
+                    xmlns:b="clr-namespace:PowerMIDI.Behaviors"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
   <Style TargetType="Button">
     <Setter Property="Background" Value="{DynamicResource ButtonBrush}"/>
     <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -414,7 +415,9 @@
   <!-- Scroll bars (lists, playlist, Event Editor, open drop-down lists, Effects tab) in the colors of the controls of the
        theme (light with the light controls): no arrows, a rounded thumb in the line color (11 px wide), lighter under the
        mouse, in the accent color while dragged; a click on the bar scrolls by a page. Width / height of the Windows ones,
-       so that nothing moves (the File column of the playlist takes the space left). -->
+       so that nothing moves (the File column of the playlist takes the space left).
+       The thumb at least 24 px long (30 with its margins): the Track takes half the height / width of the arrow buttons as its
+       minimum, looked up in the resources (otherwise about 8 px, nothing left with the margins on long contents). -->
   <Style x:Key="ScrollPageButton" TargetType="RepeatButton">
     <Setter Property="OverridesDefaultStyle" Value="True"/>
     <Setter Property="Focusable" Value="False"/>
@@ -460,6 +463,10 @@
     </Border>
   </ControlTemplate>
   <Style TargetType="ScrollBar">
+    <Style.Resources>
+      <sys:Double x:Key="{x:Static SystemParameters.VerticalScrollBarButtonHeightKey}">60</sys:Double>
+      <sys:Double x:Key="{x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}">60</sys:Double>
+    </Style.Resources>
     <Setter Property="OverridesDefaultStyle" Value="True"/>
     <Setter Property="Background" Value="{DynamicResource ControlBrush}"/>
     <Setter Property="Width" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>

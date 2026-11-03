@@ -67,6 +67,7 @@ public sealed partial class MainViewModel : ObservableObject
         PreviousCommand = Command(Previous);
         RepeatCommand = Command(() => RepeatMode = RepeatMode switch { 0 => 2, 2 => 1, _ => 0 });   // off → track → playlist → off
         EventsCommand = Command(OpenEventEditor);
+        MuteCommand = Command(ToggleMute);
         MixerAppendCommand = Command(MixerAppend);
         CancelInsertCommand = Command(CancelInsert);
 
@@ -116,6 +117,7 @@ public sealed partial class MainViewModel : ObservableObject
     public ICommand PreviousCommand { get; }
     public ICommand RepeatCommand { get; }
     public ICommand EventsCommand { get; }       // Event Editor window
+    public ICommand MuteCommand { get; }         // click on the speaker icon of the volume
     public ICommand MixerAppendCommand { get; }  // Append of the Mixer / Effects tabs (MainViewModel.MixerAppend.cs)
     public ICommand CancelInsertCommand { get; }
 
@@ -628,11 +630,23 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (!Set(ref masterVolume, value)) return;
             OnPropertyChanged(nameof(MasterVolumeText));
+            OnPropertyChanged(nameof(VolumeGlyph));
             Run(() => { if (output != null) ChannelMixer.SetMasterVolume(output, (int)value); });
         }
     }
 
     public string MasterVolumeText => ((int)masterVolume).ToString();
+
+    // Speaker icon next to the volume: muted at 0 (by its click or the slider), as an integer: the one sent (e.g. 0.4 from the slider).
+    public string VolumeGlyph => (int)masterVolume == 0 ? "" : "";
+
+    // Click on the icon: volume to 0, then back to the one before (full when it was already at 0, e.g. at startup).
+    double volumeBeforeMute = 127;
+    void ToggleMute()
+    {
+        if ((int)masterVolume > 0) { volumeBeforeMute = masterVolume; MasterVolume = 0; }
+        else MasterVolume = (int)volumeBeforeMute > 0 ? volumeBeforeMute : 127;
+    }
 
     bool shuffle;
     public bool Shuffle { get => shuffle; set => Set(ref shuffle, value); }
