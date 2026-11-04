@@ -52,6 +52,7 @@
        or completed (see Themes.cs). -->
   <ItemGroup>
     <ThemeFile Include="Themes\*.xaml" />
+    <ThemeFile Include="Themes\*.jpg;Themes\*.png" />   <!-- background images of the themes (see Themes.SetBackground) -->
   </ItemGroup>
   <Target Name="CopyThemes" AfterTargets="Build">
     <Copy SourceFiles="@(ThemeFile)" DestinationFolder="$(OutDir)themes" SkipUnchangedFiles="true" />
