@@ -47,6 +47,21 @@ public class ThemeFileTests : IDisposable
         Assert.Empty(ThemeFile.ReadColors(Write("Broken.xaml", Header + "<SolidColorBrush x:Key=\"A\" Color=\"#101010\"/>")));
     }
 
+    // Numbers of the background image: <sys:Double>, read with a dot whatever the culture; text that is not a number, and
+    // NaN / Infinity, ignored.
+    [Fact]
+    public void Numbers_are_read_by_key()
+    {
+        var path = Write("Night.xaml", Header.Replace(">", " xmlns:sys=\"clr-namespace:System;assembly=System.Runtime\">") +
+            "<SolidColorBrush x:Key=\"WindowBrush\" Color=\"#101010\"/><sys:Double x:Key=\"BackgroundTint\"> 40.5 </sys:Double>" +
+            "<sys:Double x:Key=\"BackgroundOpacity\">much</sys:Double><sys:Double x:Key=\"A\">NaN</sys:Double>" +
+            "<sys:Double x:Key=\"B\">Infinity</sys:Double></ResourceDictionary>");
+        var numbers = ThemeFile.ReadNumbers(path);
+        Assert.Equal(40.5, Assert.Single(numbers).Value);
+        Assert.Equal("BackgroundTint", numbers.Keys.Single());
+        Assert.Empty(ThemeFile.ReadNumbers(Path.Combine(folder, "missing.xaml")));
+    }
+
     [Fact]
     public void Names_are_the_xaml_files_of_the_folder()
     {
@@ -67,6 +82,9 @@ public class ThemeFileTests : IDisposable
         var keys = ThemeFile.ReadColors(Path.Combine(themes, "Dark.xaml")).Keys.OrderBy(k => k).ToList();
         Assert.NotEmpty(keys);
         foreach (var name in names)
+        {
             Assert.Equal(keys, ThemeFile.ReadColors(Path.Combine(themes, name + ".xaml")).Keys.OrderBy(k => k).ToList());
+            Assert.Equal(new[] { "BackgroundOpacity", "BackgroundTint" }, ThemeFile.ReadNumbers(Path.Combine(themes, name + ".xaml")).Keys.OrderBy(k => k));
+        }
     }
 }

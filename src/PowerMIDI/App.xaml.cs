@@ -37,7 +37,8 @@ public partial class App : Application
         {
             var owner = MainWindow is { IsLoaded: true } main ? main : null;
             var text = $"Unexpected error: {e.Exception.Message}";
-            if (owner != null) MessageBox.Show(owner, text, "PowerMIDI", MessageBoxButton.OK, MessageBoxImage.Error);
+            if (owner is PowerMIDI.MainWindow window) window.Dialog(() => MessageBox.Show(owner, text, "PowerMIDI", MessageBoxButton.OK, MessageBoxImage.Error));
+            else if (owner != null) MessageBox.Show(owner, text, "PowerMIDI", MessageBoxButton.OK, MessageBoxImage.Error);
             else MessageBox.Show(text, "PowerMIDI", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         catch { }

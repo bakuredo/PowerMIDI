@@ -1,5 +1,7 @@
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using PowerMIDI.Core;
 
 namespace PowerMIDI;
@@ -145,6 +147,65 @@ public static class Themes
         if (!InstrumentIcons) merged.Add(NoInstrumentIcons());
     }
 
+    // Background image of the windows: the image of the theme in the themes folder, named as it (e.g. Dark.jpg for
+    // Dark.xaml; .jpg or .png), none by default. Tinted with the window color of the theme (BackgroundTint of the theme:
+    // its opacity over the image in %); the panels over it let it show through (BackgroundOpacity: their opacity in %).
+    static readonly string[] BackgroundKeys = { "BackgroundTint", "BackgroundOpacity" };
+
+    // Size of all the screens, in pixels (WPF gives it in device-independent units).
+    [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+    const int SmCxVirtualScreen = 78, SmCyVirtualScreen = 79;
+
+    static string BackgroundOf(string name) =>
+        new[] { ".jpg", ".png" }.Select(ext => Path.Combine(Folder, name + ext)).FirstOrDefault(File.Exists);
+
+    // A number of the theme in %, as an opacity (0 to 1); the default if missing.
+    static double Percent(ResourceDictionary dictionary, string key, double missing) =>
+        Math.Clamp(dictionary[key] is double value ? value : missing, 0, 100) / 100.0;
+
+    // The image under the window color, the panels in their color with BackgroundOpacity. No image, or one that cannot be
+    // read: the theme as it is.
+    static void SetBackground(ResourceDictionary dictionary, string name)
+    {
+        var path = BackgroundOf(name);
+        if (path == null || dictionary["WindowBrush"] is not SolidColorBrush window) return;
+        BitmapImage image;
+        try
+        {
+            var uri = new Uri(Path.GetFullPath(path));
+            // Decoded no larger than the screens (all of them): a 4K / 8K image would take 33 / 130 MB, for the same look.
+            // Its size first (header only); the smaller scale that still covers them, as UniformToFill does.
+            var frame = BitmapDecoder.Create(uri, BitmapCreateOptions.DelayCreation | BitmapCreateOptions.IgnoreImageCache, BitmapCacheOption.None).Frames[0];
+            double scale = Math.Max(GetSystemMetrics(SmCxVirtualScreen) / (double)frame.PixelWidth, GetSystemMetrics(SmCyVirtualScreen) / (double)frame.PixelHeight);
+            image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;   // the file is not kept open
+            image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;   // a file replaced: read again with the theme
+            if (scale > 0 && scale < 1) image.DecodePixelWidth = (int)Math.Ceiling(frame.PixelWidth * scale);
+            image.UriSource = uri;
+            image.EndInit();
+            image.Freeze();
+        }
+        catch { return; }
+        var area = new Rect(0, 0, image.PixelWidth, image.PixelHeight);
+        var drawing = new DrawingGroup();
+        // The window color under it too: the transparent parts of a PNG in it, not in black.
+        drawing.Children.Add(new GeometryDrawing(new SolidColorBrush(window.Color), null, new RectangleGeometry(area)));
+        drawing.Children.Add(new ImageDrawing(image, area));
+        drawing.Children.Add(new GeometryDrawing(new SolidColorBrush(window.Color) { Opacity = Percent(dictionary, "BackgroundTint", 55) }, null, new RectangleGeometry(area)));
+        var brush = new DrawingBrush(drawing) { Stretch = Stretch.UniformToFill };
+        brush.Freeze();
+        dictionary["WindowBrush"] = brush;
+        double opacity = Percent(dictionary, "BackgroundOpacity", 85);
+        foreach (var key in new[] { "PanelBrush", "HeaderBrush" })
+        {
+            if (dictionary[key] is not SolidColorBrush solid) continue;
+            var panel = new SolidColorBrush(solid.Color) { Opacity = opacity };
+            panel.Freeze();
+            dictionary[key] = panel;
+        }
+    }
+
     static string FindBuiltIn(string name) => BuiltIn.FirstOrDefault(b => string.Equals(b, name, StringComparison.OrdinalIgnoreCase));
 
     // Applies a theme; an unknown name (e.g. from an edited PowerMIDI.ini, or a file removed since) gives the default one.
@@ -163,11 +224,15 @@ public static class Themes
             }
             catch { }   // not a color: the built-in one is kept
         }
+        // Numbers of the background image (a file written before they existed: those of the built-in theme).
+        foreach (var (key, value) in ThemeFile.ReadNumbers(Path.Combine(Folder, name + ".xaml")))
+            if (BackgroundKeys.Contains(key)) dictionary[key] = value;
         // Activity LEDs: a file that gives its accent color and not this one (e.g. written before it existed) has
         // them in its accent color, not in the one of the built-in theme.
         if (colors.ContainsKey("AccentBrush") && !colors.ContainsKey("ActivityBrush") && dictionary["AccentBrush"] is SolidColorBrush accent)
             dictionary["ActivityBrush"] = accent;
         SetControlColors(dictionary);
+        SetBackground(dictionary, name);
         var merged = Application.Current.Resources.MergedDictionaries;
         if (merged.Count > 0) merged[0] = dictionary; else merged.Add(dictionary);
         Current = name;

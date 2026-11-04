@@ -173,10 +173,11 @@
   <TextBlock DockPanel.Dock="Bottom" Margin="4,8,0,0" Foreground="{DynamicResource WindowTextMutedBrush}" FontSize="12"
              Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
 
-  <!-- Right panel: Mixer (16 channels), Effects (those of the current mode), Library and About tabs -->
+  <!-- Right panel: Mixer (16 channels), Effects (those of the current mode), Library and About tabs. The tabs on the
+       background of the panel (transparent): one layer only over the background image, as the other panels. -->
   <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
           BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="6">
-    <TabControl x:Name="RightTabs" Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}"
+    <TabControl x:Name="RightTabs" Background="Transparent" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}"
                 SelectedIndex="{Binding SelectedTab}">
     <TabItem Header="Mixer" DataContext="{Binding Mixer}" d:DataContext="{d:DesignInstance vm:MixerViewModel}">
     <DockPanel>
@@ -793,7 +794,8 @@
       <TextBlock DockPanel.Dock="Top" Margin="2,12,2,0" TextWrapping="Wrap" Foreground="{DynamicResource TextSoftBrush}"
                  Visibility="{Binding HasNoLibrary, Converter={StaticResource BoolToVisibility}}"
                  Text="No library: library\library.db missing next to PowerMIDI.exe."/>
-      <ListView x:Name="LibraryView" Style="{StaticResource ThemedListView}" ItemsSource="{Binding Rows}" SelectionMode="Extended"
+      <!-- On the background of the panel (transparent), as the tabs: one layer only over the background image. -->
+      <ListView x:Name="LibraryView" Style="{StaticResource ThemedListView}" Background="Transparent" ItemsSource="{Binding Rows}" SelectionMode="Extended"
                 SelectedItem="{Binding SelectedRow}" SelectionChanged="OnLibrarySelectionChanged"
                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                 GridViewColumnHeader.Click="OnLibraryHeaderClick" PreviewKeyDown="OnLibraryKeyDown"

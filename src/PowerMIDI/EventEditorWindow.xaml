@@ -12,7 +12,7 @@
        selected while Follow is on; double click (or Enter) on a row: playback from there. Edit panel under the list:
        change the selected event, delete the selected ones (Delete), add one at the selected position, write the
        settings in blue (Mixer / Effects tabs) after the selected event (Append) or instead of it (Replace); Ctrl+Z / Ctrl+Y.
-       A window of its own (not kept above the main one), closed with it. -->
+       A window of its own (not kept above the main one, unless pinned above all the others), closed with it. -->
   <Window.InputBindings>
     <KeyBinding Gesture="Ctrl+Z" Command="{Binding UndoCommand}"/>
     <KeyBinding Gesture="Ctrl+Y" Command="{Binding RedoCommand}"/>
@@ -61,6 +61,18 @@
       <ComboBox Width="120" Margin="8,0,0,0" ItemsSource="{Binding Channels}" SelectedIndex="{Binding ChannelFilter}"
                 ToolTip="Show events of one channel (No channel: SysEx and meta events)"/>
       <ComboBox Width="140" Margin="8,0,0,0" ItemsSource="{Binding Kinds}" SelectedIndex="{Binding KindFilter}" ToolTip="Show one kind of events"/>
+      <!-- Pin: the window kept above all the others (Topmost), the pinned icon while on. -->
+      <ToggleButton DockPanel.Dock="Right" Padding="7,0" Margin="6,0,0,0" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                    IsChecked="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" ToolTip="Keep window on top">
+        <ToggleButton.Style>
+          <Style TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
+            <Setter Property="Content" Value="&#xE718;"/>
+            <Style.Triggers>
+              <Trigger Property="IsChecked" Value="True"><Setter Property="Content" Value="&#xE840;"/></Trigger>
+            </Style.Triggers>
+          </Style>
+        </ToggleButton.Style>
+      </ToggleButton>
       <ToggleButton DockPanel.Dock="Right" Content="Follow" Padding="10,3" IsChecked="{Binding Follow}"
                     ToolTip="Select event being played"/>
       <ToggleButton DockPanel.Dock="Right" Content="Audition" Padding="10,3" Margin="0,0,6,0" IsChecked="{Binding Audition}"

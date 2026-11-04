@@ -388,14 +388,14 @@ public partial class MainWindow : Window, IMainView
             Multiselect = true,
         };
         if (initialFolder != null) dlg.InitialDirectory = initialFolder;
-        return dlg.ShowDialog(this) == true ? dlg.FileNames : null;
+        return Dialog(() => dlg.ShowDialog(this)) == true ? dlg.FileNames : null;
     }
 
     public string PickFolder(string initialFolder)
     {
         var dlg = new Microsoft.Win32.OpenFolderDialog { Title = "Folder of MIDI files (subfolders included)" };
         if (initialFolder != null) dlg.InitialDirectory = initialFolder;
-        return dlg.ShowDialog(this) == true ? dlg.FolderName : null;
+        return Dialog(() => dlg.ShowDialog(this)) == true ? dlg.FolderName : null;
     }
 
     public string PickSaveFile(string initialFolder, string fileName)
@@ -407,32 +407,43 @@ public partial class MainWindow : Window, IMainView
             FileName = fileName,
             OverwritePrompt = true,
         };
-        return dlg.ShowDialog(this) == true ? dlg.FileName : null;
+        return Dialog(() => dlg.ShowDialog(this)) == true ? dlg.FileName : null;
     }
 
-    public void ShowMessage(string text) => MessageBox.Show(this, text, "PowerMIDI");
+    public void ShowMessage(string text) => Dialog(() => MessageBox.Show(this, text, "PowerMIDI"));
 
-    public void ShowError(Exception ex) => MessageBox.Show(this, ex.Message, "PowerMIDI", MessageBoxButton.OK, MessageBoxImage.Error);
+    public void ShowError(Exception ex) => Dialog(() => MessageBox.Show(this, ex.Message, "PowerMIDI", MessageBoxButton.OK, MessageBoxImage.Error));
 
     public bool? AskYesNoCancel(string text) =>
-        MessageBox.Show(this, text, "PowerMIDI", MessageBoxButton.YesNoCancel, MessageBoxImage.Question) switch
+        Dialog(() => MessageBox.Show(this, text, "PowerMIDI", MessageBoxButton.YesNoCancel, MessageBoxImage.Question)) switch
         {
             MessageBoxResult.Yes => true,
             MessageBoxResult.No => false,
             _ => null,
         };
 
+    // Shows a dialog of this window. The Event Editor pinned (kept on top) is not while it is open: otherwise it could
+    // hide the dialog (this window not on top), e.g. the question of the unsaved settings on closing.
+    internal T Dialog<T>(Func<T> show)
+    {
+        bool pinned = eventWindow?.Topmost == true;
+        if (pinned) eventWindow.Topmost = false;
+        try { return show(); }
+        finally { if (pinned && eventWindow != null) eventWindow.Topmost = true; }
+    }
+
     public void SetBusy(bool busy) => Cursor = busy ? Cursors.Wait : null;
 
     // Event Editor: one window, of its own (not kept above this one), closed with this one.
     EventEditorWindow eventWindow;
+    bool eventWindowTopmost;   // its pin button (kept on top), for the next opening while PowerMIDI runs
 
     public void ShowEventEditor(EventEditorViewModel editor, Action closed)
     {
         if (eventWindow != null) { eventWindow.Activate(); return; }
-        eventWindow = new EventEditorWindow(editor);
+        eventWindow = new EventEditorWindow(editor) { Topmost = eventWindowTopmost };
         Themes.ApplyControls(eventWindow.Resources);
-        eventWindow.Closed += (_, _) => { eventWindow = null; closed(); };
+        eventWindow.Closed += (_, _) => { eventWindowTopmost = eventWindow.Topmost; eventWindow = null; closed(); };
         eventWindow.Show();
     }
 

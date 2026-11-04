@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
   <!-- Surfaces -->
   <SolidColorBrush x:Key="WindowBrush" Color="#1E1F24"/>
   <SolidColorBrush x:Key="PanelBrush" Color="#25272D"/>
@@ -29,4 +30,7 @@
   <SolidColorBrush x:Key="LcdDotBrush" Color="#20242C"/>
   <SolidColorBrush x:Key="LcdTextBrush" Color="#C9D6E8"/>
   <SolidColorBrush x:Key="LcdSungBrush" Color="#FFFFFF"/>
+  <!-- Background image (<name>.jpg or .png, optional), values in % -->
+  <sys:Double x:Key="BackgroundTint">55</sys:Double>
+  <sys:Double x:Key="BackgroundOpacity">85</sys:Double>
 </ResourceDictionary>
