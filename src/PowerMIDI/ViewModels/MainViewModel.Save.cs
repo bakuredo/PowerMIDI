@@ -21,7 +21,7 @@ public sealed partial class MainViewModel
     // (even if it was removed from the playlist in the meantime).
     // The file is chosen the first time; afterwards it is saved again to the same file, unless ask is true
     // (right click on the button: the dialog again, and a copy of the track even with nothing changed).
-    // reload: saved over the track being played, the file is loaded again (its settings are now in it); false when
+    // reload: the saved file replaces the track being played (its settings are now in it); false when
     // the track is being left anyway.
     bool SaveModifiedMidi(bool ask = false, bool reload = true)
     {
@@ -60,9 +60,11 @@ public sealed partial class MainViewModel
 
         savedSignature = GetSettingsSignature();
         lastSavedTarget = target;
-        // Saved over the track being played: its settings and changed events are now in the file. It is loaded again,
-        // with nothing pending (otherwise the next save would write the settings twice).
-        if (reload && current != null && SamePath(target, current.Path) && SamePath(source, current.Path)) SwitchToSavedFile(target);
+        // Settings of the track being played, saved over it or to another file: its settings and changed events are now
+        // in that file, which replaces it in the playlist and the playback (the original stays on disk), with nothing
+        // pending: otherwise the settings would stay in blue, and the next save would write them again (or twice, over
+        // the same file). Not for a copy of the track with nothing changed: nothing is pending.
+        if (reload && !unchanged && current != null && SamePath(source, current.Path)) SwitchToSavedFile(target);
         Status = $"Saved: {target}";
         view.ShowMessage($"File saved:\n{target}\n\n{string.Join("\n", report.Where(s => !string.IsNullOrEmpty(s)))}");
         return true;
