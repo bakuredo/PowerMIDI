@@ -24,7 +24,7 @@ public sealed class MixerViewModel : ObservableObject
     static int NewestGsMap => ChannelMixer.GsDefaultMapOverride >= 1 ? ChannelMixer.GsDefaultMapOverride : InstrumentDefinitions.DefaultGsMap;
     static readonly MapChoice[][] gsMapChoicesUpTo = Enumerable.Range(0, 5).Select(n => GsMapChoices.Where(m => m.Map <= n).ToArray()).ToArray();
     static MapChoice[] GsMapChoicesUpTo(int map) => gsMapChoicesUpTo[map];
-    public static readonly MapChoice[] XgMapChoices = { new("2000", 2), new("MEx", 3), new("SFX", 4), new("Spl", 5), new("GM2", 6) };
+    public static readonly MapChoice[] XgMapChoices = { new("2000", 2), new("MEx", 3), new("SFX", 4), new("SPL", 5), new("GM2", 6), new("VL", 8), new("SG", 9) };
     // With the MU Basic voice map: what the MU50 has.
     public static readonly MapChoice[] XgMapChoicesMu50 = { new("50", InstrumentDefinitions.XgMu50Map), new("SFX", 4) };
 
@@ -410,6 +410,8 @@ public sealed class MixerViewModel : ObservableObject
         // GM2: the list has MSB 120 (kits) / 121 (sounds); a file without these banks plays the same sounds.
         if (HasGm2Banks) (msb, lsb) = drum ? (InstrumentDefinitions.Gm2DrumMsb, 0)
                                            : (InstrumentDefinitions.Gm2MelodicMsb, msb == InstrumentDefinitions.Gm2MelodicMsb ? lsb : 0);
+        // XG: a board voice asked by the other bank of its songs is listed by its own (see InstrumentDefinitions.XgListedMsb).
+        if (HasXgBanks) msb = InstrumentDefinitions.XgListedMsb(msb);
         // In GS, the LSB only selects the map: compare program and MSB only.
         bool compareLsb = Standard is "XG" or "GM2";
         int index = -1;

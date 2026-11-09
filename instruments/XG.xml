@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Voices, drum kits and effects of the Yamaha MU2000 (XG), in the module definition format of Domino http://takabosoft.com/ -->
+<!-- With the PLG-VL and PLG-SG boards of the S-YXG2026 (its reabank): maps VL and SG. -->
 <ModuleData Name="MU2000" Folder="YAMAHA" Priority="1" FileCreator="PowerMIDI" FileVersion="1.00">
 	<InstrumentList>
 		<Map Name="001-008 Piano">
@@ -2414,6 +2415,1084 @@
 			</PC>
 			<PC Name="Fireball" PC="117">
 				<Bank Name="Fireball" MSB="64" LSB="0" />
+			</PC>
+		</Map>
+		<!-- PLG-VL voices: XG bank (MSB 81, also MSB 97 in the songs of the board) and its own bank (MSB 33) -->
+		<Map Name="VL">
+			<PC Name="Mad Tube" PC="1">
+				<Bank Name="Mad Tube" MSB="33" LSB="0" />
+				<Bank Name="Vento" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="VintLead" PC="2">
+				<Bank Name="VintLead" MSB="33" LSB="0" />
+				<Bank Name="Floboe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SpaceZoo" PC="3">
+				<Bank Name="SpaceZoo" MSB="33" LSB="0" />
+				<Bank Name="Sintax" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Gtr Hero" PC="4">
+				<Bank Name="Gtr Hero" MSB="33" LSB="0" />
+				<Bank Name="Eastern" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="StoneHng" PC="5">
+				<Bank Name="StoneHng" MSB="33" LSB="0" />
+				<Bank Name="Trumpet!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Whizzer" PC="6">
+				<Bank Name="Whizzer" MSB="33" LSB="0" />
+				<Bank Name="SprnoSx!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SimpleBa" PC="7">
+				<Bank Name="SimpleBa" MSB="33" LSB="0" />
+				<Bank Name="LiteAlto" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="ClavBass" PC="8">
+				<Bank Name="ClavBass" MSB="33" LSB="0" />
+				<Bank Name="Trombon!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SuperBas" PC="9">
+				<Bank Name="SuperBas" MSB="33" LSB="0" />
+				<Bank Name="BtlFlute" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="New Slap" PC="10">
+				<Bank Name="New Slap" MSB="33" LSB="0" />
+				<Bank Name="Air Sax" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="RockPigs" PC="11">
+				<Bank Name="RockPigs" MSB="33" LSB="0" />
+				<Bank Name="TenorSx!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Igneous" PC="12">
+				<Bank Name="Igneous" MSB="33" LSB="0" />
+				<Bank Name="Coca" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="50/50" PC="13">
+				<Bank Name="50/50" MSB="33" LSB="0" />
+				<Bank Name="JetLpBow" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Cybastrg" PC="14">
+				<Bank Name="Cybastrg" MSB="33" LSB="0" />
+				<Bank Name="Viol Inn" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Wynth" PC="15">
+				<Bank Name="Wynth" MSB="33" LSB="0" />
+				<Bank Name="MuteCone" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Buzz Saw" PC="16">
+				<Bank Name="Buzz Saw" MSB="33" LSB="0" />
+				<Bank Name="BrethBow" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Zub Zub" PC="17">
+				<Bank Name="Zub Zub" MSB="33" LSB="0" />
+				<Bank Name="Trumpt!2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="BlueLead" PC="18">
+				<Bank Name="BlueLead" MSB="33" LSB="0" />
+				<Bank Name="FluglHr!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="OsciLead" PC="19">
+				<Bank Name="OsciLead" MSB="33" LSB="0" />
+				<Bank Name="Cornet!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SqrLead!" PC="20">
+				<Bank Name="SqrLead!" MSB="33" LSB="0" />
+				<Bank Name="Jazz Trp" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="BiggerSy" PC="21">
+				<Bank Name="BiggerSy" MSB="33" LSB="0" />
+				<Bank Name="JazzTrp2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Squeeze" PC="22">
+				<Bank Name="Squeeze" MSB="81" LSB="112" />
+				<Bank Name="Squeeze" MSB="97" LSB="112" />
+				<Bank Name="AnaSquid" MSB="33" LSB="0" />
+				<Bank Name="Flumpet" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="MouthKey" PC="23">
+				<Bank Name="MouthKey" MSB="81" LSB="112" />
+				<Bank Name="AmpdHarp" MSB="81" LSB="113" />
+				<Bank Name="CromHarp" MSB="81" LSB="114" />
+				<Bank Name="MouthKey" MSB="97" LSB="112" />
+				<Bank Name="AmpdHarp" MSB="97" LSB="113" />
+				<Bank Name="CromHarp" MSB="97" LSB="114" />
+				<Bank Name="SharpSyn" MSB="33" LSB="0" />
+				<Bank Name="WXTrumpt" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Ana.Wave" PC="24">
+				<Bank Name="Ana.Wave" MSB="33" LSB="0" />
+				<Bank Name="MuteTrp!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="EspaGtr!" PC="25">
+				<Bank Name="EspaGtr!" MSB="81" LSB="112" />
+				<Bank Name="EspaGtr!" MSB="97" LSB="112" />
+				<Bank Name="Ana.Wurl" MSB="33" LSB="0" />
+				<Bank Name="MuteTp!2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Babalog" PC="26">
+				<Bank Name="Babalog" MSB="33" LSB="0" />
+				<Bank Name="MelTrmbn" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="JazzGtr!" PC="27">
+				<Bank Name="JazzGtr!" MSB="81" LSB="112" />
+				<Bank Name="Carlos" MSB="81" LSB="113" />
+				<Bank Name="Destiny" MSB="81" LSB="114" />
+				<Bank Name="JazzGtr!" MSB="97" LSB="112" />
+				<Bank Name="Carlos" MSB="97" LSB="113" />
+				<Bank Name="Destiny" MSB="97" LSB="114" />
+				<Bank Name="FngrBas!" MSB="33" LSB="0" />
+				<Bank Name="NerzoBrs" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="L7 Pluck" PC="28">
+				<Bank Name="L7 Pluck" MSB="81" LSB="112" />
+				<Bank Name="WetPluck" MSB="81" LSB="113" />
+				<Bank Name="L7 Pluck" MSB="97" LSB="112" />
+				<Bank Name="WetPluck" MSB="97" LSB="113" />
+				<Bank Name="UprghtBa" MSB="33" LSB="0" />
+				<Bank Name="FrchHrn!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Fnground" PC="29">
+				<Bank Name="Fnground" MSB="33" LSB="0" />
+				<Bank Name="FrHorn!2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Birdland" PC="30">
+				<Bank Name="Birdland" MSB="33" LSB="0" />
+				<Bank Name="Nu Horne" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="FlageoBa" PC="31">
+				<Bank Name="FlageoBa" MSB="33" LSB="0" />
+				<Bank Name="WX Horn" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="DampBass" PC="32">
+				<Bank Name="DampBass" MSB="33" LSB="0" />
+				<Bank Name="Tuba!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="UprghtBa" PC="33">
+				<Bank Name="UprghtBa" MSB="81" LSB="112" />
+				<Bank Name="UprghtBa" MSB="97" LSB="112" />
+				<Bank Name="Fretles!" MSB="33" LSB="0" />
+				<Bank Name="NuViolin" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Fnground" PC="34">
+				<Bank Name="Fnground" MSB="81" LSB="112" />
+				<Bank Name="Birdland" MSB="81" LSB="113" />
+				<Bank Name="Fnground" MSB="97" LSB="112" />
+				<Bank Name="Birdland" MSB="97" LSB="113" />
+				<Bank Name="Fretls!2" MSB="33" LSB="0" />
+				<Bank Name="C Violin" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="FlageoBa" PC="35">
+				<Bank Name="FlageoBa" MSB="81" LSB="112" />
+				<Bank Name="DampBass" MSB="81" LSB="113" />
+				<Bank Name="FlageoBa" MSB="97" LSB="112" />
+				<Bank Name="DampBass" MSB="97" LSB="113" />
+				<Bank Name="ThumBass" MSB="33" LSB="0" />
+				<Bank Name="BrtVioln" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Fretles!" PC="36">
+				<Bank Name="Fretles!" MSB="81" LSB="112" />
+				<Bank Name="Fretls!2" MSB="81" LSB="113" />
+				<Bank Name="Fretles!" MSB="97" LSB="112" />
+				<Bank Name="Fretls!2" MSB="97" LSB="113" />
+				<Bank Name="RockBass" MSB="33" LSB="0" />
+				<Bank Name="MutedVln" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="New Slap" PC="37">
+				<Bank Name="New Slap" MSB="81" LSB="112" />
+				<Bank Name="ThumBass" MSB="81" LSB="113" />
+				<Bank Name="New Slap" MSB="97" LSB="112" />
+				<Bank Name="ThumBass" MSB="97" LSB="113" />
+				<Bank Name="SmooBass" MSB="33" LSB="0" />
+				<Bank Name="BrtViola" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="WarmBass" PC="38">
+				<Bank Name="WarmBass" MSB="33" LSB="0" />
+				<Bank Name="Vla Outt" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="AcidBas!" PC="39">
+				<Bank Name="AcidBas!" MSB="81" LSB="112" />
+				<Bank Name="SqrBass!" MSB="81" LSB="113" />
+				<Bank Name="AcidBas!" MSB="97" LSB="112" />
+				<Bank Name="SqrBass!" MSB="97" LSB="113" />
+				<Bank Name="YamaBass" MSB="33" LSB="0" />
+				<Bank Name="Cello!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="PlsClav!" PC="40">
+				<Bank Name="PlsClav!" MSB="81" LSB="112" />
+				<Bank Name="MogueBas" MSB="81" LSB="113" />
+				<Bank Name="PlsClav!" MSB="97" LSB="112" />
+				<Bank Name="MogueBas" MSB="97" LSB="113" />
+				<Bank Name="Box Bass" MSB="33" LSB="0" />
+				<Bank Name="Eleanor" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="NuViolin" PC="41">
+				<Bank Name="NuViolin" MSB="81" LSB="112" />
+				<Bank Name="Viol Inn" MSB="81" LSB="113" />
+				<Bank Name="C Violin" MSB="81" LSB="114" />
+				<Bank Name="BrtVioln" MSB="81" LSB="115" />
+				<Bank Name="MutedVln" MSB="81" LSB="116" />
+				<Bank Name="NuViolin" MSB="97" LSB="112" />
+				<Bank Name="Viol Inn" MSB="97" LSB="113" />
+				<Bank Name="C Violin" MSB="97" LSB="114" />
+				<Bank Name="BrtVioln" MSB="97" LSB="115" />
+				<Bank Name="MutedVln" MSB="97" LSB="116" />
+				<Bank Name="Bass Cab" MSB="33" LSB="0" />
+				<Bank Name="Nu Cello" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="BrtViola" PC="42">
+				<Bank Name="BrtViola" MSB="81" LSB="112" />
+				<Bank Name="Vla Outt" MSB="81" LSB="113" />
+				<Bank Name="BrtViola" MSB="97" LSB="112" />
+				<Bank Name="Vla Outt" MSB="97" LSB="113" />
+				<Bank Name="FruitBas" MSB="33" LSB="0" />
+				<Bank Name="Contrair" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Cello!" PC="43">
+				<Bank Name="Cello!" MSB="81" LSB="112" />
+				<Bank Name="Eleanor" MSB="81" LSB="113" />
+				<Bank Name="Nu Cello" MSB="81" LSB="114" />
+				<Bank Name="Cello!" MSB="97" LSB="112" />
+				<Bank Name="Eleanor" MSB="97" LSB="113" />
+				<Bank Name="Nu Cello" MSB="97" LSB="114" />
+				<Bank Name="AcidBas!" MSB="33" LSB="0" />
+				<Bank Name="DoublBow" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Contrair" PC="44">
+				<Bank Name="Contrair" MSB="81" LSB="112" />
+				<Bank Name="DoublBow" MSB="81" LSB="113" />
+				<Bank Name="Contrair" MSB="97" LSB="112" />
+				<Bank Name="DoublBow" MSB="97" LSB="113" />
+				<Bank Name="SqrBass!" MSB="33" LSB="0" />
+				<Bank Name="Piccolo!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="PlsClav!" PC="45">
+				<Bank Name="PlsClav!" MSB="33" LSB="0" />
+				<Bank Name="Picolo!2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="MogueBas" PC="46">
+				<Bank Name="MogueBas" MSB="33" LSB="0" />
+				<Bank Name="BowPicol" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="BoppaBas" PC="47">
+				<Bank Name="BoppaBas" MSB="33" LSB="0" />
+				<Bank Name="C Flute" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="BuzzerBa" PC="48">
+				<Bank Name="BuzzerBa" MSB="33" LSB="0" />
+				<Bank Name="C Flute2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="MuteHrBa" PC="49">
+				<Bank Name="MuteHrBa" MSB="33" LSB="0" />
+				<Bank Name="JazFlute" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Tek.Bass" PC="50">
+				<Bank Name="Tek.Bass" MSB="33" LSB="0" />
+				<Bank Name="OakFlute" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="TranzBas" PC="51">
+				<Bank Name="TranzBas" MSB="33" LSB="0" />
+				<Bank Name="BtlFlut2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Chamlion" PC="52">
+				<Bank Name="Chamlion" MSB="33" LSB="0" />
+				<Bank Name="Rzde.Flt" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Para.Syn" PC="53">
+				<Bank Name="Para.Syn" MSB="33" LSB="0" />
+				<Bank Name="Flutuen" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SteamBas" PC="54">
+				<Bank Name="SteamBas" MSB="33" LSB="0" />
+				<Bank Name="Nz Flute" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Boo Bass" PC="55">
+				<Bank Name="Boo Bass" MSB="33" LSB="0" />
+				<Bank Name="WX Shaku" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="WhelkBas" PC="56">
+				<Bank Name="WhelkBas" MSB="33" LSB="0" />
+				<Bank Name="Pan Pipe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Trumpet!" PC="57">
+				<Bank Name="Trumpet!" MSB="81" LSB="112" />
+				<Bank Name="Trumpt!2" MSB="81" LSB="113" />
+				<Bank Name="FluglHr!" MSB="81" LSB="114" />
+				<Bank Name="Cornet!" MSB="81" LSB="115" />
+				<Bank Name="Trumpet!" MSB="97" LSB="112" />
+				<Bank Name="Trumpt!2" MSB="97" LSB="113" />
+				<Bank Name="FluglHr!" MSB="97" LSB="114" />
+				<Bank Name="Cornet!" MSB="97" LSB="115" />
+				<Bank Name="AttakSyn" MSB="33" LSB="0" />
+				<Bank Name="PanPicol" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Trombon!" PC="58">
+				<Bank Name="Trombon!" MSB="81" LSB="112" />
+				<Bank Name="MelTrmbn" MSB="81" LSB="113" />
+				<Bank Name="Trombon!" MSB="97" LSB="112" />
+				<Bank Name="MelTrmbn" MSB="97" LSB="113" />
+				<Bank Name="Q. Klav" MSB="33" LSB="0" />
+				<Bank Name="Bamboo" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Tuba!" PC="59">
+				<Bank Name="Tuba!" MSB="81" LSB="112" />
+				<Bank Name="Tuba!" MSB="97" LSB="112" />
+				<Bank Name="Sitar!" MSB="33" LSB="0" />
+				<Bank Name="Andean" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="MuteTrp!" PC="60">
+				<Bank Name="MuteTrp!" MSB="81" LSB="112" />
+				<Bank Name="MuteTp!2" MSB="81" LSB="113" />
+				<Bank Name="MuteTrp!" MSB="97" LSB="112" />
+				<Bank Name="MuteTp!2" MSB="97" LSB="113" />
+				<Bank Name="India" MSB="33" LSB="0" />
+				<Bank Name="Flurinet" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="FrchHrn!" PC="61">
+				<Bank Name="FrchHrn!" MSB="81" LSB="112" />
+				<Bank Name="FrHorn!2" MSB="81" LSB="113" />
+				<Bank Name="FrchHrn!" MSB="97" LSB="112" />
+				<Bank Name="FrHorn!2" MSB="97" LSB="113" />
+				<Bank Name="YamSteel" MSB="33" LSB="0" />
+				<Bank Name="SoftReed" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Stung St" PC="62">
+				<Bank Name="Stung St" MSB="33" LSB="0" />
+				<Bank Name="Flurmod" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Mu" PC="63">
+				<Bank Name="Mu" MSB="33" LSB="0" />
+				<Bank Name="Jhopali" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Waterfon" PC="64">
+				<Bank Name="Waterfon" MSB="33" LSB="0" />
+				<Bank Name="Baroquen" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SprnoSx!" PC="65">
+				<Bank Name="SprnoSx!" MSB="81" LSB="112" />
+				<Bank Name="CvSoprSx" MSB="81" LSB="113" />
+				<Bank Name="SoprPipe" MSB="81" LSB="114" />
+				<Bank Name="LiteSopr" MSB="81" LSB="115" />
+				<Bank Name="SprnoSx!" MSB="97" LSB="112" />
+				<Bank Name="CvSoprSx" MSB="97" LSB="113" />
+				<Bank Name="SoprPipe" MSB="97" LSB="114" />
+				<Bank Name="LiteSopr" MSB="97" LSB="115" />
+				<Bank Name="DinoPerc" MSB="33" LSB="0" />
+				<Bank Name="SquealAT" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="AltoSax!" PC="66">
+				<Bank Name="AltoSax!" MSB="81" LSB="112" />
+				<Bank Name="SweetAlt" MSB="81" LSB="113" />
+				<Bank Name="LiteAlto" MSB="81" LSB="114" />
+				<Bank Name="HarpAlto" MSB="81" LSB="115" />
+				<Bank Name="HarpAlt2" MSB="81" LSB="116" />
+				<Bank Name="GlassAlt" MSB="81" LSB="117" />
+				<Bank Name="AltoSax!" MSB="97" LSB="112" />
+				<Bank Name="SweetAlt" MSB="97" LSB="113" />
+				<Bank Name="LiteAlto" MSB="97" LSB="114" />
+				<Bank Name="HarpAlto" MSB="97" LSB="115" />
+				<Bank Name="HarpAlt2" MSB="97" LSB="116" />
+				<Bank Name="GlassAlt" MSB="97" LSB="117" />
+				<Bank Name="Formula" MSB="33" LSB="0" />
+				<Bank Name="NuSoprSx" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="TenorSx!" PC="67">
+				<Bank Name="TenorSx!" MSB="81" LSB="112" />
+				<Bank Name="MildTenr" MSB="81" LSB="113" />
+				<Bank Name="Jazz Sax" MSB="81" LSB="114" />
+				<Bank Name="TenorSub" MSB="81" LSB="115" />
+				<Bank Name="BellMike" MSB="81" LSB="116" />
+				<Bank Name="GlassTnr" MSB="81" LSB="117" />
+				<Bank Name="FunkyTnr" MSB="81" LSB="118" />
+				<Bank Name="OldTenor" MSB="81" LSB="119" />
+				<Bank Name="TenorSx!" MSB="97" LSB="112" />
+				<Bank Name="MildTenr" MSB="97" LSB="113" />
+				<Bank Name="Jazz Sax" MSB="97" LSB="114" />
+				<Bank Name="TenorSub" MSB="97" LSB="115" />
+				<Bank Name="BellMike" MSB="97" LSB="116" />
+				<Bank Name="GlassTnr" MSB="97" LSB="117" />
+				<Bank Name="FunkyTnr" MSB="97" LSB="118" />
+				<Bank Name="OldTenor" MSB="97" LSB="119" />
+				<Bank Name="Jurassic" MSB="33" LSB="0" />
+				<Bank Name="CvSoprSx" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="BariSax!" PC="68">
+				<Bank Name="BariSax!" MSB="81" LSB="112" />
+				<Bank Name="VoxoSaxo" MSB="81" LSB="113" />
+				<Bank Name="BariSax!" MSB="97" LSB="112" />
+				<Bank Name="VoxoSaxo" MSB="97" LSB="113" />
+				<Bank Name="Devil" MSB="33" LSB="0" />
+				<Bank Name="SoprPipe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Oboe!" PC="69">
+				<Bank Name="Oboe!" MSB="81" LSB="112" />
+				<Bank Name="Oboe!2" MSB="81" LSB="113" />
+				<Bank Name="DblReedy" MSB="81" LSB="114" />
+				<Bank Name="TripleRd" MSB="81" LSB="115" />
+				<Bank Name="Oboe!" MSB="97" LSB="112" />
+				<Bank Name="Oboe!2" MSB="97" LSB="113" />
+				<Bank Name="DblReedy" MSB="97" LSB="114" />
+				<Bank Name="TripleRd" MSB="97" LSB="115" />
+				<Bank Name="SpcHorse" MSB="33" LSB="0" />
+				<Bank Name="LiteSopr" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="EngHorn!" PC="70">
+				<Bank Name="EngHorn!" MSB="81" LSB="112" />
+				<Bank Name="Loboe" MSB="81" LSB="113" />
+				<Bank Name="EngHorn!" MSB="97" LSB="112" />
+				<Bank Name="Loboe" MSB="97" LSB="113" />
+				<Bank Name="Jason" MSB="33" LSB="0" />
+				<Bank Name="AnaSprno" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Bassoon!" PC="71">
+				<Bank Name="Bassoon!" MSB="81" LSB="112" />
+				<Bank Name="Flurinet" MSB="81" LSB="113" />
+				<Bank Name="Bassoon!" MSB="97" LSB="112" />
+				<Bank Name="Flurinet" MSB="97" LSB="113" />
+				<Bank Name="Suedhead" MSB="33" LSB="0" />
+				<Bank Name="NuAltoSx" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Clrinet!" PC="72">
+				<Bank Name="Clrinet!" MSB="81" LSB="112" />
+				<Bank Name="LitePipe" MSB="81" LSB="113" />
+				<Bank Name="HyperCla" MSB="81" LSB="114" />
+				<Bank Name="Clrinet!" MSB="97" LSB="112" />
+				<Bank Name="LitePipe" MSB="97" LSB="113" />
+				<Bank Name="HyperCla" MSB="97" LSB="114" />
+				<Bank Name="EspaGtr!" MSB="33" LSB="0" />
+				<Bank Name="SweetAlt" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Piccolo!" PC="73">
+				<Bank Name="Piccolo!" MSB="81" LSB="112" />
+				<Bank Name="Picolo!2" MSB="81" LSB="113" />
+				<Bank Name="BowPicol" MSB="81" LSB="114" />
+				<Bank Name="Piccolo!" MSB="97" LSB="112" />
+				<Bank Name="Picolo!2" MSB="97" LSB="113" />
+				<Bank Name="BowPicol" MSB="97" LSB="114" />
+				<Bank Name="JazzGtr!" MSB="33" LSB="0" />
+				<Bank Name="AltoSax!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="C Flute" PC="74">
+				<Bank Name="C Flute" MSB="81" LSB="112" />
+				<Bank Name="C Flute2" MSB="81" LSB="113" />
+				<Bank Name="JazFlute" MSB="81" LSB="114" />
+				<Bank Name="OakFlute" MSB="81" LSB="115" />
+				<Bank Name="C Flute" MSB="97" LSB="112" />
+				<Bank Name="C Flute2" MSB="97" LSB="113" />
+				<Bank Name="JazFlute" MSB="97" LSB="114" />
+				<Bank Name="OakFlute" MSB="97" LSB="115" />
+				<Bank Name="JazzyGtr" MSB="33" LSB="0" />
+				<Bank Name="HarpAlto" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Recordr!" PC="75">
+				<Bank Name="Recordr!" MSB="81" LSB="112" />
+				<Bank Name="Claricrd" MSB="81" LSB="113" />
+				<Bank Name="SoftPipe" MSB="81" LSB="114" />
+				<Bank Name="Recordr!" MSB="97" LSB="112" />
+				<Bank Name="Claricrd" MSB="97" LSB="113" />
+				<Bank Name="SoftPipe" MSB="97" LSB="114" />
+				<Bank Name="L7 Pluck" MSB="33" LSB="0" />
+				<Bank Name="HarpAlt2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Pan Pipe" PC="76">
+				<Bank Name="Pan Pipe" MSB="81" LSB="112" />
+				<Bank Name="PanPicol" MSB="81" LSB="113" />
+				<Bank Name="Pan Pipe" MSB="97" LSB="112" />
+				<Bank Name="PanPicol" MSB="97" LSB="113" />
+				<Bank Name="WetPluck" MSB="33" LSB="0" />
+				<Bank Name="GlassAlt" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="YamaBotl" PC="77">
+				<Bank Name="YamaBotl" MSB="81" LSB="112" />
+				<Bank Name="Bamboo" MSB="81" LSB="113" />
+				<Bank Name="Andean" MSB="81" LSB="114" />
+				<Bank Name="BtlFlute" MSB="81" LSB="115" />
+				<Bank Name="BtlFlut2" MSB="81" LSB="116" />
+				<Bank Name="YamaBotl" MSB="97" LSB="112" />
+				<Bank Name="Bamboo" MSB="97" LSB="113" />
+				<Bank Name="Andean" MSB="97" LSB="114" />
+				<Bank Name="BtlFlute" MSB="97" LSB="115" />
+				<Bank Name="BtlFlut2" MSB="97" LSB="116" />
+				<Bank Name="Comp.Gtr" MSB="33" LSB="0" />
+				<Bank Name="Acid Sax" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Shakuha!" PC="78">
+				<Bank Name="Shakuha!" MSB="81" LSB="112" />
+				<Bank Name="Shakuha!" MSB="97" LSB="112" />
+				<Bank Name="FunkyGtr" MSB="33" LSB="0" />
+				<Bank Name="Wack Sax" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="BowedSaw" PC="79">
+				<Bank Name="BowedSaw" MSB="81" LSB="112" />
+				<Bank Name="BowedSaw" MSB="97" LSB="112" />
+				<Bank Name="Thin Gtr" MSB="33" LSB="0" />
+				<Bank Name="NuTenrSx" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Ocarina!" PC="80">
+				<Bank Name="Ocarina!" MSB="81" LSB="112" />
+				<Bank Name="Ocarina!" MSB="97" LSB="112" />
+				<Bank Name="Carlos" MSB="33" LSB="0" />
+				<Bank Name="MildTenr" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="50/50" PC="81">
+				<Bank Name="50/50" MSB="81" LSB="112" />
+				<Bank Name="ChalPuls" MSB="81" LSB="113" />
+				<Bank Name="Pluck Ld" MSB="81" LSB="114" />
+				<Bank Name="50/50" MSB="97" LSB="112" />
+				<Bank Name="ChalPuls" MSB="97" LSB="113" />
+				<Bank Name="Pluck Ld" MSB="97" LSB="114" />
+				<Bank Name="Destiny" MSB="33" LSB="0" />
+				<Bank Name="Jazz Sax" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Brassyn" PC="82">
+				<Bank Name="Brassyn" MSB="81" LSB="112" />
+				<Bank Name="AcoSynLd" MSB="81" LSB="113" />
+				<Bank Name="VintLead" MSB="81" LSB="114" />
+				<Bank Name="Brassyn" MSB="97" LSB="112" />
+				<Bank Name="AcoSynLd" MSB="97" LSB="113" />
+				<Bank Name="VintLead" MSB="97" LSB="114" />
+				<Bank Name="Gonzo" MSB="33" LSB="0" />
+				<Bank Name="TenorSub" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Maysbe?!" PC="83">
+				<Bank Name="Maysbe?!" MSB="81" LSB="112" />
+				<Bank Name="Air Sax" MSB="81" LSB="113" />
+				<Bank Name="Baroquen" MSB="81" LSB="114" />
+				<Bank Name="LipClari" MSB="81" LSB="115" />
+				<Bank Name="Maysbe?!" MSB="97" LSB="112" />
+				<Bank Name="Air Sax" MSB="97" LSB="113" />
+				<Bank Name="Baroquen" MSB="97" LSB="114" />
+				<Bank Name="LipClari" MSB="97" LSB="115" />
+				<Bank Name="Grunge" MSB="33" LSB="0" />
+				<Bank Name="BellMike" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Grunge" PC="84">
+				<Bank Name="Grunge" MSB="81" LSB="112" />
+				<Bank Name="Ossyncro" MSB="81" LSB="113" />
+				<Bank Name="Talk Box" MSB="81" LSB="114" />
+				<Bank Name="Grunge" MSB="97" LSB="112" />
+				<Bank Name="Ossyncro" MSB="97" LSB="113" />
+				<Bank Name="Talk Box" MSB="97" LSB="114" />
+				<Bank Name="Ossyncro" MSB="33" LSB="0" />
+				<Bank Name="GlassTnr" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="MizuHorn" PC="85">
+				<Bank Name="MizuHorn" MSB="81" LSB="112" />
+				<Bank Name="Floboe" MSB="81" LSB="113" />
+				<Bank Name="MizuHorn" MSB="97" LSB="112" />
+				<Bank Name="Floboe" MSB="97" LSB="113" />
+				<Bank Name="Talk Box" MSB="33" LSB="0" />
+				<Bank Name="FunkyTnr" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SoftReed" PC="86">
+				<Bank Name="SoftReed" MSB="81" LSB="112" />
+				<Bank Name="BrethBow" MSB="81" LSB="113" />
+				<Bank Name="SoftReed" MSB="97" LSB="112" />
+				<Bank Name="BrethBow" MSB="97" LSB="113" />
+				<Bank Name="Sync Ld!" MSB="33" LSB="0" />
+				<Bank Name="OldTenor" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Old Mini" PC="87">
+				<Bank Name="Old Mini" MSB="33" LSB="0" />
+				<Bank Name="BrtTenor" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Chamlion" PC="88">
+				<Bank Name="Chamlion" MSB="81" LSB="112" />
+				<Bank Name="OldMini" MSB="81" LSB="113" />
+				<Bank Name="Chamlion" MSB="97" LSB="112" />
+				<Bank Name="OldMini" MSB="97" LSB="113" />
+				<Bank Name="Fat Mini" MSB="33" LSB="0" />
+				<Bank Name="BariSax!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Parlopho" PC="89">
+				<Bank Name="Parlopho" MSB="33" LSB="0" />
+				<Bank Name="VoxoSaxo" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SimpleSy" PC="90">
+				<Bank Name="SimpleSy" MSB="33" LSB="0" />
+				<Bank Name="Oboe!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Choronic" PC="91">
+				<Bank Name="Choronic" MSB="33" LSB="0" />
+				<Bank Name="Oboe!2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SlitMinu" PC="92">
+				<Bank Name="SlitMinu" MSB="33" LSB="0" />
+				<Bank Name="Noboe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SynHarmo" PC="93">
+				<Bank Name="SynHarmo" MSB="33" LSB="0" />
+				<Bank Name="OboeWhi." MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Flaggoot" PC="94">
+				<Bank Name="Flaggoot" MSB="33" LSB="0" />
+				<Bank Name="DblReedy" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Syn.Skex" PC="95">
+				<Bank Name="Syn.Skex" MSB="33" LSB="0" />
+				<Bank Name="TripleRd" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Reso.Sqr" PC="96">
+				<Bank Name="Reso.Sqr" MSB="33" LSB="0" />
+				<Bank Name="EngHorn!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Mad Tube" PC="97">
+				<Bank Name="Mad Tube" MSB="81" LSB="112" />
+				<Bank Name="Mad Tube" MSB="97" LSB="112" />
+				<Bank Name="Wurli Ld" MSB="33" LSB="0" />
+				<Bank Name="Loboe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="StoneHng" PC="98">
+				<Bank Name="StoneHng" MSB="81" LSB="112" />
+				<Bank Name="StoneHng" MSB="97" LSB="112" />
+				<Bank Name="FlatLead" MSB="33" LSB="0" />
+				<Bank Name="Bassoon!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Mu" PC="99">
+				<Bank Name="Mu" MSB="81" LSB="112" />
+				<Bank Name="Mu" MSB="97" LSB="112" />
+				<Bank Name="PhilTur" MSB="33" LSB="0" />
+				<Bank Name="Clrinet!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Moby" PC="100">
+				<Bank Name="Moby" MSB="81" LSB="112" />
+				<Bank Name="Moby" MSB="97" LSB="112" />
+				<Bank Name="ChalPuls" MSB="33" LSB="0" />
+				<Bank Name="LitePipe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Igenous" PC="101">
+				<Bank Name="Igenous" MSB="81" LSB="112" />
+				<Bank Name="Igenous" MSB="97" LSB="112" />
+				<Bank Name="Pluck Ld" MSB="33" LSB="0" />
+				<Bank Name="HyperCla" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SquealAT" PC="102">
+				<Bank Name="SquealAT" MSB="81" LSB="112" />
+				<Bank Name="SquealAT" MSB="97" LSB="112" />
+				<Bank Name="Brassyn" MSB="33" LSB="0" />
+				<Bank Name="Clrint!2" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="AcoSynLd" PC="103">
+				<Bank Name="AcoSynLd" MSB="33" LSB="0" />
+				<Bank Name="IslePipe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Moby" PC="104">
+				<Bank Name="Moby" MSB="33" LSB="0" />
+				<Bank Name="Chanter" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Sitar!" PC="105">
+				<Bank Name="Sitar!" MSB="81" LSB="112" />
+				<Bank Name="India" MSB="81" LSB="113" />
+				<Bank Name="Sitar!" MSB="97" LSB="112" />
+				<Bank Name="India" MSB="97" LSB="113" />
+				<Bank Name="Digitron" MSB="33" LSB="0" />
+				<Bank Name="ThaiReed" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="LyricOff" PC="106">
+				<Bank Name="LyricOff" MSB="33" LSB="0" />
+				<Bank Name="Recordr!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Rezzawi" PC="107">
+				<Bank Name="Rezzawi" MSB="33" LSB="0" />
+				<Bank Name="Claricrd" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Macro" PC="108">
+				<Bank Name="Macro" MSB="33" LSB="0" />
+				<Bank Name="SoftPipe" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Claribo" PC="109">
+				<Bank Name="Claribo" MSB="33" LSB="0" />
+				<Bank Name="BowedSaw" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Chanter" PC="110">
+				<Bank Name="Chanter" MSB="81" LSB="112" />
+				<Bank Name="ThaiReed" MSB="81" LSB="113" />
+				<Bank Name="Chanter" MSB="97" LSB="112" />
+				<Bank Name="ThaiReed" MSB="97" LSB="113" />
+				<Bank Name="Binafone" MSB="33" LSB="0" />
+				<Bank Name="Ocarina!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="JetLpBow" PC="111">
+				<Bank Name="JetLpBow" MSB="81" LSB="112" />
+				<Bank Name="JetLpBow" MSB="97" LSB="112" />
+				<Bank Name="MokoPipe" MSB="33" LSB="0" />
+				<Bank Name="Lonely" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Alibaba" PC="112">
+				<Bank Name="Alibaba" MSB="33" LSB="0" />
+				<Bank Name="Ophelia" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Persinet" PC="113">
+				<Bank Name="Persinet" MSB="33" LSB="0" />
+				<Bank Name="Maysbe?!" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="PicoPipe" PC="114">
+				<Bank Name="PicoPipe" MSB="33" LSB="0" />
+				<Bank Name="MizuHorn" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="YamSteel" PC="115">
+				<Bank Name="YamSteel" MSB="81" LSB="112" />
+				<Bank Name="YamSteel" MSB="97" LSB="112" />
+				<Bank Name="Gertrude" MSB="33" LSB="0" />
+				<Bank Name="Pico Str" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Xynth" PC="116">
+				<Bank Name="Xynth" MSB="33" LSB="0" />
+				<Bank Name="Sylophon" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Duality" PC="117">
+				<Bank Name="Duality" MSB="33" LSB="0" />
+				<Bank Name="Bowed Ld" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Alt Kwek" PC="118">
+				<Bank Name="Alt Kwek" MSB="33" LSB="0" />
+				<Bank Name="Squeeze" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Softblow" PC="119">
+				<Bank Name="Softblow" MSB="33" LSB="0" />
+				<Bank Name="MouthKey" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="AlbaPipe" PC="120">
+				<Bank Name="AlbaPipe" MSB="33" LSB="0" />
+				<Bank Name="AmpdHarp" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Jurassic" PC="121">
+				<Bank Name="Jurassic" MSB="81" LSB="112" />
+				<Bank Name="Jurassic" MSB="97" LSB="112" />
+				<Bank Name="Electrum" MSB="33" LSB="0" />
+				<Bank Name="CromHarp" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Formula" PC="122">
+				<Bank Name="Formula" MSB="81" LSB="112" />
+				<Bank Name="Formula" MSB="97" LSB="112" />
+				<Bank Name="Edgeopho" MSB="33" LSB="0" />
+				<Bank Name="WahUpHrp" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Waterfon" PC="123">
+				<Bank Name="Waterfon" MSB="81" LSB="112" />
+				<Bank Name="Waterfon" MSB="97" LSB="112" />
+				<Bank Name="BaClari!" MSB="33" LSB="0" />
+				<Bank Name="YamaBotl" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Devil" PC="124">
+				<Bank Name="Devil" MSB="81" LSB="112" />
+				<Bank Name="Devil" MSB="97" LSB="112" />
+				<Bank Name="WX Clari" MSB="33" LSB="0" />
+				<Bank Name="Blowsoo" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SpcHorse" PC="125">
+				<Bank Name="SpcHorse" MSB="81" LSB="112" />
+				<Bank Name="SpcHorse" MSB="97" LSB="112" />
+				<Bank Name="WX Oboe" MSB="33" LSB="0" />
+				<Bank Name="Brappo" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="DinoPerc" PC="126">
+				<Bank Name="DinoPerc" MSB="81" LSB="112" />
+				<Bank Name="DinoPerc" MSB="97" LSB="112" />
+				<Bank Name="WX JzGtr" MSB="33" LSB="0" />
+				<Bank Name="CrumBon" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="SpaceZoo" PC="127">
+				<Bank Name="SpaceZoo" MSB="81" LSB="112" />
+				<Bank Name="SpaceZoo" MSB="97" LSB="112" />
+				<Bank Name="Shakuha!" MSB="33" LSB="0" />
+				<Bank Name="Klarina" MSB="33" LSB="1" />
+			</PC>
+			<PC Name="Jason" PC="128">
+				<Bank Name="Jason" MSB="81" LSB="112" />
+				<Bank Name="Jason" MSB="97" LSB="112" />
+				<Bank Name="LipClari" MSB="33" LSB="0" />
+				<Bank Name="ReedWin" MSB="33" LSB="1" />
+			</PC>
+		</Map>
+		<!-- PLG-SG voices (MSB 98, also MSB 82 in the songs of the board) -->
+		<Map Name="SG">
+			<PC Name="M-Male" PC="1">
+				<Bank Name="M-Male" MSB="98" LSB="0" />
+				<Bank Name="M-Male" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-ASoft" PC="2">
+				<Bank Name="M-ASoft" MSB="98" LSB="0" />
+				<Bank Name="M-ASoft" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-AHusky" PC="3">
+				<Bank Name="M-AHusky" MSB="98" LSB="0" />
+				<Bank Name="M-AHusky" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-Enka" PC="4">
+				<Bank Name="M-Enka" MSB="98" LSB="0" />
+				<Bank Name="M-Enka" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-Opera" PC="5">
+				<Bank Name="M-Opera" MSB="98" LSB="0" />
+				<Bank Name="M-Opera" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-Classc" PC="6">
+				<Bank Name="M-Classc" MSB="98" LSB="0" />
+				<Bank Name="M-Classc" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-Antiq" PC="7">
+				<Bank Name="M-Antiq" MSB="98" LSB="0" />
+				<Bank Name="M-Antiq" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-DamiVo" PC="8">
+				<Bank Name="M-DamiVo" MSB="98" LSB="0" />
+				<Bank Name="M-DamiVo" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-MidAge" PC="9">
+				<Bank Name="M-MidAge" MSB="98" LSB="0" />
+				<Bank Name="M-MidAge" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-Heavy" PC="10">
+				<Bank Name="M-Heavy" MSB="98" LSB="0" />
+				<Bank Name="M-Heavy" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-YngMan" PC="11">
+				<Bank Name="M-YngMan" MSB="98" LSB="0" />
+				<Bank Name="M-YngMan" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-YSoft" PC="12">
+				<Bank Name="M-YSoft" MSB="98" LSB="0" />
+				<Bank Name="M-YSoft" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-YHusky" PC="13">
+				<Bank Name="M-YHusky" MSB="98" LSB="0" />
+				<Bank Name="M-YHusky" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-AGO" PC="14">
+				<Bank Name="M-AGO" MSB="98" LSB="0" />
+				<Bank Name="M-AGO" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-Idol" PC="15">
+				<Bank Name="M-Idol" MSB="98" LSB="0" />
+				<Bank Name="M-Idol" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="M-Honest" PC="16">
+				<Bank Name="M-Honest" MSB="98" LSB="0" />
+				<Bank Name="M-Honest" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-NMusic" PC="21">
+				<Bank Name="F-NMusic" MSB="98" LSB="0" />
+				<Bank Name="F-NMusic" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Weak" PC="22">
+				<Bank Name="F-Weak" MSB="98" LSB="0" />
+				<Bank Name="F-Weak" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Modrat" PC="23">
+				<Bank Name="F-Modrat" MSB="98" LSB="0" />
+				<Bank Name="F-Modrat" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Enka" PC="24">
+				<Bank Name="F-Enka" MSB="98" LSB="0" />
+				<Bank Name="F-Enka" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Opera" PC="25">
+				<Bank Name="F-Opera" MSB="98" LSB="0" />
+				<Bank Name="F-Opera" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Coquet" PC="26">
+				<Bank Name="F-Coquet" MSB="98" LSB="0" />
+				<Bank Name="F-Coquet" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Antiq" PC="27">
+				<Bank Name="F-Antiq" MSB="98" LSB="0" />
+				<Bank Name="F-Antiq" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Nose" PC="28">
+				<Bank Name="F-Nose" MSB="98" LSB="0" />
+				<Bank Name="F-Nose" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Chobo" PC="29">
+				<Bank Name="F-Chobo" MSB="98" LSB="0" />
+				<Bank Name="F-Chobo" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Pops" PC="31">
+				<Bank Name="F-Pops" MSB="98" LSB="0" />
+				<Bank Name="F-Pops" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Soft" PC="32">
+				<Bank Name="F-Soft" MSB="98" LSB="0" />
+				<Bank Name="F-Soft" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Boyish" PC="33">
+				<Bank Name="F-Boyish" MSB="98" LSB="0" />
+				<Bank Name="F-Boyish" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Buriko" PC="34">
+				<Bank Name="F-Buriko" MSB="98" LSB="0" />
+				<Bank Name="F-Buriko" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Bright" PC="35">
+				<Bank Name="F-Bright" MSB="98" LSB="0" />
+				<Bank Name="F-Bright" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Teens" PC="36">
+				<Bank Name="F-Teens" MSB="98" LSB="0" />
+				<Bank Name="F-Teens" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="F-Honest" PC="37">
+				<Bank Name="F-Honest" MSB="98" LSB="0" />
+				<Bank Name="F-Honest" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="K-Boy" PC="41">
+				<Bank Name="K-Boy" MSB="98" LSB="0" />
+				<Bank Name="K-Boy" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="K-Girl" PC="42">
+				<Bank Name="K-Girl" MSB="98" LSB="0" />
+				<Bank Name="K-Girl" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="K-Baby" PC="43">
+				<Bank Name="K-Baby" MSB="98" LSB="0" />
+				<Bank Name="K-Baby" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="NoseKid" PC="44">
+				<Bank Name="NoseKid" MSB="98" LSB="0" />
+				<Bank Name="NoseKid" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="Comical" PC="45">
+				<Bank Name="Comical" MSB="98" LSB="0" />
+				<Bank Name="Comical" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="C-Goat" PC="51">
+				<Bank Name="C-Goat" MSB="98" LSB="0" />
+				<Bank Name="C-Goat" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="C-Frog" PC="52">
+				<Bank Name="C-Frog" MSB="98" LSB="0" />
+				<Bank Name="C-Frog" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="C-Crow" PC="53">
+				<Bank Name="C-Crow" MSB="98" LSB="0" />
+				<Bank Name="C-Crow" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="C-Cow" PC="54">
+				<Bank Name="C-Cow" MSB="98" LSB="0" />
+				<Bank Name="C-Cow" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="C-Msqito" PC="55">
+				<Bank Name="C-Msqito" MSB="98" LSB="0" />
+				<Bank Name="C-Msqito" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="A-Mercry" PC="61">
+				<Bank Name="A-Mercry" MSB="98" LSB="0" />
+				<Bank Name="A-Mercry" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="A-Venus" PC="62">
+				<Bank Name="A-Venus" MSB="98" LSB="0" />
+				<Bank Name="A-Venus" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="A-Mars" PC="63">
+				<Bank Name="A-Mars" MSB="98" LSB="0" />
+				<Bank Name="A-Mars" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="A-Jupitr" PC="64">
+				<Bank Name="A-Jupitr" MSB="98" LSB="0" />
+				<Bank Name="A-Jupitr" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="A-Saturn" PC="65">
+				<Bank Name="A-Saturn" MSB="98" LSB="0" />
+				<Bank Name="A-Saturn" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="R-Mirai" PC="71">
+				<Bank Name="R-Mirai" MSB="98" LSB="0" />
+				<Bank Name="R-Mirai" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="AM.Radio" PC="72">
+				<Bank Name="AM.Radio" MSB="98" LSB="0" />
+				<Bank Name="AM.Radio" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="R-HAL100" PC="73">
+				<Bank Name="R-HAL100" MSB="98" LSB="0" />
+				<Bank Name="R-HAL100" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="TinyUFO" PC="74">
+				<Bank Name="TinyUFO" MSB="98" LSB="0" />
+				<Bank Name="TinyUFO" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="SpSiren" PC="75">
+				<Bank Name="SpSiren" MSB="98" LSB="0" />
+				<Bank Name="SpSiren" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="R-LowFi" PC="76">
+				<Bank Name="R-LowFi" MSB="98" LSB="0" />
+				<Bank Name="R-LowFi" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="R-Kororo" PC="77">
+				<Bank Name="R-Kororo" MSB="98" LSB="0" />
+				<Bank Name="R-Kororo" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="CrzyRobo" PC="78">
+				<Bank Name="CrzyRobo" MSB="98" LSB="0" />
+				<Bank Name="CrzyRobo" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="OpenRobo" PC="79">
+				<Bank Name="OpenRobo" MSB="98" LSB="0" />
+				<Bank Name="OpenRobo" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="R-Trmolo" PC="80">
+				<Bank Name="R-Trmolo" MSB="98" LSB="0" />
+				<Bank Name="R-Trmolo" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="VTrumpet" PC="81">
+				<Bank Name="VTrumpet" MSB="98" LSB="0" />
+				<Bank Name="VTrumpet" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="VOrgan" PC="82">
+				<Bank Name="VOrgan" MSB="98" LSB="0" />
+				<Bank Name="VOrgan" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="VSynBass" PC="83">
+				<Bank Name="VSynBass" MSB="98" LSB="0" />
+				<Bank Name="VSynBass" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="VSynth1" PC="84">
+				<Bank Name="VSynth1" MSB="98" LSB="0" />
+				<Bank Name="VSynth1" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="VSynth2" PC="85">
+				<Bank Name="VSynth2" MSB="98" LSB="0" />
+				<Bank Name="VSynth2" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="N-Wind" PC="91">
+				<Bank Name="N-Wind" MSB="98" LSB="0" />
+				<Bank Name="N-Wind" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="N-Wtrfal" PC="92">
+				<Bank Name="N-Wtrfal" MSB="98" LSB="0" />
+				<Bank Name="N-Wtrfal" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="N-Storm" PC="93">
+				<Bank Name="N-Storm" MSB="98" LSB="0" />
+				<Bank Name="N-Storm" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="N-Sea" PC="94">
+				<Bank Name="N-Sea" MSB="98" LSB="0" />
+				<Bank Name="N-Sea" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="WaterEFX" PC="95">
+				<Bank Name="WaterEFX" MSB="98" LSB="0" />
+				<Bank Name="WaterEFX" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="O-Cry" PC="101">
+				<Bank Name="O-Cry" MSB="98" LSB="0" />
+				<Bank Name="O-Cry" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="Dosukoi" PC="102">
+				<Bank Name="Dosukoi" MSB="98" LSB="0" />
+				<Bank Name="Dosukoi" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="O-Onchi" PC="103">
+				<Bank Name="O-Onchi" MSB="98" LSB="0" />
+				<Bank Name="O-Onchi" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="Unison1" PC="104">
+				<Bank Name="Unison1" MSB="98" LSB="0" />
+				<Bank Name="Unison1" MSB="82" LSB="0" />
+			</PC>
+			<PC Name="Unison2" PC="105">
+				<Bank Name="Unison2" MSB="98" LSB="0" />
+				<Bank Name="Unison2" MSB="82" LSB="0" />
 			</PC>
 		</Map>
 		<Map Name="GM Level 2 voices (MSB 121)">

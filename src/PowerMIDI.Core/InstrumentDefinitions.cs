@@ -61,13 +61,18 @@ public sealed class InstrumentDefinitions
     // MU50: the voices an XG Level 1 module also has (capital voices and part of the variations, marked MU50="1" in
     // the file), offered when the module plays the MU Basic voice map; its capital voices are plain bank LSB 0.
     // With that voice map, only the MU50 map, the SFX voices and the drum kits of the MU50 are offered.
+    // VL and SG: the PLG-VL and PLG-SG boards (as on the S-YXG2026): VL = bank MSB 81 (XG voices) and 33 (its own bank),
+    // SG = MSB 98. The songs of the boards also use MSB 97 (VL) and 82 (SG): named, listed once by 81 / 98.
     public static readonly Dictionary<int, string> XgMapNames = new()
-        { [2] = "2000", [3] = "MEx", [4] = "SFX", [5] = "Spl", [6] = "GM2", [7] = "50" };
+        { [2] = "2000", [3] = "MEx", [4] = "SFX", [5] = "SPL", [6] = "GM2", [7] = "50", [8] = "VL", [9] = "SG" };
     public const int XgNativeMap = 2, XgSamplingMap = 5, XgMu50Map = 7;
     public const int XgBasicLsb = 127, XgNativeLsb = 126;
 
+    // Bank MSB a board voice is listed by (see XgMapNames).
+    public static int XgListedMsb(int msb) => msb switch { 97 => 81, 82 => 98, _ => msb };
+
     // Map of an XG voice (not of a drum kit); a bank the MU2000 does not have counts as the default map.
-    public static int XgMap(int msb) => msb switch { 48 => 3, 64 => 4, 16 => 5, 121 => 6, _ => XgNativeMap };
+    public static int XgMap(int msb) => XgListedMsb(msb) switch { 48 => 3, 64 => 4, 16 => 5, 121 => 6, 81 or 33 => 8, 98 => 9, _ => XgNativeMap };
 
     // Map of an XG voice when the MU50 map is offered (MU Basic voice map): a voice the MU50 has belongs to it,
     // unless its bank asks for the MU100 Native version of the capital voice (LSB 126).
@@ -76,7 +81,7 @@ public sealed class InstrumentDefinitions
 
     static bool IsInXgMap(int map, int msb) => map switch
     {
-        3 => msb == 48, 4 => msb == 64, XgSamplingMap => msb == 16, 6 => msb == 121,
+        3 => msb == 48, 4 => msb == 64, XgSamplingMap => msb == 16, 6 => msb == 121, 8 => msb is 81 or 33, 9 => msb == 98,
         _ => msb == 0,
     };
 
@@ -486,10 +491,12 @@ public sealed class InstrumentDefinitions
         else if (drum && GmDrums.Count > 0) raw.AddRange(GmDrums.Select(kv => (0, 0, kv.Key, kv.Value)));
         else for (int pc = 0; pc < 128; pc++) raw.Add((0, 0, pc, GmProgramName(pc)));
 
-        // In XG, the SFX kits (MSB 126) come after the drum kits; the sampling voices are listed bank after bank.
+        // In XG, the SFX kits (MSB 126) come after the drum kits; the sampling voices are listed bank after bank. In the VL
+        // map, the XG voices of a program (MSB 81, in the GM order: trumpets on program 57…) come before those of the own
+        // bank of the board (MSB 33, in an order of its own), so that the program is headed by one of them.
         bool byBank = useXg && !drum && map == XgSamplingMap;
         var sorted = raw.OrderBy(r => useXg && drum && r.Msb == 126).ThenBy(r => byBank ? r.Lsb : 0).ThenBy(r => r.Program)
-                        .ThenBy(r => r.Msb).ThenBy(r => r.Lsb).ToList();
+                        .ThenBy(r => useXg && r.Msb == 33).ThenBy(r => r.Msb).ThenBy(r => r.Lsb).ToList();
         var choices = sorted.Select((r, i) =>
             {
                 // Base sound of a program: number shown. Variation: indented under its program.

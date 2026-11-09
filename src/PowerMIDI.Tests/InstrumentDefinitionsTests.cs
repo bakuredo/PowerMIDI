@@ -105,8 +105,13 @@ public class InstrumentDefinitionsTests
     [InlineData(0, "2000")]        // every bank LSB, 126 and 127 (MU100 Native / MU Basic) included
     [InlineData(48, "MEx")]
     [InlineData(64, "SFX")]
-    [InlineData(16, "Spl")]
+    [InlineData(16, "SPL")]
     [InlineData(121, "GM2")]
+    [InlineData(81, "VL")]         // PLG-VL: XG voices, its own bank, the bank of its songs
+    [InlineData(33, "VL")]
+    [InlineData(97, "VL")]
+    [InlineData(98, "SG")]         // PLG-SG, and the bank of its songs
+    [InlineData(82, "SG")]
     [InlineData(5, "2000")]        // a bank the module does not have
     public void Xg_map_of_a_bank(int msb, string map) =>
         Assert.Equal(map, InstrumentDefinitions.XgMapNames[InstrumentDefinitions.XgMap(msb)]);
@@ -139,10 +144,20 @@ public class InstrumentDefinitionsTests
         Assert.All(Map("MEx"), c => Assert.Equal(48, c.Msb));
         Assert.All(Map("SFX"), c => Assert.Equal(64, c.Msb));
         Assert.All(Map("GM2"), c => Assert.Equal(121, c.Msb));
-        var sampling = Map("Spl");
+        var sampling = Map("SPL");
         Assert.Equal(256, sampling.Count);
         Assert.Equal(Enumerable.Range(1, 256).Select(n => $"Voice{n:000}"), sampling.Select(c => c.Text[4..]));
         Assert.Equal(256, Map("GM2").Count);
+        // PLG-VL and PLG-SG: listed once by their own banks (not by the banks of their songs, 97 / 82, also named).
+        Assert.Equal(136 + 256, Map("VL").Count);
+        Assert.All(Map("VL"), c => Assert.True(c.Msb is 81 or 33));
+        // A program headed by its XG voices (MSB 81, GM order), then those of the own bank of the board (MSB 33).
+        Assert.Equal(new[] { "057 Trumpet!", "      · Trumpt!2", "      · FluglHr!", "      · Cornet!", "      · AttakSyn", "      · PanPicol" },
+                     Map("VL").Where(c => c.Program == 56).Select(c => c.Text));
+        Assert.Equal(72, Map("SG").Count);
+        Assert.All(Map("SG"), c => Assert.Equal(98, c.Msb));
+        Assert.Equal("Trumpet!", Defs.Resolve("XG", 0, 56, 97, 112, 0).Name);
+        Assert.Equal("F-NMusic", Defs.Resolve("XG", 0, 20, 82, 0, 0).Name);
     }
 
     // MU50 map (offered with the MU Basic voice map): the voices an XG Level 1 module also has.
