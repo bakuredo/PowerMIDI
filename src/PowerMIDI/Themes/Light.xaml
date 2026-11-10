@@ -24,7 +24,6 @@
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#FFFFFF"/>
   <SolidColorBrush x:Key="ActivityBrush" Color="#1E78D7"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#A8650A"/>
-  <!-- Scroll bars: thumb at rest, under the mouse -->
   <SolidColorBrush x:Key="ScrollThumbBrush" Color="#A3A8B3"/>
   <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#6A6F7C"/>
   <!-- LCD Screen -->
@@ -33,6 +32,9 @@
   <SolidColorBrush x:Key="LcdDotBrush" Color="#D6D9DF"/>
   <SolidColorBrush x:Key="LcdTextBrush" Color="#2A2E35"/>
   <SolidColorBrush x:Key="LcdSungBrush" Color="#000000"/>
+  <!-- Fonts -->
+  <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
+  <FontFamily x:Key="MonoFont">Consolas</FontFamily>
   <!-- Background image (<name>.jpg or .png, optional), values in % -->
   <sys:Double x:Key="BackgroundTint">55</sys:Double>
   <sys:Double x:Key="BackgroundOpacity">85</sys:Double>

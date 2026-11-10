@@ -2,9 +2,10 @@ using System.Xml.Linq;
 
 namespace PowerMIDI.Core;
 
-// Color theme file (themes\<name>.xaml next to the program): a list of <SolidColorBrush x:Key="…" Color="…"/>, and the
-// numbers of the background image (<sys:Double x:Key="…">). Read as plain XML, not loaded as XAML: a theme file can only
-// give colors and numbers, nothing in it is ever executed.
+// Color theme file (themes\<name>.xaml next to the program): a list of <SolidColorBrush x:Key="…" Color="…"/>, the
+// fonts of the interface (<FontFamily x:Key="…">) and the numbers of the background image (<sys:Double x:Key="…">). Read
+// as plain XML, not loaded as XAML: a theme file can only give colors, font names and numbers, nothing in it is ever
+// executed.
 public static class ThemeFile
 {
     static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
@@ -55,5 +56,24 @@ public static class ThemeFile
         }
         catch { numbers.Clear(); }
         return numbers;
+    }
+
+    // Fonts of a theme file by key (<FontFamily x:Key="…">Segoe UI</FontFamily>, e.g. UiFont): their names, as written
+    // (a list of names separated by commas too). Empty if the file is missing or not valid XML; an empty name is ignored,
+    // and so is one with # / or \: WPF reads it as the place of a font file ("file:///…/#Name", "\\server\…#Name"), which a
+    // theme must not load (installed fonts only).
+    public static Dictionary<string, string> ReadFonts(string path)
+    {
+        var fonts = new Dictionary<string, string>();
+        try
+        {
+            foreach (var e in XDocument.Load(path).Descendants().Where(e => e.Name.LocalName == "FontFamily"))
+            {
+                string key = (string)e.Attribute(Xaml + "Key"), name = e.Value.Trim();
+                if (!string.IsNullOrWhiteSpace(key) && name.Length > 0 && name.IndexOfAny(new[] { '#', '/', '\\' }) < 0) fonts[key.Trim()] = name;
+            }
+        }
+        catch { fonts.Clear(); }
+        return fonts;
     }
 }

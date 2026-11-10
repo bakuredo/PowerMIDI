@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
         Title="{Binding Title}" Icon="PowerMIDI.ico" Width="1100" Height="720" MinWidth="900" MinHeight="420"
-        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource WindowTextBrush}" FontFamily="Segoe UI" FontSize="13"
+        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource WindowTextBrush}" FontFamily="{DynamicResource UiFont}" FontSize="13"
         WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance vm:EventEditorViewModel}">
   <!-- Event Editor (see EventEditorViewModel): the events of the current track, filtered; the row being played is
@@ -34,7 +34,7 @@
       </Style>
       <!-- Hexadecimal and numbers in a fixed-width font. -->
       <DataTemplate x:Key="DataCell">
-        <TextBlock Text="{Binding Data}" FontFamily="Consolas" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Text="{Binding Data}" FontFamily="{DynamicResource MonoFont}" TextTrimming="CharacterEllipsis"/>
       </DataTemplate>
       <DataTemplate x:Key="DescriptionCell">
         <TextBlock Text="{Binding Description}" TextTrimming="CharacterEllipsis"/>
@@ -179,7 +179,7 @@
             <TextBlock Text="{Binding TextLabel}" Style="{StaticResource Label}"/>
             <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource SearchBox}" Padding="2,1" VerticalAlignment="Center"
                      VerticalContentAlignment="Center"
-                     FontFamily="Consolas" IsEnabled="{Binding CanApply}"/>
+                     FontFamily="{DynamicResource MonoFont}" IsEnabled="{Binding CanApply}"/>
           </DockPanel>
         </DockPanel>
       </StackPanel>

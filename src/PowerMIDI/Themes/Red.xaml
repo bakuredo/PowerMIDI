@@ -24,15 +24,17 @@
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
   <SolidColorBrush x:Key="ActivityBrush" Color="#FF6B81"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#E0A050"/>
-  <!-- Scroll bars: thumb at rest, under the mouse -->
   <SolidColorBrush x:Key="ScrollThumbBrush" Color="#AE8A8D"/>
   <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#F3E6E6"/>
-  <!-- Screen of the module (LCD): background, border, dots off, text and dots on, part of the lyrics already sung -->
+  <!-- LCD Screen -->
   <SolidColorBrush x:Key="LcdBrush" Color="#2A0E12"/>
   <SolidColorBrush x:Key="LcdLineBrush" Color="#5A2630"/>
   <SolidColorBrush x:Key="LcdDotBrush" Color="#3A161C"/>
   <SolidColorBrush x:Key="LcdTextBrush" Color="#FF7A8C"/>
   <SolidColorBrush x:Key="LcdSungBrush" Color="#FFE4E8"/>
+  <!-- Fonts -->
+  <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
+  <FontFamily x:Key="MonoFont">Consolas</FontFamily>
   <!-- Background image (<name>.jpg or .png, optional), values in % -->
   <sys:Double x:Key="BackgroundTint">55</sys:Double>
   <sys:Double x:Key="BackgroundOpacity">85</sys:Double>

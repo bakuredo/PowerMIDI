@@ -6,7 +6,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d"
         Title="PowerMIDI" Icon="PowerMIDI.ico" Width="1172" Height="620" MinWidth="1098" MinHeight="620"
-        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource WindowTextBrush}" FontFamily="Segoe UI" FontSize="13"
+        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource WindowTextBrush}" FontFamily="{DynamicResource UiFont}" FontSize="13"
         AllowDrop="True" WindowStartupLocation="CenterScreen"
         d:DataContext="{d:DesignInstance vm:MainViewModel}"
         Drop="OnDrop" PreviewKeyDown="OnPreviewKeyDown" PreviewKeyUp="OnPreviewKeyUp" Deactivated="OnDeactivated"
@@ -274,7 +274,7 @@
             <MouseBinding MouseAction="RightClick" Command="{Binding ResetSpeedCommand}"/>
           </Slider.InputBindings>
         </Slider>
-        <TextBlock Grid.Column="2" Text="{Binding SpeedText}" FontFamily="Consolas" TextAlignment="Right" Margin="0,0,6,0"/>
+        <TextBlock Grid.Column="2" Text="{Binding SpeedText}" FontFamily="{DynamicResource MonoFont}" TextAlignment="Right" Margin="0,0,6,0"/>
         <!-- Pitch: an arrow up and an arrow down, drawn bold, in the color of the text. -->
         <Viewbox Grid.Column="3" Width="14" Height="15" VerticalAlignment="Center" Margin="24,0,5,0" ToolTip="Pitch" AutomationProperties.Name="Pitch">
           <Path Stroke="{Binding (TextElement.Foreground), RelativeSource={RelativeSource Self}}" StrokeThickness="1.9"
@@ -288,7 +288,7 @@
             <MouseBinding MouseAction="RightClick" Command="{Binding ResetTransposeCommand}"/>
           </Slider.InputBindings>
         </Slider>
-        <TextBlock Grid.Column="5" Text="{Binding TransposeText}" FontFamily="Consolas" TextAlignment="Center" Margin="3,0,-3,0"/>   <!-- the pitch part 3 px right (icon, slider, value): the value under the M buttons -->
+        <TextBlock Grid.Column="5" Text="{Binding TransposeText}" FontFamily="{DynamicResource MonoFont}" TextAlignment="Center" Margin="3,0,-3,0"/>   <!-- the pitch part 3 px right (icon, slider, value): the value under the M buttons -->
       </Grid>
       <!-- One row per channel: number · LED · map · instrument · slider · value · M -->
       <ItemsControl ItemsSource="{Binding Channels}">
@@ -306,7 +306,7 @@
               </Grid.ColumnDefinitions>
 
               <!-- Channel number: bold on a drum channel; click = keyboard mode on this channel (highlighted). -->
-              <TextBlock Text="{Binding Number}" ToolTip="{Binding NumberToolTip}" FontFamily="Consolas" Cursor="Hand"
+              <TextBlock Text="{Binding Number}" ToolTip="{Binding NumberToolTip}" FontFamily="{DynamicResource MonoFont}" Cursor="Hand"
                          Padding="2,1" Margin="0,0,4,0" HorizontalAlignment="Left">
                 <TextBlock.InputBindings>
                   <MouseBinding Gesture="LeftClick" Command="{Binding KeyboardCommand}"/>
@@ -402,7 +402,7 @@
 
               <!-- Value: in the accent color and bold when fixed, underlined when fixed for the whole track (right click: whole
                    track or until the first change of the controller). -->
-              <TextBlock Grid.Column="5" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right" Margin="0,0,6,0"
+              <TextBlock Grid.Column="5" Text="{Binding ValueText}" FontFamily="{DynamicResource MonoFont}" TextAlignment="Right" Margin="0,0,6,0"
                          Background="Transparent" ToolTip="{Binding ValueToolTip}">
                 <TextBlock.InputBindings>
                   <MouseBinding MouseAction="RightClick" Command="{Binding WholeTrackCommand}"/>
@@ -487,7 +487,7 @@
             </ComboBox.Style>
           </ComboBox>
           <!-- Hidden when empty: the list then takes its column, and a TextBlock would catch the clicks over it. -->
-          <TextBlock Grid.Column="2" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right">
+          <TextBlock Grid.Column="2" Text="{Binding ValueText}" FontFamily="{DynamicResource MonoFont}" TextAlignment="Right">
             <TextBlock.Style>
               <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                 <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
@@ -517,7 +517,7 @@
               <MouseBinding MouseAction="RightClick" Command="{Binding ClearCommand}"/>
             </Slider.InputBindings>
           </Slider>
-          <TextBlock Grid.Column="2" Text="{Binding ValueText}" FontFamily="Consolas" TextAlignment="Right">
+          <TextBlock Grid.Column="2" Text="{Binding ValueText}" FontFamily="{DynamicResource MonoFont}" TextAlignment="Right">
             <TextBlock.Style>
               <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
                 <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
@@ -1058,7 +1058,7 @@
             <TextBlock Text="{Binding CurrentStandard}" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}"/>
           </Border>
           <!-- Title and time on the same baseline: both at the bottom, the time (Consolas, deeper descent) raised by 1; its right end 1 px inside the one of the position bar. -->
-          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="Consolas" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
+          <TextBlock DockPanel.Dock="Right" Text="{Binding TimeText}" FontFamily="{DynamicResource MonoFont}" FontSize="14" VerticalAlignment="Bottom" Margin="0,0,0,1"/>
           <TextBlock Text="{Binding Title}" ToolTip="{Binding TitleToolTip}" FontSize="15" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom"/>
         </DockPanel>
         <!-- Position: the jump happens when the mouse button is released. -->
@@ -1166,7 +1166,7 @@
             </TextBlock>
             <Slider Width="90" Minimum="0" Maximum="127" Value="{Binding MasterVolume}" b:Wheel.SliderStep="True" IsMoveToPointEnabled="True"
                     VerticalAlignment="Center" ToolTip="Master volume"/>
-            <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="Consolas"/>
+            <TextBlock Text="{Binding MasterVolumeText}" Width="28" Margin="6,0,0,0" VerticalAlignment="Center" FontFamily="{DynamicResource MonoFont}"/>
           </StackPanel>
           <Grid/>
         </DockPanel>
@@ -1180,7 +1180,7 @@
                 Visibility="{Binding DisplayShown, Converter={StaticResource BoolToVisibility}}">
           <DockPanel>
             <Image DockPanel.Dock="Left" Source="{Binding DisplayDots}" Width="48" Height="48" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
-            <TextBlock FontFamily="Consolas" FontSize="13" Foreground="{DynamicResource LcdTextBrush}" xml:space="preserve"
+            <TextBlock FontFamily="{DynamicResource MonoFont}" FontSize="13" Foreground="{DynamicResource LcdTextBrush}" xml:space="preserve"
                        VerticalAlignment="Center" Margin="8,0,6,0" TextAlignment="Center" TextTrimming="CharacterEllipsis"><Run
                        Text="{Binding DisplaySung, Mode=OneWay}" Foreground="{DynamicResource LcdSungBrush}" FontWeight="Bold"/><Run
                        Text="{Binding DisplayComing, Mode=OneWay}"/></TextBlock>

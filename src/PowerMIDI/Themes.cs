@@ -90,6 +90,11 @@ public static class Themes
     // its opacity over the image in %); the panels over it let it show through (BackgroundOpacity: their opacity in %).
     static readonly string[] BackgroundKeys = { "BackgroundTint", "BackgroundOpacity" };
 
+    // Fonts of the interface (MainWindow.xaml, EventEditorWindow.xaml, Styles.xaml): UiFont for the text, MonoFont for the
+    // numbers in columns (time, values of the Mixer, data of the Event Editor, screen of the module). The icons keep
+    // Segoe MDL2 Assets. A font missing from the computer: Windows shows another one.
+    static readonly string[] FontKeys = { "UiFont", "MonoFont" };
+
     // Size of all the screens, in pixels (WPF gives it in device-independent units).
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
     const int SmCxVirtualScreen = 78, SmCyVirtualScreen = 79;
@@ -165,6 +170,9 @@ public static class Themes
         // Numbers of the background image (a file written before they existed: those of the built-in theme).
         foreach (var (key, value) in ThemeFile.ReadNumbers(Path.Combine(Folder, name + ".xaml")))
             if (BackgroundKeys.Contains(key)) dictionary[key] = value;
+        // Fonts of the file (a file written before they existed: those of the built-in theme).
+        foreach (var (key, font) in ThemeFile.ReadFonts(Path.Combine(Folder, name + ".xaml")))
+            if (FontKeys.Contains(key)) dictionary[key] = new FontFamily(font);
         // Activity LEDs: a file that gives its accent color and not this one (e.g. written before it existed) has
         // them in its accent color, not in the one of the built-in theme.
         if (colors.ContainsKey("AccentBrush") && !colors.ContainsKey("ActivityBrush") && dictionary["AccentBrush"] is SolidColorBrush accent)

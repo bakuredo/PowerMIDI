@@ -85,6 +85,22 @@ public class ThemeFileTests : IDisposable
         {
             Assert.Equal(keys, ThemeFile.ReadColors(Path.Combine(themes, name + ".xaml")).Keys.OrderBy(k => k).ToList());
             Assert.Equal(new[] { "BackgroundOpacity", "BackgroundTint" }, ThemeFile.ReadNumbers(Path.Combine(themes, name + ".xaml")).Keys.OrderBy(k => k));
+            var fonts = ThemeFile.ReadFonts(Path.Combine(themes, name + ".xaml"));
+            Assert.Equal(("Segoe UI", "Consolas"), (fonts["UiFont"], fonts["MonoFont"]));
         }
+    }
+
+    // Fonts of the interface: their names by key, as written (an empty one ignored); never the place of a font file.
+    [Fact]
+    public void Fonts_are_read_by_key()
+    {
+        var path = Write("Retro.xaml", Header + "<FontFamily x:Key=\"UiFont\"> Bahnschrift, Arial </FontFamily>" +
+            "<FontFamily x:Key=\"MonoFont\"></FontFamily><SolidColorBrush x:Key=\"TextBrush\" Color=\"#FFFFFF\"/></ResourceDictionary>");
+        Assert.Equal("Bahnschrift, Arial", Assert.Single(ThemeFile.ReadFonts(path)).Value);
+        Assert.Empty(ThemeFile.ReadFonts(Path.Combine(folder, "missing.xaml")));
+
+        var files = Write("Files.xaml", Header + "<FontFamily x:Key=\"UiFont\">file:///C:/Fonts/#Evil</FontFamily>" +
+            "<FontFamily x:Key=\"MonoFont\">\\\\server\\share\\#Evil</FontFamily><FontFamily x:Key=\"A\">./fonts/#Evil</FontFamily></ResourceDictionary>");
+        Assert.Empty(ThemeFile.ReadFonts(files));
     }
 }
