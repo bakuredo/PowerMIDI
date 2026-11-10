@@ -280,15 +280,6 @@ public partial class MainWindow : Window, IMainView
         });
     }
 
-    // The controls of the tabs (right panel) and of the Event Editor light or in the colors of the theme (see
-    // Themes.LightControls).
-    void ApplyControlColors()
-    {
-        Themes.ApplyControls(RightTabs.Resources);
-        if (eventWindow != null) Themes.ApplyControls(eventWindow.Resources);
-        Themes.ApplyHover();
-    }
-
     void OnPreviewKeyUp(object sender, KeyEventArgs e)
     {
         bool used = false;
@@ -442,7 +433,7 @@ public partial class MainWindow : Window, IMainView
     {
         if (eventWindow != null) { eventWindow.Activate(); return; }
         eventWindow = new EventEditorWindow(editor) { Topmost = eventWindowTopmost };
-        Themes.ApplyControls(eventWindow.Resources);
+        Themes.ApplyInstrumentIcons(eventWindow.Resources);
         eventWindow.Closed += (_, _) => { eventWindowTopmost = eventWindow.Topmost; eventWindow = null; closed(); };
         eventWindow.Show();
     }
@@ -464,7 +455,6 @@ public partial class MainWindow : Window, IMainView
         ini.Set("Window", "Height", (int)bounds.Height);
         ini.Set("Window", "Maximized", WindowState == WindowState.Maximized ? 1 : 0);
         ini.Set("Window", "Theme", Themes.Current);
-        ini.Set("Window", "LightControls", Themes.LightControls ? 1 : 0);
         ini.Set("Window", "InstrumentIcons", Themes.InstrumentIcons ? 1 : 0);
         ini.Write(SettingsPath, "PowerMIDI settings (written on close).");
     }
@@ -500,11 +490,10 @@ public partial class MainWindow : Window, IMainView
         }
         if (ini.Get("Window", "Maximized") == "1") WindowState = WindowState.Maximized;
 
-        // Color theme (About tab); a missing or unknown name gives the default theme. Light controls and instrument
-        // icons of the Mixer: in the INI only (LightControls=1; icons shown unless InstrumentIcons=0).
-        Themes.LightControls = ini.Get("Window", "LightControls") == "1";
+        // Color theme (About tab); a missing or unknown name gives the default theme. Instrument icons of the Mixer: in
+        // the INI only (shown unless InstrumentIcons=0).
         Themes.InstrumentIcons = ini.Get("Window", "InstrumentIcons") != "0";
-        ApplyControlColors();
+        Themes.ApplyInstrumentIcons(RightTabs.Resources);
         Themes.Apply(ini.Get("Window", "Theme"));
         ThemeBox.ItemsSource = Themes.Names;
         ThemeBox.SelectedItem = Themes.Current;

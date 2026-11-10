@@ -24,6 +24,9 @@
   <SolidColorBrush x:Key="OnAccentTextBrush" Color="#1E1E1E"/>
   <SolidColorBrush x:Key="ActivityBrush" Color="#A6E35A"/>
   <SolidColorBrush x:Key="WarningBrush" Color="#E0A050"/>
+  <!-- Scroll bars: thumb at rest, under the mouse -->
+  <SolidColorBrush x:Key="ScrollThumbBrush" Color="#86A792"/>
+  <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#E4F2E8"/>
   <!-- LCD Screen -->
   <SolidColorBrush x:Key="LcdBrush" Color="#1F2A14"/>
   <SolidColorBrush x:Key="LcdLineBrush" Color="#3D5226"/>

@@ -20,9 +20,15 @@ public sealed class CollectionFiles : IDisposable
     {
         this.info = info;
         root = info.Root.Trim('/');
-        ZipPath = Path.Combine(libraryFolder, info.ZipName);
-        CacheFolder = Path.Combine(libraryFolder, "cache", info.Id);
+        ZipPath = Path.Combine(libraryFolder, PlainName(info.ZipName, "zip name"));
+        CacheFolder = Path.Combine(libraryFolder, "cache", PlainName(info.Id, "collection id"));
     }
+
+    // The zip and the cache folder stay in the library folder, whatever the database says: their names are refused if they
+    // are paths (a database changed by someone else could otherwise have files written, or deleted, elsewhere).
+    static string PlainName(string name, string what) =>
+        !string.IsNullOrWhiteSpace(name) && name == Path.GetFileName(name) && name is not ("." or "..") && name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+            ? name : throw new InvalidDataException($"Library database: invalid {what} '{name}'");
 
     public void Dispose() => Close();
 

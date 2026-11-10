@@ -73,7 +73,16 @@ public sealed partial class MainViewModel : ObservableObject
 
         Mixer.KeyboardToggle = c => Run(() => ToggleKeyboardChannel(c));
 
-        timer.Tick += (_, _) => Run(OnTimer);
+        // Not again while a tick is still running: its error message is open (the timer goes on meanwhile), and an error
+        // that comes back at each tick would otherwise open one message after the other.
+        bool ticking = false;
+        timer.Tick += (_, _) =>
+        {
+            if (ticking) return;
+            ticking = true;
+            try { Run(OnTimer); }
+            finally { ticking = false; }
+        };
         ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); UpdateLyrics(); UpdatePositionBar(); UpdateMixerSliders(); } catch { } };
     }
 
@@ -219,6 +228,7 @@ public sealed partial class MainViewModel : ObservableObject
         StopTrack();
         ChannelMixer.Device = null;
         output?.Dispose();
+        output = null;   // the port asked for may be gone (unplugged): never left with the closed one
         output = OutputDevice.GetByName(name);
         ChannelMixer.Device = output;   // for resending after a reset sent by the file
         ChannelMixer.SetMasterVolume(output, (int)MasterVolume);
@@ -312,8 +322,9 @@ public sealed partial class MainViewModel : ObservableObject
             var files = new List<string>();
             foreach (var p in paths)
             {
+                // Subfolders that cannot be read (no access) are left out; hidden and system files are taken, as before.
                 if (Directory.Exists(p))
-                    files.AddRange(Directory.EnumerateFiles(p, "*", SearchOption.AllDirectories)
+                    files.AddRange(Directory.EnumerateFiles(p, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = 0 })
                                             .Where(MidiTools.IsMidiFile).OrderBy(f => f, StringComparer.OrdinalIgnoreCase));
                 else if (MidiTools.IsMidiFile(p)) files.Add(p);
             }
@@ -721,6 +732,7 @@ public sealed partial class MainViewModel : ObservableObject
             savedSignature = "";
             ResetSpeedAndPitch();
             lastSavedTarget = null;
+            Mixer.ShownController = ChannelMixer.Volume;   // the sliders of the Mixer tab back to Volume (CC7)
         }
         settingsFile = item.Path;
 
@@ -787,6 +799,8 @@ public sealed partial class MainViewModel : ObservableObject
         CurrentStandard = std;
     }
 
+    volatile Exception playbackError;   // set by the playback thread, read by the timer
+
     // Playback of a track (with its changes) on the output, its tempo map and duration.
     Playback CreatePlayback(MidiFile midi)
     {
@@ -814,6 +828,11 @@ public sealed partial class MainViewModel : ObservableObject
         pb.EventCallback = (e, raw, time) => IsLoopSeam(raw) ? null : ChannelMixer.Callback(e, raw, time);
         pb.NoteCallback = (note, raw, length, time) => IsLoopSeam(raw) ? null : TransposeNote(ChannelMixer.NoteCallback(note, raw, length, time));
         pb.Speed = speed / 100;   // speed and pitch sliders (MainViewModel.Speed.cs)
+        // An error while playing (a damaged event, the port lost) stops the playback library: said by the timer (OnTimer),
+        // instead of being taken for the end of the track.
+        // Only the error of the playback in progress (one replaced since may still report one while it closes).
+        playbackError = null;
+        pb.ErrorOccurred += (_, e) => { if (playback == pb) playbackError = e.Exception; };
         playback = pb;
         tempoMap = midi.GetTempoMap();
         eventsPending = true;   // the Event Editor lists it at the next timer tick (after the start)
@@ -926,6 +945,15 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshEventsFixed();
         if (playback == null || state != "playing") return;
         UpdateLoop();
+        if (playbackError is { } error)   // stopped by an error: the playlist does not go on (nor the track again, with repeat)
+        {
+            // Said first: stopping sends to the port, which fails if the error was the port lost.
+            playbackError = null;
+            Status = $"Playback stopped: {error.Message}";
+            StopTrack();
+            UpdateNumbers();
+            return;
+        }
         if (!playback.IsRunning)   // end of track
         {
             if (repeatMode == 2) StartTrack(current); else MoveTrack(1, auto: true);

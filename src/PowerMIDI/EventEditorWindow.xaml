@@ -45,7 +45,7 @@
         <Setter Property="Margin" Value="12,0,6,0"/>
         <Setter Property="Foreground" Value="{DynamicResource TextSoftBrush}"/>
       </Style>
-      <!-- Fields of the selected event: as the search boxes, in the colors of the theme (light with the light controls). -->
+      <!-- Fields of the selected event: as the search boxes, in the colors of the theme. -->
       <Style x:Key="Field" TargetType="TextBox" BasedOn="{StaticResource SearchBox}">
         <Setter Property="Width" Value="70"/>
         <Setter Property="Padding" Value="2,1"/>

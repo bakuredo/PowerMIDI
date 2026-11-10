@@ -1,5 +1,12 @@
 <Project>
 
+  <!-- A compiler warning stops the build: it is often a real bug (an extern method without its DllImport compiles with
+       a warning, then fails at run time). NuGet audit warnings (a new advisory on a package) stay warnings. -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+  </PropertyGroup>
+
   <!-- Publishing (dotnet publish -c Release, from this folder): one exe per program in ..\publish, for
        64-bit Windows, using the installed .NET Desktop Runtime; no debug symbols. -->
   <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">

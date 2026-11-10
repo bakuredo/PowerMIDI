@@ -24,7 +24,7 @@ public static class ChannelMixer
         { "volume", "pan", "reverb", "chorus", "variation/delay", "attack", "decay", "release", "cutoff", "resonance",
           "vibrato rate", "vibrato depth", "vibrato delay", "modulation", "expression", "portamento time" };
     public static readonly int[] ControllerDefaults = { 100, 64, 40, 0, 0, 64, 64, 64, 64, 64, 64, 64, 64, 0, 127, 0 };   // values after a reset
-    public const int Modulation = 13, Expression = 14, PortamentoTime = 15;
+    public const int Volume = 0, Modulation = 13, Expression = 14, PortamentoTime = 15;
     const int Controllers = 16;
     // Portamento switch (CC65) of each channel: the file's. While Portamento Time is fixed in the interface, the
     // portamento is on (127), so that the time is heard, and off (0) when the time is fixed at 0; back to the file's
@@ -447,6 +447,8 @@ public static class ChannelMixer
         if (channel < 0) return null;
         for (int pos = 6; pos < d.Length - 1; pos++)
         {
+            // A damaged file: a data byte above 127 is not a value (sent as one, it would stop the playback).
+            if (d[pos] > 127) continue;
             int address = d[5] + pos - 6, k = MultiPartController(address);
             if (k >= 0) { FileCc[k, channel] = d[pos]; ReadPassage(k, channel, rawTime); }
             else if (address == 0x01) BankMsb[channel] = d[pos];
@@ -643,7 +645,7 @@ public static class ChannelMixer
             // file's master volume: scaled by interface slider.
             if (d.Length >= 6 && d[0] == 0x7F && d[2] == 0x04 && d[3] == 0x01)
             {
-                fileMasterVolume = d[5];
+                fileMasterVolume = Math.Min((int)d[5], 127);   // a damaged file: at most 127
                 return MasterVolumeEvent();
             }
             // Forced mode: SysEx of other modes ignored (manufacturer 41 Roland / 43 Yamaha).

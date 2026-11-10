@@ -27,6 +27,18 @@ public class XgMultiPartTests
         }
     }
 
+    // A damaged file: a data byte above 127 is not a value (sent as a controller or a program, it would stop the playback).
+    [Fact]
+    public void Bytes_above_127_are_not_read_as_values()
+    {
+        Reset();
+        Play(Part(2, 0x01, 0xC8, 0xC9, 0xCA));   // bank MSB, LSB, program
+        Play(Part(2, 0x0B, 0xC8));               // volume
+        Assert.Equal((0, 0, 0), (ChannelMixer.BankMsb[2], ChannelMixer.BankLsb[2], ChannelMixer.Program[2]));
+        Assert.Equal(100, ChannelMixer.Value(Volume, 2));
+        Assert.All(Enumerable.Range(0, ChannelMixer.ControllerNumbers.Length), k => Assert.InRange(ChannelMixer.Sent(k, 2), 0, 127));
+    }
+
     [Fact]
     public void Values_of_the_file_are_read()
     {

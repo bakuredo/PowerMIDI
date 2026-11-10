@@ -22,7 +22,8 @@ public partial class EventEditorWindow : Window
 
     // Until its first picture (the list of a long track takes a moment), a new window is empty: Windows shows it white,
     // fading it in. It stays hidden from the screen (cloaked) until that picture, then appears drawn.
-    [DllImport("dwmapi.dll")]
+    // Loaded from the system folder only (never a DLL of the same name next to the program).
+    [DefaultDllImportSearchPaths(DllImportSearchPath.System32), DllImport("dwmapi.dll")]
     static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
     const int DwmCloak = 13;   // DWMWA_CLOAK (Windows 8 and later; without it, the window opens as before)
 

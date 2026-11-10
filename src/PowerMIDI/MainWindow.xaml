@@ -24,7 +24,7 @@
         <ToggleButton Style="{x:Null}" Template="{StaticResource ComboToggleTemplate}" Focusable="False" ClickMode="Press"
                       IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"/>
         <!-- What the channel plays: two notes for a sound, a drum for a drum kit (none while unused), in the color of the
-             arrow; not with the light controls nor with InstrumentIcons=0 in the INI (InstrumentIconsVisibility, InstrumentTextMargin: Themes.cs). -->
+             arrow; not with InstrumentIcons=0 in the INI (InstrumentIconsVisibility, InstrumentTextMargin: Themes.cs). -->
         <Grid Visibility="{DynamicResource InstrumentIconsVisibility}" HorizontalAlignment="Left">
           <Viewbox x:Name="SoundIcon" IsHitTestVisible="False" Margin="5,2,0,0" Width="12" Height="12" HorizontalAlignment="Left"
                    VerticalAlignment="Center">
@@ -103,7 +103,7 @@
       <Setter Property="Height" Value="36"/>
     </Style>
     <!-- Transport bar toggle buttons (shuffle, repeat, module display): option enabled = icon in ActiveIconBrush (Themes.cs:
-         the accent color, the blue of the theme with the light controls), the button itself drawn as the others (not
+         the accent color), the button itself drawn as the others (not
          pressed); under the mouse as the other buttons (HoverBrush, icon in HoverTextBrush). Tag: the color of the enabled
          icon (the module display: DisplayIconBrush, the text color of the screen). -->
     <Style x:Key="TransportToggle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
@@ -325,7 +325,7 @@
                 </TextBlock.Style>
               </TextBlock>
 
-              <!-- Activity LED, in ActivityBrush (the accent color, green with the light controls); dimmed while the channel is muted
+              <!-- Activity LED, in ActivityBrush (the accent color); dimmed while the channel is muted
                    (its notes are played, not heard). -->
               <Ellipse Grid.Column="1" Width="9" Height="9" ToolTip="Activity (dim: muted)">
                 <Ellipse.Style>
@@ -870,7 +870,7 @@
          (set in MainWindow.xaml.cs from the version of the program). -->
     <TabItem Header="About">
     <DockPanel>
-      <!-- Color theme (Themes.cs), remembered in PowerMIDI.ini (the light controls: LightControls=1 there only). -->
+      <!-- Color theme (Themes.cs), remembered in PowerMIDI.ini. -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
         <TextBlock Text="Theme" Margin="0,0,8,0"/>
         <ComboBox x:Name="ThemeBox" Width="110" SelectionChanged="OnThemeChanged" ToolTip="Window colors"/>

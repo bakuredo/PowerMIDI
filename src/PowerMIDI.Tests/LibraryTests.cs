@@ -215,6 +215,21 @@ public class LibraryTests
         public void Dispose() => listener.Close();
     }
 
+    // The zip and the cache folder stay in the library folder: a database whose zip name or collection id is a path is
+    // refused (its files would otherwise be written, or deleted, elsewhere).
+    [Fact]
+    public void Names_of_the_database_that_are_paths_are_refused()
+    {
+        var info = new CollectionInfo("sample", "Sample", "http://localhost/files/source.zip", 1, "", "", "", "");
+        var folder = Path.Combine(Path.GetTempPath(), "powermidi-tests-names");
+        using (var files = new CollectionFiles(folder, info))
+            Assert.Equal(Path.Combine(folder, "cache", "sample"), files.CacheFolder);
+        foreach (var id in new[] { @"..\..", "../x", @"a\b", "..", "", @"C:\x" })
+            Assert.Throws<InvalidDataException>(() => new CollectionFiles(folder, info with { Id = id }));
+        // The last part of the URL, unescaped: "..\evil.zip".
+        Assert.Throws<InvalidDataException>(() => new CollectionFiles(folder, info with { SourceUrl = "http://localhost/files/..%5Cevil.zip" }));
+    }
+
     [Fact]
     public async Task Files_downloaded_then_taken_from_the_zip()
     {
