@@ -417,7 +417,7 @@
   </Style>
 
   <!-- Scroll bars (lists, playlist, Event Editor, open drop-down lists, Effects tab) in the colors of the controls of the
-       theme: no arrows, a rounded thumb in the thumb colors of the theme (11 px wide, visible at rest; see
+       theme: no arrows, a square-cornered thumb in the thumb colors of the theme (11 px wide, visible at rest; see
        Themes.ControlKeys), darker / lighter under the mouse, in the accent color while dragged; a click on the bar scrolls
        by a page.
        Width / height of the Windows ones, so that nothing moves (the File column of the playlist takes the space left).
@@ -440,7 +440,7 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Thumb">
-          <Border x:Name="Bd" CornerRadius="3" Background="{DynamicResource ControlThumbBrush}"/>
+          <Border x:Name="Bd" Background="{DynamicResource ControlThumbBrush}"/>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource ControlThumbHoverBrush}"/></Trigger>
             <Trigger Property="IsDragging" Value="True"><Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}"/></Trigger>

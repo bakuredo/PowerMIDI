@@ -8,7 +8,7 @@
   <SolidColorBrush x:Key="ButtonBrush" Color="#E2E0DA"/>
   <SolidColorBrush x:Key="HeaderBrush" Color="#E38E28"/>
   <SolidColorBrush x:Key="TabHoverBrush" Color="#EFEDE7"/>
-  <SolidColorBrush x:Key="TabSelectedBrush" Color="#F4A641"/>
+  <SolidColorBrush x:Key="TabSelectedBrush" Color="#EFEDE7"/>
   <SolidColorBrush x:Key="InactiveBrush" Color="#B79366"/>
   <!-- Text -->
   <SolidColorBrush x:Key="TextBrush" Color="#1F1408"/>

@@ -57,12 +57,12 @@
   <DockPanel Margin="12">
     <!-- Filters; the search box takes the space left (200 at most), so that the buttons stay whole in a narrow window. -->
     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-      <ComboBox Width="190" ItemsSource="{Binding Tracks}" SelectedIndex="{Binding TrackFilter}" ToolTip="Show events of one track"/>
+      <ComboBox Width="190" Margin="2,0,0,0" ItemsSource="{Binding Tracks}" SelectedIndex="{Binding TrackFilter}" ToolTip="Show events of one track"/>
       <ComboBox Width="120" Margin="8,0,0,0" ItemsSource="{Binding Channels}" SelectedIndex="{Binding ChannelFilter}"
                 ToolTip="Show events of one channel (No channel: SysEx and meta events)"/>
       <ComboBox Width="140" Margin="8,0,0,0" ItemsSource="{Binding Kinds}" SelectedIndex="{Binding KindFilter}" ToolTip="Show one kind of events"/>
       <!-- Pin: the window kept above all the others (Topmost), the pinned icon while on. -->
-      <ToggleButton DockPanel.Dock="Right" Padding="7,0" Margin="6,0,0,0" FontFamily="Segoe MDL2 Assets" FontSize="14"
+      <ToggleButton DockPanel.Dock="Right" Padding="7,0" Margin="6,0,2,0" FontFamily="Segoe MDL2 Assets" FontSize="14"
                     IsChecked="{Binding Topmost, RelativeSource={RelativeSource AncestorType=Window}}" ToolTip="Keep window on top">
         <ToggleButton.Style>
           <Style TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
@@ -103,7 +103,7 @@
 
     <!-- Edit panel: addition, deletion, Append / Replace, undo / redo, then the selected event (Apply or Enter, shown with a
          selection; a text or SysEx on the same line, up to Apply). -->
-    <Border DockPanel.Dock="Bottom" Margin="0,8,0,0" Padding="10,8" Background="{DynamicResource PanelBrush}"
+    <Border DockPanel.Dock="Bottom" Margin="0,8,0,0" Padding="10,8" UseLayoutRounding="True" Background="{DynamicResource PanelBrush}"
             BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="4" TextElement.Foreground="{DynamicResource TextBrush}">
       <Border.InputBindings>
         <KeyBinding Key="Return" Command="{Binding ApplyCommand}"/>

@@ -134,7 +134,7 @@ public sealed class MixerViewModel : ObservableObject
         HasMu50Map ? defs.XgMap(msb, lsb, program, true) : InstrumentDefinitions.XgMap(msb);
 
     // With the MU50 map (MU Basic voice map), the lists only offer what the MU50 has: the MU50 map, the SFX voices
-    // and the drum kits it has. A voice of another map is still named, with no map selected.
+    // and the drum kits it has. A voice of another map keeps that map, shown in its selector and its list.
     static bool IsMu50ModeMap(int map) => map is InstrumentDefinitions.XgMu50Map or XgSfxMap;
     const int XgSfxMap = 4;
 
@@ -401,8 +401,8 @@ public sealed class MixerViewModel : ObservableObject
         // bank asked for it; the 2000 map has its three banks (0, 126 = MU100 Native, 127 = MU Basic).
         int xgMap = HasXgBanks ? XgMapOfSound(msb, lsb, program) : 0;
         if (HasXgBanks && IsXgCapital(msb, lsb) && xgMap == InstrumentDefinitions.XgMu50Map) lsb = 0;
-        if (HasMu50Map && !IsMu50ModeMap(xgMap)) xgMap = InstrumentDefinitions.XgMu50Map;
-        var choices = defs.GetChoices(Standard, drum, HasXgBanks ? xgMap : lsb, HasMu50Map);
+        // A voice of a map the MU Basic voice map does not offer (VL, MEx…): the list of its own map, as its map selector.
+        var choices = defs.GetChoices(Standard, drum, HasXgBanks ? xgMap : lsb, HasMu50Map && (drum || IsMu50ModeMap(xgMap)));
         // MT-32: the programs named by the patch table of the file.
         if (Standard == "MT-32" && !drum && defs.Mt32Voices.Count > 0)
             choices = choices.Select(x => !Mt32Patches.IsCustom(x.Program) ? x : new InstrumentChoice
@@ -653,14 +653,21 @@ public sealed class MixerViewModel : ObservableObject
         var key = $"{gs}/{xg}/{map}/{ChannelMixer.VoiceMap}/{ChannelMixer.GsDefaultMap}";
         if (key == ch.MapKey) return;
         ch.MapKey = key;
-        var items = HasMu50Map ? XgMapChoicesMu50 : xg ? XgMapChoices : GsMapChoicesUpTo(NewestGsMap);
+        IReadOnlyList<MapChoice> items = HasMu50Map ? XgMapChoicesMu50 : xg ? XgMapChoices : GsMapChoicesUpTo(NewestGsMap);
+        // A sound of a map the mode does not offer (an SC-8850 sound with the SC-88Pro map chosen, a VL voice with the MU
+        // Basic voice map): that map is still shown, at the end of the list of this channel only; its tooltip says so.
+        bool outside = map > 0 && !items.Any(m => m.Map == map);
+        if (outside)
+            items = items.Append(gs ? GsMapChoices.First(m => m.Map == map)
+                                    : XgMapChoices.FirstOrDefault(m => m.Map == map) ?? new MapChoice(InstrumentDefinitions.XgMapNames[map], map)).ToList();
+        var outsideText = !outside ? "" : gs ? $" (not on {InstrumentDefinitions.GsMapNames[NewestGsMap]})" : " (not in MU Basic)";
         Update(ch, () =>
         {
             ch.MapItems = items;
             ch.MapEnabled = map > 0;
             ch.SelectedMap = items.FirstOrDefault(m => m.Map == map);
-            ch.MapToolTip = gs ? $"Map of channel {ch.Channel + 1}: {InstrumentDefinitions.GsMapNames[map]}"
-                          : xg ? (map > 0 ? $"Map of channel {ch.Channel + 1}: {InstrumentDefinitions.XgMapNames[map]}" : "Maps: not for drum kits")
+            ch.MapToolTip = gs ? $"Map of channel {ch.Channel + 1}: {InstrumentDefinitions.GsMapNames[map]}{outsideText}"
+                          : xg ? (map > 0 ? $"Map of channel {ch.Channel + 1}: {InstrumentDefinitions.XgMapNames[map]}{outsideText}" : "Maps: not for drum kits")
                           : "Maps: GS and XG only";
         });
     }

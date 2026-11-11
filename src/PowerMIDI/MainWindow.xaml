@@ -174,8 +174,9 @@
              Text="{Binding Status}" TextTrimming="CharacterEllipsis"/>
 
   <!-- Right panel: Mixer (16 channels), Effects (those of the current mode), Library and About tabs. The tabs on the
-       background of the panel (transparent): one layer only over the background image, as the other panels. -->
-  <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" Background="{DynamicResource PanelBrush}"
+       background of the panel (transparent): one layer only over the background image, as the other panels.
+       Layout rounding: lines on whole pixels (not blurred), as the current track panel. -->
+  <Border DockPanel.Dock="Right" Width="508" Margin="12,0,0,0" UseLayoutRounding="True" Background="{DynamicResource PanelBrush}"
           BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="6" Padding="6">
     <TabControl x:Name="RightTabs" Background="Transparent" BorderBrush="{DynamicResource LineBrush}" Padding="4,8,4,4" Foreground="{DynamicResource TextBrush}"
                 SelectedIndex="{Binding SelectedTab}">
@@ -709,8 +710,8 @@
                 Visibility="{Binding NeedsDownload, Converter={StaticResource BoolToVisibility}}" ToolTip="{Binding DownloadText}"/>
         <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,2" Margin="6,0,0,0" Command="{Binding CancelDownloadCommand}"
                 Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" ToolTip="Stop download"/>
-        <!-- Collection icon (a list with a note, as the sliders icon of the Mixer tab), in place of a "Collection" label. -->
-        <TextBlock Text="&#xE90B;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
+        <!-- Collection icon (three lines: a list), in place of a "Collection" label. -->
+        <TextBlock Text="&#xE700;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
                    ToolTip="Collection" AutomationProperties.Name="Collection"/>
         <!-- Padding: its text 1 px higher than the default one, measured 1 px lower than in the other lists otherwise (as the
              list of the Mixer tab and the filters below; a rounding of the layout). -->
@@ -804,7 +805,6 @@
         <ListView.ItemContainerStyle>
           <Style TargetType="ListViewItem" BasedOn="{StaticResource ThemedListViewItem}">
             <EventSetter Event="MouseDoubleClick" Handler="OnLibraryItemDoubleClick"/>
-            <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
             <Style.Triggers>
               <DataTrigger Binding="{Binding Unreadable}" Value="True">
                 <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
@@ -1026,8 +1026,9 @@
       </Button>
     </WrapPanel>
 
-    <!-- Current track -->
-    <Border Grid.Row="3" Background="{DynamicResource PanelBrush}" TextElement.Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+    <!-- Current track; layout rounding: the buttons above have a fractional height, which put the top line
+         between two pixels (blurred). -->
+    <Border Grid.Row="3" UseLayoutRounding="True" Background="{DynamicResource PanelBrush}" TextElement.Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
             CornerRadius="6" Padding="12">
       <Grid>
         <Grid.RowDefinitions>

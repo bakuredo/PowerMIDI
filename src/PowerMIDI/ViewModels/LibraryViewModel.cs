@@ -23,7 +23,6 @@ public sealed class LibraryRow : ObservableObject
     public string FolderText { get; init; }   // the folder of a file (search and played lists)
     public string Format { get; init; }
     public string Time { get; init; }
-    public string ToolTip { get; init; }
     public bool Unreadable => File?.Error != null;
 
     bool favorite;
@@ -343,10 +342,10 @@ public sealed class LibraryViewModel : ObservableObject
                 parts.Add(f.Copyright.Contains('©') || f.Copyright.Contains("copyright", StringComparison.OrdinalIgnoreCase) ||
                           f.Copyright.Contains("(c)", StringComparison.OrdinalIgnoreCase) ? f.Copyright : $"© {f.Copyright}");
             // Plays as they are now (the row has them as they were when listed; also when the database cannot be read).
-            var (count, last) = (f.PlayCount, f.LastPlayed);
+            int count = f.PlayCount;
             if (selectedCollection != null)
-                try { (count, last) = UserDatabase().Plays(selectedCollection.Id, f.Path); } catch { }
-            parts.Add(count > 0 ? $"Played {count} time{(count > 1 ? "s" : "")}, last {LocalTime(last)}" : "Not played yet");
+                try { count = UserDatabase().Plays(selectedCollection.Id, f.Path).Count; } catch { }
+            parts.Add(count > 0 ? $"Played {count} time{(count > 1 ? "s" : "")}" : "Not played yet");
             return string.Join(" · ", parts);
         }
     }
@@ -493,7 +492,6 @@ public sealed class LibraryViewModel : ObservableObject
                 list.Add(new LibraryRow
                 {
                     Folder = child, Title = $"{child.Shown} ({count})",   // its number of files after its name
-                    ToolTip = $"{child.Path}\n{count} file{(count > 1 ? "s" : "")}" + (child.DisplayName != null ? $" · folder {child.Name}" : ""),
                 });
                 folderCount++;
             }
@@ -509,24 +507,12 @@ public sealed class LibraryViewModel : ObservableObject
 
     LibraryRow FileRow(LibraryFile f)
     {
-        var tip = new List<string> { f.Path };
-        if (f.InternalTitle != null && f.InternalTitle != f.Title) tip.Add($"Title in file: {f.InternalTitle}");
-        if (f.Copyright != null) tip.Add($"Copyright: {f.Copyright}");
-        if (f.Error != null) tip.Add($"Unreadable: {f.Error}");
-        else
-        {
-            tip.Add($"{f.Tracks} track{(f.Tracks != 1 ? "s" : "")} · {ChannelsText(f)}");
-            var extras = new List<string>();
-            if (f.HasLyrics) extras.Add("Karaoke");
-            if (f.HasLoop) extras.Add("Loop");
-            if (extras.Count > 0) tip.Add(string.Join(" · ", extras));
-        }
-        if (f.PlayCount > 0) tip.Add($"Played {f.PlayCount} time{(f.PlayCount > 1 ? "s" : "")}, last {LocalTime(f.LastPlayed)}");
+        // No tooltip on the rows: the panel under the list has the details of the file selected.
         var folderRow = catalog.Folders.TryGetValue(f.FolderPath, out var fo) ? fo.Shown : f.FolderPath;
         return new LibraryRow
         {
             File = f, Title = f.Title, FolderText = folderRow, Format = f.Standard ?? "?",
-            Time = f.DurationMs is long ms ? FormatDuration(ms) : "", ToolTip = string.Join("\n", tip), Favorite = f.Favorite,
+            Time = f.DurationMs is long ms ? FormatDuration(ms) : "", Favorite = f.Favorite,
         };
     }
 
@@ -535,10 +521,6 @@ public sealed class LibraryViewModel : ObservableObject
         var t = TimeSpan.FromMilliseconds(ms);
         return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss");
     }
-
-    static string LocalTime(string utc) =>
-        DateTime.TryParse(utc, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t)
-            ? t.ToLocalTime().ToString("g") : utc;
 
     // ---------- Actions ----------
 
