@@ -2,8 +2,8 @@
 
 MIDI file player and editor for Windows, made for hardware or software sound modules :
 - **Roland Sound Canvas Series**: 88emuPlayer, Nuked-SC55-P256, Roland SC-8850 and other GS modules
-- **Yamaha MU Series**: S-MU2000, Yamaha MU2000EX, Yamaha MU50, S-YXG50 and other XG modules
-- **Roland MT-32**: MuntVSTi or Roland MT-32 / CM-64
+- **Yamaha MU Series**: S-MU2000, Yamaha MU2000EX, Yamaha MU50, Yamaha PLG-VL/SG cards and other XG modules
+- **Roland MT-32**: MuntVSTi or Roland MT-32/CM-64
 - **General MIDI Level 1 and 2**: Too much devices and software !
 
 ![PowerMIDI](docs/screenshot.png)
@@ -11,7 +11,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 ## Features
 
 - **Player**: Playback speed, transposition, play a channel on your keyboard with normal or scale notes.
-- **Playlist**: Files and folders, drag and drop, shuffle, repeat modes...
+- **Playlist**: Files and folders, drag and drop, shuffle, repeat modes.
 - **Library**: Browse and play MIDI collections downloaded from archive.org (see Credits) with folder navigation, filters, random function...
 - **Modes**: GM, GM2, GS, XG and MT-32, detected from file or forced with matching reset. Custom SysEx patches detected from MIDI or SYX file.
 - **Mixer**: Mute/Solo, activity and controller slider per channel (modulation, volume, pan, reverb,
@@ -22,7 +22,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 - **Saving**: Changed settings in Mixer/Effects tabs and event editor can be written into a MIDI file.
 - **File loops markers**: `loopStart` / `loopEnd`, `[` / `]` markers and CC111 are followed, can be edited.
 - **LCD module support**: Show text, karaoke lyrics or dot pictures from file during playback.
-- **Color themes**: Built-in XAML themes.
+- **Color themes**: Built-in XAML themes with background and font customization.
 
 
 ## Next-Steps
@@ -34,7 +34,7 @@ MIDI file player and editor for Windows, made for hardware or software sound mod
 
 - Windows 10 or 11, 64-bit.
 - [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) or download standalone version.
-- A MIDI output device (a hardware module, software, VST or included with Windows).
+- MIDI output device (a hardware module, software, VST or included with Windows).
 
 ## Building
 

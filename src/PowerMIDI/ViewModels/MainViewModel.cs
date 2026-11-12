@@ -224,8 +224,9 @@ public sealed partial class MainViewModel : ObservableObject
     void OpenPort(string name)
     {
         if (string.IsNullOrEmpty(name) || output?.Name == name) return;
-        var wasPlaying = current;
-        StopTrack();
+        // Playback stopped as by the Stop button (back to the start), not restarted on the new port: the user starts it
+        // when the module is ready.
+        Stop();
         ChannelMixer.Device = null;
         output?.Dispose();
         output = null;   // the port asked for may be gone (unplugged): never left with the closed one
@@ -234,7 +235,6 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.SetMasterVolume(output, (int)MasterVolume);
         ApplyMixerState();
         Status = "";   // the port is shown in its list
-        if (wasPlaying != null) StartTrack(wasPlaying);
     }
 
     // Controllers, chosen instruments and fixed effects (start of track, seek, port change).
