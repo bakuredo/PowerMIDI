@@ -2,7 +2,7 @@
 
 MIDI file player and editor for Windows, made for hardware or software sound modules :
 - **Roland Sound Canvas Series**: 88emuPlayer, Nuked-SC55-P256, Roland SC-8850 and other GS modules
-- **Yamaha MU Series**: S-MU2000, Yamaha MU2000EX, Yamaha MU50, Yamaha PLG-VL/SG cards and other XG modules
+- **Yamaha MU Series**: S-MU2000, Yamaha MU2000EX/MU50, Yamaha PLG-VL/SG cards and other XG modules
 - **Roland MT-32**: MuntVSTi or Roland MT-32/CM-64
 - **General MIDI Level 1 and 2**: Too much devices and software !
 

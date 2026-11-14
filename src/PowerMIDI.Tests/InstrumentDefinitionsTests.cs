@@ -103,7 +103,7 @@ public class InstrumentDefinitionsTests
     // XG (MU2000): the bank MSB gives the map of a voice.
     [Theory]
     [InlineData(0, "2000")]        // every bank LSB, 126 and 127 (MU100 Native / MU Basic) included
-    [InlineData(48, "MEx")]
+    [InlineData(48, "MEX")]
     [InlineData(64, "SFX")]
     [InlineData(16, "SPL")]
     [InlineData(121, "GM2")]
@@ -141,7 +141,7 @@ public class InstrumentDefinitionsTests
         Assert.Equal(new[] { ("      · Grand Piano #", 126), ("      · Grand Piano", 127) }, native.Take(piano).TakeLast(2).Select(c => (c.Text, c.Lsb)));
 
         // The other maps are families of sounds, each with its bank MSB.
-        Assert.All(Map("MEx"), c => Assert.Equal(48, c.Msb));
+        Assert.All(Map("MEX"), c => Assert.Equal(48, c.Msb));
         Assert.All(Map("SFX"), c => Assert.Equal(64, c.Msb));
         Assert.All(Map("GM2"), c => Assert.Equal(121, c.Msb));
         var sampling = Map("SPL");

@@ -433,7 +433,6 @@ public partial class MainWindow : Window, IMainView
     {
         if (eventWindow != null) { eventWindow.Activate(); return; }
         eventWindow = new EventEditorWindow(editor) { Topmost = eventWindowTopmost };
-        Themes.ApplyInstrumentIcons(eventWindow.Resources);
         eventWindow.Closed += (_, _) => { eventWindowTopmost = eventWindow.Topmost; eventWindow = null; closed(); };
         eventWindow.Show();
     }
@@ -455,7 +454,6 @@ public partial class MainWindow : Window, IMainView
         ini.Set("Window", "Height", (int)bounds.Height);
         ini.Set("Window", "Maximized", WindowState == WindowState.Maximized ? 1 : 0);
         ini.Set("Window", "Theme", Themes.Current);
-        ini.Set("Window", "InstrumentIcons", Themes.InstrumentIcons ? 1 : 0);
         ini.Write(SettingsPath, "PowerMIDI settings (written on close).");
     }
 
@@ -490,10 +488,7 @@ public partial class MainWindow : Window, IMainView
         }
         if (ini.Get("Window", "Maximized") == "1") WindowState = WindowState.Maximized;
 
-        // Color theme (About tab); a missing or unknown name gives the default theme. Instrument icons of the Mixer: in
-        // the INI only (shown unless InstrumentIcons=0).
-        Themes.InstrumentIcons = ini.Get("Window", "InstrumentIcons") != "0";
-        Themes.ApplyInstrumentIcons(RightTabs.Resources);
+        // Color theme (About tab); a missing or unknown name gives the default theme.
         Themes.Apply(ini.Get("Window", "Theme"));
         ThemeBox.ItemsSource = Themes.Names;
         ThemeBox.SelectedItem = Themes.Current;

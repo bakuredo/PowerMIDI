@@ -368,7 +368,12 @@ public sealed class EventEditorViewModel : ObservableObject
 
     string countText = "";
     public string CountText { get => countText; private set => Set(ref countText, value); }
-    void UpdateCount() => CountText = $"{View.Cast<object>().Count()} / {rows.Count} events";
+    // The events shown (after the filters and the search).
+    void UpdateCount()
+    {
+        int shown = View.Cast<object>().Count();
+        CountText = $"{shown} event{(shown != 1 ? "s" : "")}";
+    }
 
     // ---------- Follow and selection ----------
 

@@ -25,10 +25,6 @@ public static class Themes
 
     public static string Current { get; private set; } = Default;
 
-    // Icons before the instrument of each channel in the Mixer (PowerMIDI.ini only, Window/InstrumentIcons; on by
-    // default).
-    public static bool InstrumentIcons { get; set; } = true;
-
     // Colors of the controls (Styles.xaml), those of the theme (set with it): background, border, text, under the mouse,
     // selected or pressed, arrow and disabled text, then the state colors (sound missing, set by a SysEx), the text of a
     // disabled list, then the open list: background, border, item under the mouse and its frame, item selected and its
@@ -61,28 +57,6 @@ public static class Themes
         dictionary["PressedTextBrush"] = dictionary["OnAccentTextBrush"];
         dictionary["ActiveIconBrush"] = dictionary["AccentBrush"];   // icon of an enabled option (transport bar)
         dictionary["DisplayIconBrush"] = dictionary["LcdTextBrush"];   // the module display shown: in the text color of the screen
-        // Instrument list of the Mixer: its sound / drum kit icon, before the name (not with InstrumentIcons off:
-        // NoInstrumentIcons).
-        dictionary["InstrumentIconsVisibility"] = Visibility.Visible;
-        dictionary["InstrumentTextMargin"] = new Thickness(22, 0, 20, 0);
-    }
-
-    static ResourceDictionary noInstrumentIcons;
-
-    // The instrument names of the Mixer without their icons.
-    static ResourceDictionary NoInstrumentIcons() => noInstrumentIcons ??= new ResourceDictionary
-    {
-        ["InstrumentIconsVisibility"] = Visibility.Collapsed,
-        ["InstrumentTextMargin"] = new Thickness(6, 0, 20, 0),
-    };
-
-    // Hides the instrument icons in these resources (tabs of the main window, Event Editor) without InstrumentIcons, or
-    // shows them again. The other merged dictionaries (e.g. Styles.xaml) are kept.
-    public static void ApplyInstrumentIcons(ResourceDictionary resources)
-    {
-        var merged = resources.MergedDictionaries;
-        merged.Remove(NoInstrumentIcons());
-        if (!InstrumentIcons) merged.Add(NoInstrumentIcons());
     }
 
     // Background image of the windows: the image of the theme in the themes folder, named as it (e.g. Dark.jpg for

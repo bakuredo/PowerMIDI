@@ -24,7 +24,7 @@ public sealed class MixerViewModel : ObservableObject
     static int NewestGsMap => ChannelMixer.GsDefaultMapOverride >= 1 ? ChannelMixer.GsDefaultMapOverride : InstrumentDefinitions.DefaultGsMap;
     static readonly MapChoice[][] gsMapChoicesUpTo = Enumerable.Range(0, 5).Select(n => GsMapChoices.Where(m => m.Map <= n).ToArray()).ToArray();
     static MapChoice[] GsMapChoicesUpTo(int map) => gsMapChoicesUpTo[map];
-    public static readonly MapChoice[] XgMapChoices = { new("2000", 2), new("MEx", 3), new("SFX", 4), new("SPL", 5), new("GM2", 6), new("VL", 8), new("SG", 9) };
+    public static readonly MapChoice[] XgMapChoices = { new("2000", 2), new("MEX", 3), new("SFX", 4), new("SPL", 5), new("GM2", 6), new("VL", 8), new("SG", 9) };
     // With the MU Basic voice map: what the MU50 has.
     public static readonly MapChoice[] XgMapChoicesMu50 = { new("50", InstrumentDefinitions.XgMu50Map), new("SFX", 4) };
 
@@ -401,7 +401,7 @@ public sealed class MixerViewModel : ObservableObject
         // bank asked for it; the 2000 map has its three banks (0, 126 = MU100 Native, 127 = MU Basic).
         int xgMap = HasXgBanks ? XgMapOfSound(msb, lsb, program) : 0;
         if (HasXgBanks && IsXgCapital(msb, lsb) && xgMap == InstrumentDefinitions.XgMu50Map) lsb = 0;
-        // A voice of a map the MU Basic voice map does not offer (VL, MEx…): the list of its own map, as its map selector.
+        // A voice of a map the MU Basic voice map does not offer (VL, MEX…): the list of its own map, as its map selector.
         var choices = defs.GetChoices(Standard, drum, HasXgBanks ? xgMap : lsb, HasMu50Map && (drum || IsMu50ModeMap(xgMap)));
         // MT-32: the programs named by the patch table of the file.
         if (Standard == "MT-32" && !drum && defs.Mt32Voices.Count > 0)

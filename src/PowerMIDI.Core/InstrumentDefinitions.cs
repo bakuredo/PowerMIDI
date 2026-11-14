@@ -64,7 +64,7 @@ public sealed class InstrumentDefinitions
     // VL and SG: the PLG-VL and PLG-SG boards (as on the S-YXG2026): VL = bank MSB 81 (XG voices) and 33 (its own bank),
     // SG = MSB 98. The songs of the boards also use MSB 97 (VL) and 82 (SG): named, listed once by 81 / 98.
     public static readonly Dictionary<int, string> XgMapNames = new()
-        { [2] = "2000", [3] = "MEx", [4] = "SFX", [5] = "SPL", [6] = "GM2", [7] = "50", [8] = "VL", [9] = "SG" };
+        { [2] = "2000", [3] = "MEX", [4] = "SFX", [5] = "SPL", [6] = "GM2", [7] = "50", [8] = "VL", [9] = "SG" };
     public const int XgNativeMap = 2, XgSamplingMap = 5, XgMu50Map = 7;
     public const int XgBasicLsb = 127, XgNativeLsb = 126;
 
