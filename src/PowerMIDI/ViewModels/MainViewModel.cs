@@ -83,7 +83,22 @@ public sealed partial class MainViewModel : ObservableObject
             try { Run(OnTimer); }
             finally { ticking = false; }
         };
-        ledTimer.Tick += (_, _) => { try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); UpdateLyrics(); UpdatePositionBar(); UpdateMixerSliders(); } catch { } };
+        ledTimer.Tick += (_, _) =>
+        {
+            try { Mixer.UpdateLeds(state == "playing", KeyboardLedChannel); UpdateDisplayDots(); UpdateLyrics(); UpdatePositionBar(); UpdateMixerSliders(); }
+            catch (Exception ex) { ReportDisplayError(ex); }
+        };
+    }
+
+    // An error of the display update (LEDs, screen, lyrics, position bar, sliders): the playback goes on, the error is
+    // said once in the status line (it would come back at each tick, many times a second).
+    bool displayErrorShown;
+
+    void ReportDisplayError(Exception ex)
+    {
+        if (displayErrorShown) return;
+        displayErrorShown = true;
+        Status = $"Display update error: {ex.Message}";
     }
 
     RelayCommand Command(Action action) => new(() => Run(action));
@@ -312,10 +327,11 @@ public sealed partial class MainViewModel : ObservableObject
 
     // Adds files and folders (subfolders included) to the playlist. play: the first added file plays right away
     // (file opened from Explorer while PowerMIDI runs); otherwise only if nothing is in progress.
+    // The rows come at once; the format and duration of each file need it read in full: a few files are read here, more
+    // (a folder) in the background, their rows filled in as they are read, so that the window does not freeze.
     public void AddFiles(IEnumerable<string> paths, bool play = false)
     {
-        PlaylistItem firstAdded = null;
-        int added = 0;
+        var items = new List<PlaylistItem>();
         view.SetBusy(true);
         try
         {
@@ -330,28 +346,59 @@ public sealed partial class MainViewModel : ObservableObject
             }
             foreach (var f in files)
             {
-                string std = "?", dur = "unreadable";
-                bool read = false;
-                try
-                {
-                    var midi = MidiTools.ReadFile(f);
-                    std = MidiTools.GetStandard(midi);
-                    dur = MidiTools.FormatTime(MidiTools.GetDuration(midi));
-                    read = true;
-                }
-                catch { }
-                var item = new PlaylistItem { Name = Path.GetFileName(f), Path = Path.GetFullPath(f), Standard = std, Duration = dur, Unreadable = !read, Library = Library.KeyOf(f) };
+                var item = new PlaylistItem { Name = Path.GetFileName(f), Path = Path.GetFullPath(f), Library = Library.KeyOf(f) };
                 Playlist.Add(item);
-                firstAdded ??= item;
-                added++;
+                items.Add(item);
             }
             UpdateNumbers();
-            Status = $"{added} file(s) added — {Playlist.Count} in playlist.";
+            // In the background only with a window (its thread gets the results back); tests and few files: read here.
+            bool background = items.Count >= BackgroundReadFrom && SynchronizationContext.Current != null;
+            if (background) ReadInfoInBackground(items);
+            else foreach (var item in items) ApplyInfo(item, ReadInfo(item.Path));
+            Status = $"{items.Count} file(s) added — {Playlist.Count} in playlist{(background ? " (reading formats and durations…)" : "")}.";
         }
         finally { view.SetBusy(false); }
 
         // Nothing in progress (no playback, no pause, no track loaded): play the first added file.
+        var firstAdded = items.FirstOrDefault();
         if (firstAdded != null && output != null && (play || (state == "stopped" && current == null))) StartTrack(firstAdded);
+    }
+
+    // From this number of files added at once, they are read in the background.
+    const int BackgroundReadFrom = 20;
+
+    // Format, duration and readability of a file (any thread).
+    static (string Standard, string Duration, bool Unreadable) ReadInfo(string path)
+    {
+        try
+        {
+            var midi = MidiTools.ReadFile(path);
+            return (MidiTools.GetStandard(midi), MidiTools.FormatTime(MidiTools.GetDuration(midi)), false);
+        }
+        catch { return ("?", "unreadable", true); }
+    }
+
+    static void ApplyInfo(PlaylistItem item, (string Standard, string Duration, bool Unreadable) info)
+    {
+        item.Standard = info.Standard;
+        item.Duration = info.Duration;
+        item.Unreadable = info.Unreadable;
+    }
+
+    // Reads the files by groups on other threads (a few at once), each group shown when read (on the window's thread, the
+    // continuation of the await). A row removed meanwhile is filled in for nothing. Until read, a file is not known as
+    // unreadable: the playlist going on by itself could reach it (its error then shown), which takes far longer than
+    // reading.
+    async void ReadInfoInBackground(List<PlaylistItem> items)
+    {
+        foreach (var item in items) item.Duration = "…";
+        const int GroupSize = 64;
+        for (int start = 0; start < items.Count; start += GroupSize)
+        {
+            var group = items.Skip(start).Take(GroupSize).ToList();
+            var infos = await Task.Run(() => group.AsParallel().AsOrdered().WithDegreeOfParallelism(4).Select(i => ReadInfo(i.Path)).ToList());
+            for (int i = 0; i < group.Count; i++) ApplyInfo(group[i], infos[i]);
+        }
     }
 
     // A file opened in the Library tab: played (added to the playlist first, unless it is there already), with the Mixer
