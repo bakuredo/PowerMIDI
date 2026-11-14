@@ -353,9 +353,17 @@ public sealed partial class MainViewModel : ObservableObject
             UpdateNumbers();
             // In the background only with a window (its thread gets the results back); tests and few files: read here.
             bool background = items.Count >= BackgroundReadFrom && SynchronizationContext.Current != null;
-            if (background) ReadInfoInBackground(items);
-            else foreach (var item in items) ApplyInfo(item, ReadInfo(item.Path));
-            Status = $"{items.Count} file(s) added — {Playlist.Count} in playlist{(background ? " (reading formats and durations…)" : "")}.";
+            var added = $"{items.Count} file(s) added — {Playlist.Count} in playlist";
+            if (background)
+            {
+                Status = $"{added} (reading formats and durations…).";
+                ReadInfoInBackground(items, Status, $"{added}.");
+            }
+            else
+            {
+                foreach (var item in items) ApplyInfo(item, ReadInfo(item.Path));
+                Status = $"{added}.";
+            }
         }
         finally { view.SetBusy(false); }
 
@@ -388,8 +396,9 @@ public sealed partial class MainViewModel : ObservableObject
     // Reads the files by groups on other threads (a few at once), each group shown when read (on the window's thread, the
     // continuation of the await). A row removed meanwhile is filled in for nothing. Until read, a file is not known as
     // unreadable: the playlist going on by itself could reach it (its error then shown), which takes far longer than
-    // reading.
-    async void ReadInfoInBackground(List<PlaylistItem> items)
+    // reading. Once all read, the status line loses its "reading" (reading: the text it had then, done: the one after),
+    // unless another message has replaced it meanwhile.
+    async void ReadInfoInBackground(List<PlaylistItem> items, string reading, string done)
     {
         foreach (var item in items) item.Duration = "…";
         const int GroupSize = 64;
@@ -399,6 +408,7 @@ public sealed partial class MainViewModel : ObservableObject
             var infos = await Task.Run(() => group.AsParallel().AsOrdered().WithDegreeOfParallelism(4).Select(i => ReadInfo(i.Path)).ToList());
             for (int i = 0; i < group.Count; i++) ApplyInfo(group[i], infos[i]);
         }
+        if (Status == reading) Status = done;
     }
 
     // A file opened in the Library tab: played (added to the playlist first, unless it is there already), with the Mixer
