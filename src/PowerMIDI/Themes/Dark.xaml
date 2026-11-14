@@ -36,6 +36,6 @@
   <FontFamily x:Key="UiFont">Segoe UI</FontFamily>
   <FontFamily x:Key="MonoFont">Consolas</FontFamily>
   <!-- Background image (<name>.jpg or .png, optional), values in % -->
-  <sys:Double x:Key="BackgroundTint">55</sys:Double>
-  <sys:Double x:Key="BackgroundOpacity">45</sys:Double>
+  <sys:Double x:Key="BackgroundTint">5</sys:Double>
+  <sys:Double x:Key="BackgroundOpacity">75</sys:Double>
 </ResourceDictionary>
