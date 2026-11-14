@@ -719,6 +719,9 @@ public sealed partial class MainViewModel : ObservableObject
     {
         // Another file with unsaved settings: ask before losing them.
         if (settingsFile != null && settingsFile != item.Path && !ConfirmLeaveSettings()) return;
+        // Read first: an unreadable file (its error shown) changes nothing, neither the track being played nor its
+        // settings.
+        var midi = ReadTrackFile(item.Path);   // with its changes (Event Editor: changes, Record)
         StopTrack();
         if (output == null) throw new InvalidOperationException("No MIDI port selected.");
         if (mixerAppendTick != null) { mixerAppendTick = null; NotifyInsert(); }   // Append of the Mixer: over (its position is the old playback's)
@@ -736,7 +739,6 @@ public sealed partial class MainViewModel : ObservableObject
         }
         settingsFile = item.Path;
 
-        var midi = ReadTrackFile(item.Path);   // with its changes (Event Editor: changes, Record)
         var std = selectedMode == "Auto" ? MidiTools.GetStandard(midi) : selectedMode;
         ChannelMixer.ForceMode = isForced;   // file resets ignored
         ChannelMixer.Mt32Mode = std == "MT-32";   // MT-32 reverb SysEx follow the Effects tab
