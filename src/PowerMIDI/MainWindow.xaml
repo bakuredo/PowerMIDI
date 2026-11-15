@@ -881,7 +881,7 @@
       <!-- Color theme (Themes.cs), remembered in PowerMIDI.ini. -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,12">
         <TextBlock Text="Theme" Margin="0,0,8,0"/>
-        <ComboBox x:Name="ThemeBox" Width="110" SelectionChanged="OnThemeChanged" ToolTip="Window colors"/>
+        <ComboBox x:Name="ThemeBox" Width="110" SelectionChanged="OnThemeChanged" AutomationProperties.Name="Theme"/>
       </StackPanel>
       <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
         <Viewbox Width="128" Height="128">
@@ -1022,11 +1022,27 @@
 
     <!-- Playlist management (2 px right of the playlist frame, chosen by eye) -->
     <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="2,8,0,12">
-      <Button Content="Add files…" Command="{Binding AddFilesCommand}"/>
-      <Button Content="Add folder…" Command="{Binding AddFolderCommand}"/>
-      <Button Content="Remove" Command="{Binding RemoveCommand}" CommandParameter="{Binding SelectedItems, ElementName=PlaylistView}"/>
-      <Button Content="Clear" Command="{Binding ClearCommand}"/>
-      <Button Content="Save MIDI file…" Command="{Binding SaveCommand}"
+      <!-- Each button: its icon (Segoe MDL2 Assets, the glyph in Tag) before its label. -->
+      <WrapPanel.Resources>
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+          <Setter Property="ContentTemplate">
+            <Setter.Value>
+              <DataTemplate>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" FontFamily="Segoe MDL2 Assets" FontSize="13"
+                             VerticalAlignment="Center" Margin="0,1,6,0" UseLayoutRounding="True"/>
+                  <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                </StackPanel>
+              </DataTemplate>
+            </Setter.Value>
+          </Setter>
+        </Style>
+      </WrapPanel.Resources>
+      <Button Content="Add files…" Tag="&#xE710;" Command="{Binding AddFilesCommand}"/>
+      <Button Content="Add folder…" Tag="&#xE710;" Command="{Binding AddFolderCommand}"/>
+      <Button Content="Remove" Tag="&#xE738;" Command="{Binding RemoveCommand}" CommandParameter="{Binding SelectedItems, ElementName=PlaylistView}"/>
+      <Button Content="Clear" Tag="&#xE894;" Command="{Binding ClearCommand}"/>
+      <Button Content="Save MIDI file…" Tag="&#xE896;" Command="{Binding SaveCommand}"
               ToolTip="Saves track with its settings (right click: save as, also without changes)">
         <Button.InputBindings>
           <MouseBinding Gesture="RightClick" Command="{Binding SaveAsCommand}"/>

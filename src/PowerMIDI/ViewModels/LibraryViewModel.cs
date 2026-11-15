@@ -57,7 +57,7 @@ public sealed class LibraryViewModel : ObservableObject
 
     readonly IMainView view;
     readonly Action<string> setStatus;
-    readonly Action<string, bool> play;        // plays a file of a collection (added to the playlist if needed; true: Mixer tab shown)
+    readonly Action<string> play;              // plays a file of a collection (added to the playlist if needed; Mixer tab shown)
     readonly Action<IReadOnlyList<string>> addToPlaylist;
     readonly string libraryFolder;
     readonly DispatcherTimer searchDelay = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -67,7 +67,7 @@ public sealed class LibraryViewModel : ObservableObject
     string folder = "";
     string savedCollection;   // PowerMIDI.ini, until the collections are read
 
-    public LibraryViewModel(IMainView view, string libraryFolder, Action<string> setStatus, Action<string, bool> play,
+    public LibraryViewModel(IMainView view, string libraryFolder, Action<string> setStatus, Action<string> play,
                             Action<IReadOnlyList<string>> addToPlaylist)
     {
         this.view = view;
@@ -205,7 +205,7 @@ public sealed class LibraryViewModel : ObservableObject
     }
 
     // Downloads the zip of the collection shown (with its progress; Cancel stops it), then plays the file asked for, if any.
-    async void Download(LibraryRow then, bool showMixer = true)
+    async void Download(LibraryRow then)
     {
         if (files == null || downloading || files.IsDownloaded) return;
         var collection = selectedCollection;
@@ -239,7 +239,7 @@ public sealed class LibraryViewModel : ObservableObject
             UpdateDownload();
         }
         // Out of the download: an error of the file itself (taken from the zip) is not one of the download.
-        if (downloaded && then != null && files == target) Run(() => Open(then, showMixer));
+        if (downloaded && then != null && files == target) Run(() => Open(then));
     }
 
     // Deletes the downloaded zip of the collection shown and the files taken from it (the playlist keeps them only once
@@ -284,27 +284,21 @@ public sealed class LibraryViewModel : ObservableObject
         Navigate(slash >= 0 ? folder[..slash] : "");
     }
 
-    // A file of the folder and of its subfolders, shown by the filters, chosen at random, shown in the list (its folder
-    // opened, the file selected; in a search or a played list: selected there) and played as with a double click (the
-    // Mixer tab shown). Always from the folder shown: once the folder of the file is opened, the next one comes from it
-    // (up a folder to choose again from a larger one).
+    // A file of the folder and of its subfolders, shown by the filters, chosen at random and played as with a double click
+    // (the Mixer tab shown). The list stays on the folder shown, so that the next one comes from the same folder and
+    // below; the file is selected only when the list shows it (a file of this folder, a search, a played list).
     void PlayRandom()
     {
         if (catalog == null) return;
         var file = catalog.RandomFile(folder, Filter);
         if (file == null) { setStatus("No readable file here with these filters"); return; }
-        if (!IsFlat)
-        {
-            folder = file.FolderPath;
-            Refresh();
-        }
-        var row = rows.FirstOrDefault(r => r.File?.Path == file.Path) ?? FileRow(file);
-        SelectedRow = row;
+        var row = rows.FirstOrDefault(r => r.File?.Path == file.Path);
+        if (row != null) SelectedRow = row;
         setStatus($"Random: {file.Title}");
-        Open(row);
+        Open(row ?? FileRow(file));
     }
 
-    // Row selected in the list (the random file; the view keeps it visible).
+    // Row selected in the list (also the random file, when the list shows it; the view keeps it visible).
     LibraryRow selectedRow;
     public LibraryRow SelectedRow { get => selectedRow; set { if (Set(ref selectedRow, value)) NotifyDetails(); } }
 
@@ -525,26 +519,26 @@ public sealed class LibraryViewModel : ObservableObject
     // ---------- Actions ----------
 
     // Double click or Enter: a folder is entered; a file is taken from the zip, added to the playlist and played, the Mixer
-    // tab shown (showMixer false: the Library tab stays).
-    void Open(LibraryRow row, bool showMixer = true)
+    // tab shown.
+    void Open(LibraryRow row)
     {
         if (row == null) return;
         if (row.IsFolder) { searchText = ""; OnPropertyChanged(nameof(SearchText)); Navigate(row.Folder.Path); return; }
         if (row.Unreadable) { setStatus($"Unreadable file: {row.File.Error}"); return; }
-        if (!IsAvailable(row)) { OfferDownload(row, showMixer); return; }
+        if (!IsAvailable(row)) { OfferDownload(row); return; }
         var local = files.Get(row.File);
-        play(local, showMixer);
+        play(local);
     }
 
     // A file can be played: taken from the zip before, or the zip is downloaded.
     bool IsAvailable(LibraryRow row) => files.IsDownloaded || File.Exists(files.OnDisk(row.File.Path));
 
     // Its zip is missing: downloaded if the user wants (the file played then).
-    void OfferDownload(LibraryRow then, bool showMixer = true)
+    void OfferDownload(LibraryRow then)
     {
         if (downloading) { setStatus("Download in progress: file playable once it ends"); return; }
         if (view.AskYesNoCancel($"Download files of {selectedCollection.Name} ({Megabytes(selectedCollection.SourceSize)}) from {new Uri(selectedCollection.SourceUrl).Host}?") == true)
-            Download(then, showMixer);
+            Download(then);
     }
 
     // Above this many files, adding them asks first: each one is taken from the zip (the first time) and read by the
