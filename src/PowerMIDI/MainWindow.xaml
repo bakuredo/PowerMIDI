@@ -1020,29 +1020,27 @@
       </ListView.View>
     </ListView>
 
+    <!-- Empty playlist: what to do, over the list (not hit by the mouse: the files dropped there reach the list). -->
+    <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24,0,0" IsHitTestVisible="False">
+      <StackPanel.Style>
+        <Style TargetType="StackPanel">
+          <Setter Property="Visibility" Value="Collapsed"/>
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding Playlist.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </StackPanel.Style>
+      <TextBlock Text="&#xE8D6;" FontFamily="Segoe MDL2 Assets" FontSize="40" HorizontalAlignment="Center" Foreground="{DynamicResource TextMutedBrush}"/>
+      <TextBlock Text="Drop MIDI files or folders here" HorizontalAlignment="Center" Margin="0,12,0,0" Foreground="{DynamicResource TextSoftBrush}"/>
+    </StackPanel>
+
     <!-- Playlist management (2 px right of the playlist frame, chosen by eye) -->
     <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="2,8,0,12">
-      <!-- Each button: its icon (Segoe MDL2 Assets, the glyph in Tag) before its label. -->
-      <WrapPanel.Resources>
-        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-          <Setter Property="ContentTemplate">
-            <Setter.Value>
-              <DataTemplate>
-                <StackPanel Orientation="Horizontal">
-                  <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}" FontFamily="Segoe MDL2 Assets" FontSize="13"
-                             VerticalAlignment="Center" Margin="0,1,6,0" UseLayoutRounding="True"/>
-                  <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                </StackPanel>
-              </DataTemplate>
-            </Setter.Value>
-          </Setter>
-        </Style>
-      </WrapPanel.Resources>
-      <Button Content="Add files…" Tag="&#xE710;" Command="{Binding AddFilesCommand}"/>
-      <Button Content="Add folder…" Tag="&#xE710;" Command="{Binding AddFolderCommand}"/>
-      <Button Content="Remove" Tag="&#xE738;" Command="{Binding RemoveCommand}" CommandParameter="{Binding SelectedItems, ElementName=PlaylistView}"/>
-      <Button Content="Clear" Tag="&#xE894;" Command="{Binding ClearCommand}"/>
-      <Button Content="Save MIDI file…" Tag="&#xE896;" Command="{Binding SaveCommand}"
+      <Button Content="Add files…" Command="{Binding AddFilesCommand}"/>
+      <Button Content="Add folder…" Command="{Binding AddFolderCommand}"/>
+      <Button Content="Remove" Command="{Binding RemoveCommand}" CommandParameter="{Binding SelectedItems, ElementName=PlaylistView}"/>
+      <Button Content="Clear" Command="{Binding ClearCommand}"/>
+      <Button Content="Save MIDI file…" Command="{Binding SaveCommand}"
               ToolTip="Saves track with its settings (right click: save as, also without changes)">
         <Button.InputBindings>
           <MouseBinding Gesture="RightClick" Command="{Binding SaveAsCommand}"/>

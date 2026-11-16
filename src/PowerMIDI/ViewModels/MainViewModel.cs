@@ -284,8 +284,10 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // No track loaded: the mixer and effects switch to the chosen mode right away (Auto: GM, the default when no file says otherwise, as at startup),
-    // and the module receives the mode's reset, so that what is shown matches what it plays.
-    void ApplyModeWithoutTrack()
+    // and the module receives the mode's reset, so that what is shown matches what it plays. Also when the track loaded
+    // leaves the playlist (Remove, Clear): back to the state of a start without files (say false: the status line is
+    // left to the caller).
+    void ApplyModeWithoutTrack(bool say = true)
     {
         var std = selectedMode == "Auto" ? MidiTools.DefaultStandard : selectedMode;
         ChannelMixer.Mt32Mode = std == "MT-32";
@@ -303,7 +305,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
         Mixer.Refresh();
         Effects.Refresh();
-        Status = output != null ? $"Mode {std}: reset sent to {output.Name}" : $"Mode {std}";
+        DisplayText = ModuleDisplay.Text;   // the screen emptied (ResetChannelState) at once, not at the next timer tick
+        if (say) Status = output != null ? $"Mode {std}: reset sent to {output.Name}" : $"Mode {std}";
     }
 
     // Forced mode: any mode chosen in the list other than Auto is forced on the file.
@@ -326,7 +329,7 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // Adds files and folders (subfolders included) to the playlist. play: the first added file plays right away
-    // (file opened from Explorer while PowerMIDI runs); otherwise only if nothing is in progress.
+    // (file opened from Explorer while PowerMIDI runs); otherwise only if nothing plays (stopped, not paused).
     // The rows come at once; the format and duration of each file need it read in full: a few files are read here, more
     // (a folder) in the background, their rows filled in as they are read, so that the window does not freeze.
     public void AddFiles(IEnumerable<string> paths, bool play = false)
@@ -367,9 +370,10 @@ public sealed partial class MainViewModel : ObservableObject
         }
         finally { view.SetBusy(false); }
 
-        // Nothing in progress (no playback, no pause, no track loaded): play the first added file.
+        // Nothing plays (no track loaded, end of the playlist, Stop): the first added file plays; a pause is kept (the
+        // track paused is in progress), as a playback.
         var firstAdded = items.FirstOrDefault();
-        if (firstAdded != null && output != null && (play || (state == "stopped" && current == null))) StartTrack(firstAdded);
+        if (firstAdded != null && output != null && (play || state == "stopped")) StartTrack(firstAdded);
     }
 
     // From this number of files added at once, they are read in the background.
@@ -476,12 +480,16 @@ public sealed partial class MainViewModel : ObservableObject
         // The file of the manual settings is removed: they are saved or discarded now.
         bool leaving = items.Any(i => i.Path == settingsFile);
         if (leaving && !ConfirmLeaveSettings()) return;
+        bool trackGone = false;
         foreach (var item in items)
         {
-            if (item == current) { StopTrack(); current = null; ResetNowPlaying(); }
+            if (item == current) { StopTrack(); current = null; ResetNowPlaying(); trackGone = true; }
             Playlist.Remove(item);
         }
         if (leaving) ForgetSettingsFile();
+        // The track loaded removed (or the file of the settings, with no track loaded): mixer, effects, screen and
+        // module as at a start without files.
+        if (trackGone || leaving && current == null) ApplyModeWithoutTrack(say: false);
         UpdateNumbers();
     }
 
@@ -489,11 +497,15 @@ public sealed partial class MainViewModel : ObservableObject
     bool ClearPlaylist()
     {
         if (!ConfirmLeaveSettings()) return false;
+        // A track loaded (or settings of a file): back to a start without files below; none: that state already, no
+        // reset sent again (the window waits for each one).
+        bool loaded = current != null || settingsFile != null;
         StopTrack();
         current = null;
         Playlist.Clear();
         ResetNowPlaying();
         ForgetSettingsFile();
+        if (loaded) ApplyModeWithoutTrack(say: false);   // mixer, effects, screen and module as at a start without files
         Status = "Playlist cleared.";
         return true;
     }
@@ -509,19 +521,18 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // The manual settings no longer have a file (removed from the playlist): cleared, mode back to Auto,
-    // so that the next track starts clean, without asking again.
+    // so that the next track starts clean, without asking again. With no track left, the callers (Remove, Clear) then
+    // bring the mixer, effects and module back to a start without files (ApplyModeWithoutTrack: one reset).
     void ForgetSettingsFile()
     {
         if (settingsFile == null) return;
-        bool wasForced = isForced;
         ClearManualSettings();
         savedSignature = "";
         ResetSpeedAndPitch();
         lastSavedTarget = null;
         settingsFile = null;
-        // No track left playing: the mixer and effects follow the Auto mode, as when it is chosen in the list.
-        if (wasForced && current == null) ApplyModeWithoutTrack();
-        else { Mixer.Refresh(); Effects.Refresh(); }
+        Mixer.Refresh();
+        Effects.Refresh();
     }
 
     // ---------- Now playing ----------
