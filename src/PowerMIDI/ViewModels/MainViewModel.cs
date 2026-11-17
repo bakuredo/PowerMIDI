@@ -45,7 +45,8 @@ public sealed partial class MainViewModel : ObservableObject
         Effects = new EffectsViewModel(defs, () => output, view.ShowError);
         Library = new LibraryViewModel(view, Path.Combine(AppContext.BaseDirectory, "library"), s => Status = s,
                                        path => Run(() => PlayFromLibrary(path)), paths => Run(() => AddFiles(paths)));
-        SoundFonts = new SoundFontsViewModel(Path.Combine(AppContext.BaseDirectory, "soundfonts"), () => Run(OnSoundFontChosen));
+        SoundFonts = new SoundFontsViewModel(Path.Combine(AppContext.BaseDirectory, "soundfonts"), () => Run(OnSoundFontChosen),
+                                             restart => Run(() => OnEngineSettingChanged(restart)));
 
         AddFilesCommand = Command(AddFilesFromDialog);
         AddFolderCommand = Command(AddFolderFromDialog);
@@ -275,6 +276,7 @@ public sealed partial class MainViewModel : ObservableObject
         outputName = null;
         old?.Dispose();
         SoundFonts.EngineState = "Stopped";
+        SoundFonts.DelayText = null;
     }
 
     void PortOpened()
@@ -323,7 +325,8 @@ public sealed partial class MainViewModel : ObservableObject
         Status = $"Loading SoundFont {file}…";
         SoundFontOutput engine;
         IReadOnlyList<SoundFontPreset> presets;
-        try { (engine, presets) = await Task.Run(() => (new SoundFontOutput(path), ReadPresets(path))); }
+        var options = SoundFonts.Options;
+        try { (engine, presets) = await Task.Run(() => (new SoundFontOutput(path, options), ReadPresets(path))); }
         catch (Exception ex)
         {
             if (load != engineLoad) return;
@@ -340,7 +343,9 @@ public sealed partial class MainViewModel : ObservableObject
             Mixer.SoundFontChanged();
             Effects.Refresh();
             PortOpened();
-            SoundFonts.EngineState = $"Running: {file} (FluidSynth {SoundFontOutput.Version})";
+            var driverName = SoundFontEngineOptions.Drivers.FirstOrDefault(d => d.Value == engine.DriverUsed).Text ?? engine.DriverUsed;
+            SoundFonts.EngineState = $"Running: {file} (FluidSynth {SoundFontOutput.Version}, {driverName})" +
+                                     (engine.DriverUsed != options.Driver ? " — chosen output unavailable" : "");
             Status = $"SoundFont {file} loaded";
             var pending = playWhenReady;
             playWhenReady = null;
@@ -353,6 +358,28 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try { return SoundFontInfo.Read(path).PresetList; }
         catch (Exception ex) when (ex is IOException or InvalidDataException or EndOfStreamException) { return Array.Empty<SoundFontPreset>(); }
+    }
+
+    // A setting of the engine changed in the SoundFonts tab (remembered on close): one taken when FluidSynth is created
+    // restarts the engine (playback stopped, as for another SoundFont); the others are given to it at once.
+    void OnEngineSettingChanged(bool restart)
+    {
+        if (!IsSoundFontEngine) return;
+        if (restart)
+        {
+            var name = outputName ?? SoundFontOutput.PortName;
+            Stop();
+            ClosePort();
+            OpenPort(name);
+            return;
+        }
+        if (output is SoundFontOutput engine)
+        {
+            var o = SoundFonts.Options;
+            engine.SetGain(o.Gain);
+            engine.SetInterpolation(o.Interpolation);
+            engine.SetPolyphony(o.Polyphony);
+        }
     }
 
     // Another SoundFont chosen in the SoundFonts tab: remembered, and loaded if the engine is the port.
@@ -1124,6 +1151,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (prompting) return;   // confirmation prompt open: do not move on
         Mixer.Refresh();
         Effects.Refresh();
+        if (output is SoundFontOutput engine) SoundFonts.DelayText = $"Delay ~{engine.Delay:0} ms";   // SoundFonts tab
         DisplayText = ModuleDisplay.Text;
         LoadEvents();
         RefreshEventsFixed();

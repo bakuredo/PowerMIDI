@@ -25,9 +25,9 @@ public sealed class SoundFontOutput : IOutputDevice
     // The engine is offered only when its library is next to the program.
     public static bool IsAvailable => File.Exists(LibraryPath);
 
-    // Gain at full master volume. FluidSynth's default (0.2) is quiet next to a module; much more saturates on loud
-    // passages.
-    const float FullGain = 0.5f;
+    // Gain at full master volume (SoundFontEngineOptions.Gain), and the master volume (0-1, universal SysEx).
+    volatile float fullGain;
+    volatile float masterVolume = 1;
 
     const double Margin = 4;   // ms added to the lead: the sequencer's clock counts whole milliseconds
 
@@ -46,7 +46,10 @@ public sealed class SoundFontOutput : IOutputDevice
         get { Prepare(); return Text(fluid_version_str()); }
     }
 
-    public SoundFontOutput(string soundFontPath)
+    // Audio driver actually used (the one chosen, or WASAPI / DirectSound when it could not start), e.g. "wasapi".
+    public string DriverUsed { get; private set; }
+
+    public SoundFontOutput(string soundFontPath, SoundFontEngineOptions options)
     {
         SoundFontPath = soundFontPath;
         callback = OnSequencerEvent;
@@ -57,10 +60,18 @@ public sealed class SoundFontOutput : IOutputDevice
             lastError = null;
             settings = new_fluid_settings();
             if (settings == IntPtr.Zero) throw Failure("cannot create its settings");
+            // Settings taken when the synthesizer and the audio output are created.
+            fluid_settings_setstr(settings, "synth.reverb.engine", options.ReverbEngine);
+            fluid_settings_setint(settings, "synth.polyphony", options.Polyphony);
+            fluid_settings_setint(settings, "synth.dynamic-sample-loading", options.LoadOnDemand ? 1 : 0);
+            fluid_settings_setnum(settings, "synth.sample-rate", options.SampleRate);
+            fluid_settings_setint(settings, "audio.periods", options.Buffer);
             synth = new_fluid_synth(settings);
             if (synth == IntPtr.Zero) throw Failure("cannot create synthesizer");
             if (fluid_synth_sfload(synth, soundFontPath, 1) < 0) throw Failure($"cannot load {Path.GetFileName(soundFontPath)}");
-            fluid_synth_set_gain(synth, FullGain);
+            fluid_synth_set_interp_method(synth, -1, options.Interpolation);
+            fullGain = (float)options.Gain;
+            fluid_synth_set_gain(synth, fullGain);
 
             // Sequencer clocked by the rendering (no system timer), with the synthesizer and this engine as clients.
             sequencer = new_fluid_sequencer2(0);
@@ -71,14 +82,19 @@ public sealed class SoundFontOutput : IOutputDevice
             sequencerEvent = new_fluid_event();
             fluid_event_set_source(sequencerEvent, -1);
 
-            // Audio output: WASAPI (Windows' own), otherwise DirectSound.
-            foreach (var name in new[] { "wasapi", "dsound" })
+            // Audio output: the driver and device chosen; if it cannot start (device unplugged…), WASAPI then DirectSound
+            // on the default device.
+            foreach (var (name, device) in new[] { (options.Driver, options.Device), ("wasapi", "default"), ("dsound", "default") }.Distinct())
             {
                 fluid_settings_setstr(settings, "audio.driver", name);
+                fluid_settings_setstr(settings, $"audio.{name}.device", device);
                 driver = new_fluid_audio_driver(settings, synth);
-                if (driver != IntPtr.Zero) break;
+                if (driver == IntPtr.Zero) continue;
+                DriverUsed = name;
+                break;
             }
             if (driver == IntPtr.Zero) throw Failure("no audio output");
+            lead = SoundFontEngineOptions.BufferMs(DriverUsed, options.Buffer, options.SampleRate) + StartMargin;
             clock.Start();
             // The lead of the rendering is also measured between events (a few events only would not see its highest).
             leadTimer = new Timer(_ => { lock (gate) { if (sequencer != IntPtr.Zero) MeasureLead(); } }, null, 0, 5);
@@ -133,11 +149,13 @@ public sealed class SoundFontOutput : IOutputDevice
     // Lead of the rendering over the clock (ms): how far ahead the synthesizer has computed. It rises with each burst,
     // then falls until the next one (WASAPI shared mode: between about 25 and 80 ms). The estimate follows its highest:
     // it rises at once when the lead goes above it, and falls slowly (1 ms per second: the clocks of the computer and
-    // of the sound card drift apart a little), so that the dates keep the spacing of the events. It starts high
-    // (100 ms): the first events of the engine are dated as evenly as the next ones. Measured with WASAPI: events
-    // played within 2 ms of their spacing, instead of up to 35 ms when given straight to the synthesizer.
-    const double StartLead = 100, LeadFall = 0.001;   // ms, ms per ms
-    double lead = StartLead, lastMeasure;
+    // of the sound card drift apart a little), so that the dates keep the spacing of the events. It starts at the
+    // length of the audio buffer plus 10 ms, a little above the highest lead (which is about the buffer): the first
+    // events of the engine are dated as evenly as the next ones, and a smaller buffer gives a shorter delay at once.
+    // Measured with WASAPI: events played within 2 ms of their spacing, instead of up to 35 ms when given straight to
+    // the synthesizer.
+    const double StartMargin = 10, LeadFall = 0.001;   // ms, ms per ms
+    double lead, lastMeasure;
     uint lastDate;
 
     void MeasureLead()
@@ -190,7 +208,8 @@ public sealed class SoundFontOutput : IOutputDevice
         int length = data[^1] == 0xF7 ? data.Length - 1 : data.Length;   // without the final F7
         if (length == 6 && data[0] == 0x7F && data[2] == 0x04 && data[3] == 0x01)
         {
-            fluid_synth_set_gain(s, FullGain * ((data[5] << 7) | data[4]) / 16383f);
+            masterVolume = ((data[5] << 7) | data[4]) / 16383f;
+            fluid_synth_set_gain(s, fullGain * masterVolume);
             return;
         }
         if (IsModeReset(data, length))
@@ -202,6 +221,46 @@ public sealed class SoundFontOutput : IOutputDevice
         if (length < 1) return;
         var message = length == data.Length ? data : data[..length];
         fluid_synth_sysex(s, message, message.Length, IntPtr.Zero, IntPtr.Zero, out _, 0);
+    }
+
+    // ---------- Settings taken at once (SoundFonts tab) ----------
+    public void SetGain(double gain)
+    {
+        lock (gate)
+        {
+            fullGain = (float)gain;
+            if (synth != IntPtr.Zero) fluid_synth_set_gain(synth, fullGain * masterVolume);
+        }
+    }
+
+    public void SetInterpolation(int method)
+    {
+        lock (gate) { if (synth != IntPtr.Zero) fluid_synth_set_interp_method(synth, -1, method); }
+    }
+
+    public void SetPolyphony(int voices)
+    {
+        lock (gate) { if (synth != IntPtr.Zero) fluid_synth_set_polyphony(synth, voices); }
+    }
+
+    // Delay between an event sent and its sound (ms): the lead of the rendering, plus the margin (see Dates).
+    public double Delay => lead + Margin;
+
+    // Audio devices of a driver (e.g. "wasapi"), as FluidSynth names them, "default" first.
+    public static IReadOnlyList<string> Devices(string driver)
+    {
+        Prepare();
+        var names = new List<string>();
+        var options = new_fluid_settings();
+        if (options == IntPtr.Zero) return names;
+        try
+        {
+            OptionCallback add = (data, name, option) => { if (Text(option) is { } text) names.Add(text); };
+            fluid_settings_foreach_option(options, $"audio.{driver}.device", IntPtr.Zero, add);
+            GC.KeepAlive(add);
+        }
+        finally { delete_fluid_settings(options); }
+        return names.OrderBy(n => n != "default").ToList();
     }
 
     // ---------- Reverb and chorus (see SoundFontEffects) ----------

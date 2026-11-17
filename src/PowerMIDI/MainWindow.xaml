@@ -891,8 +891,83 @@
         <ComboBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" IsEnabled="{Binding HasFiles}" Padding="6,2.5,2,3.5"
                   AutomationProperties.Name="SoundFont file"/>
       </DockPanel>
-      <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,0" Foreground="{DynamicResource TextSoftBrush}" TextTrimming="CharacterEllipsis"
-                 Text="{Binding EngineState, StringFormat=Engine: {0}}" ToolTip="{Binding EngineState}"/>
+      <!-- State of the engine, and its delay (event to sound) while it runs. -->
+      <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+        <TextBlock DockPanel.Dock="Right" Margin="8,0,0,0" Foreground="{DynamicResource TextSoftBrush}" Text="{Binding DelayText}"
+                   ToolTip="Delay between an event and its sound (audio buffer and timing)"/>
+        <TextBlock Foreground="{DynamicResource TextSoftBrush}" TextTrimming="CharacterEllipsis"
+                   Text="{Binding EngineState, StringFormat=Engine: {0}}" ToolTip="{Binding EngineState}"/>
+      </DockPanel>
+      <!-- Settings of the engine (SoundFontEngineOptions): those FluidSynth takes when created restart it (tooltips). -->
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,8,0,0">
+        <Border.Resources>
+          <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+            <Setter Property="SelectedValuePath" Value="Value"/>
+            <Setter Property="DisplayMemberPath" Value="Text"/>
+          </Style>
+        </Border.Resources>
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="14"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.ColumnSpan="2" Text="Engine" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBlock Grid.Row="1" Text="Reverb" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ReverbEngines}" SelectedValue="{Binding ReverbEngine}"
+                      ToolTip="Reverb engine of FluidSynth (change restarts engine)"/>
+            <TextBlock Grid.Row="2" Text="Interpolation" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Interpolations}" SelectedValue="{Binding Interpolation}"
+                      ToolTip="Quality of sample playback (higher: more CPU)"/>
+            <TextBlock Grid.Row="3" Text="Polyphony" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Polyphonies}" SelectedValue="{Binding Polyphony}"
+                      ToolTip="Notes played at once, at most"/>
+            <TextBlock Grid.Row="4" Text="Samples" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding SampleLoadings}" SelectedValue="{Binding LoadOnDemand}"
+                      ToolTip="All at load: more memory, no delay; on demand: little memory, short delay on first use of instrument (change restarts engine)"/>
+            <TextBlock Grid.Row="5" Text="Gain" Margin="0,0,8,0" Foreground="{DynamicResource TextSoftBrush}"/>
+            <DockPanel Grid.Row="5" Grid.Column="1">
+              <TextBlock DockPanel.Dock="Right" Width="30" TextAlignment="Right" Text="{Binding GainText}"/>
+              <Slider Minimum="0" Maximum="2" SmallChange="0.05" LargeChange="0.25" IsSnapToTickEnabled="True" TickFrequency="0.05"
+                      Value="{Binding Gain}" VerticalAlignment="Center" ToolTip="Volume of engine at full master volume (FluidSynth default: 0.2)"/>
+            </DockPanel>
+          </Grid>
+          <Grid Grid.Column="2">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.ColumnSpan="2" Text="Audio output" FontWeight="SemiBold" Margin="0,0,0,6"/>
+            <TextBlock Grid.Row="1" Text="Driver" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Drivers}" SelectedValue="{Binding Driver}"
+                      ToolTip="Audio output of Windows used (change restarts engine)"/>
+            <TextBlock Grid.Row="2" Text="Device" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Devices}" SelectedValue="{Binding Device}"
+                      ToolTip="{Binding SelectedItem.Text, RelativeSource={RelativeSource Self}}"/>
+            <TextBlock Grid.Row="3" Text="Rate" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding SampleRates}" SelectedValue="{Binding SampleRate}"
+                      ToolTip="Sample rate of engine (change restarts engine)"/>
+            <TextBlock Grid.Row="4" Text="Buffer" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
+            <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Buffers}" SelectedValue="{Binding Buffer}"
+                      ToolTip="Smaller: less delay, but crackles if computer is too busy (change restarts engine)"/>
+          </Grid>
+        </Grid>
+      </Border>
       <Grid>
         <!-- No file: where to put them. -->
         <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextSoftBrush}"

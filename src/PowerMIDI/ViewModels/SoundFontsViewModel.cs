@@ -9,13 +9,15 @@ namespace PowerMIDI.ViewModels;
 public sealed class SoundFontsViewModel : ObservableObject
 {
     readonly Action chosen;   // a file chosen by hand: the engine loads it if it runs
+    readonly Action<bool> engineChanged;   // a setting of the engine changed: restart (true) or taken at once (false)
     string savedFile;         // the file remembered in PowerMIDI.ini
     bool updating;            // list refreshed or settings read: not a choice by hand
 
-    public SoundFontsViewModel(string folder, Action chosen)
+    public SoundFontsViewModel(string folder, Action chosen, Action<bool> engineChanged)
     {
         Folder = folder;
         this.chosen = chosen;
+        this.engineChanged = engineChanged;
         RefreshCommand = new RelayCommand(() => Refresh(notify: true));
         OpenFolderCommand = new RelayCommand(OpenFolder);
         Refresh(notify: false);
@@ -46,9 +48,94 @@ public sealed class SoundFontsViewModel : ObservableObject
     // Full path of the chosen file (null: none).
     public string SelectedPath => selectedFile == null ? null : Path.Combine(Folder, selectedFile);
 
-    // State of the engine, set by the main view model: stopped, loading, running.
+    // State of the engine, set by the main view model: stopped, loading, running; and its delay while it runs.
     string engineState = "Stopped";
     public string EngineState { get => engineState; set => Set(ref engineState, value); }
+    string delayText;
+    public string DelayText { get => delayText; set => Set(ref delayText, value); }
+
+    // ---------- Settings of the engine (SoundFontEngineOptions) ----------
+    // A list item: its text and its value (string, int or bool).
+    public sealed record Choice(string Text, object Value);
+
+    SoundFontEngineOptions options = new();
+    public SoundFontEngineOptions Options => options;
+
+    public IReadOnlyList<Choice> ReverbEngines { get; } = SoundFontEngineOptions.ReverbEngines.Select(x => new Choice(x.Text, x.Value)).ToList();
+    public IReadOnlyList<Choice> Interpolations { get; } = SoundFontEngineOptions.Interpolations.Select(x => new Choice(x.Text, x.Value)).ToList();
+    public IReadOnlyList<Choice> Polyphonies { get; } = SoundFontEngineOptions.Polyphonies.Select(n => new Choice($"{n} voices", n)).ToList();
+    public IReadOnlyList<Choice> SampleLoadings { get; } = new[] { new Choice("All at load", false), new Choice("On demand", true) };
+    public IReadOnlyList<Choice> Drivers { get; } = SoundFontEngineOptions.Drivers.Select(x => new Choice(x.Text, x.Value)).ToList();
+    public IReadOnlyList<Choice> SampleRates { get; } =
+        SoundFontEngineOptions.SampleRates.Select(r => new Choice($"{r / 1000.0:0.#} kHz".Replace(',', '.'), r)).ToList();
+
+    // A list given new items may give back null for a moment: ignored (the setting stays).
+    public string ReverbEngine { get => options.ReverbEngine; set { if (value != null) Change(options with { ReverbEngine = value }); } }
+    public int Interpolation { get => options.Interpolation; set => Change(options with { Interpolation = value }); }
+    public int Polyphony { get => options.Polyphony; set => Change(options with { Polyphony = value }); }
+    public bool LoadOnDemand { get => options.LoadOnDemand; set => Change(options with { LoadOnDemand = value }); }
+    public int SampleRate { get => options.SampleRate; set => Change(options with { SampleRate = value }); }
+    public int Buffer { get => options.Buffer; set => Change(options with { Buffer = value }); }
+    public string Device { get => options.Device; set { if (value != null) Change(options with { Device = value }); } }
+
+    // Gain: slider 0-2, in steps of 0.05.
+    public double Gain { get => options.Gain; set => Change(options with { Gain = Math.Clamp(Math.Round(value * 20) / 20, 0, 2) }); }
+    public string GainText => options.Gain.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Another driver: its devices; the device chosen if it has it, otherwise the default one.
+    public string Driver
+    {
+        get => options.Driver;
+        set
+        {
+            if (value == null || value == options.Driver) return;
+            var names = DeviceNames(value);
+            Change(options with { Driver = value, Device = names.Contains(options.Device) ? options.Device : "default" });
+        }
+    }
+
+    // Devices of the driver chosen (asked to FluidSynth when the list is first shown: its library is only loaded then).
+    // A device chosen earlier and gone (unplugged) stays in the list, marked missing.
+    public IReadOnlyList<Choice> Devices
+    {
+        get
+        {
+            var names = DeviceNames(options.Driver);
+            var list = names.Select(n => new Choice(n == "default" ? "Default" : n, n)).ToList();
+            if (!names.Contains(options.Device)) list.Add(new Choice($"{options.Device} (missing)", options.Device));
+            return list;
+        }
+    }
+
+    readonly Dictionary<string, IReadOnlyList<string>> deviceNames = new();
+
+    IReadOnlyList<string> DeviceNames(string driver)
+    {
+        if (deviceNames.TryGetValue(driver, out var names)) return names;
+        try { names = SoundFontOutput.IsAvailable ? SoundFontOutput.Devices(driver) : null; }
+        catch (Exception ex) when (ex is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException) { names = null; }
+        if (names == null || names.Count == 0) names = new[] { "default" };
+        return deviceNames[driver] = names;
+    }
+
+    // Buffer sizes, with their length for the driver and sample rate chosen.
+    public IReadOnlyList<Choice> Buffers =>
+        SoundFontEngineOptions.Buffers.Select(n => new Choice($"{n} periods (~{SoundFontEngineOptions.BufferMs(options.Driver, n, options.SampleRate):0} ms)", n)).ToList();
+
+    void Change(SoundFontEngineOptions next)
+    {
+        if (next == options) return;
+        bool restart = next.NeedsRestart(options);
+        var before = options;
+        options = next;
+        // The lists that depend on the driver (devices, buffer lengths) or the sample rate (buffer lengths) first.
+        if (next.Driver != before.Driver) OnPropertyChanged(nameof(Devices));
+        if (next.Driver != before.Driver || next.SampleRate != before.SampleRate) OnPropertyChanged(nameof(Buffers));
+        foreach (var name in new[] { nameof(ReverbEngine), nameof(Interpolation), nameof(Polyphony), nameof(LoadOnDemand), nameof(SampleRate),
+                                     nameof(Buffer), nameof(Gain), nameof(GainText), nameof(Driver), nameof(Device) })
+            OnPropertyChanged(name);
+        if (!updating) engineChanged(restart);
+    }
 
     // ---------- What the chosen file says about itself ----------
     string infoName, infoAuthor, infoCopyright, infoDetails, infoComment;
@@ -113,10 +200,13 @@ public sealed class SoundFontsViewModel : ObservableObject
     }
 
     // ---------- Settings (PowerMIDI.ini) ----------
-    // The file chosen, and the reverb and chorus of the engine (SoundFontEffects, set in the Effects tab).
+    // The file chosen, the settings of the engine, and its reverb and chorus (SoundFontEffects, set in the Effects tab).
     public void LoadSettings(IniFile ini)
     {
         SoundFontEffects.Read(ini);
+        updating = true;
+        try { Change(SoundFontEngineOptions.Read(ini)); }
+        finally { updating = false; }
         savedFile = ini.Get("SoundFont", "File");
         if (savedFile == "") savedFile = null;
         selectedFile = null;   // the remembered file chosen by the refresh
@@ -126,6 +216,7 @@ public sealed class SoundFontsViewModel : ObservableObject
     public void WriteSettings(IniFile ini)
     {
         ini.Set("SoundFont", "File", selectedFile ?? savedFile ?? "");
+        options.Write(ini);
         SoundFontEffects.Write(ini);
     }
 }

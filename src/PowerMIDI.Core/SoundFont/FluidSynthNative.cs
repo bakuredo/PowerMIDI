@@ -58,6 +58,14 @@ static class FluidSynthNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_settings_setnum(IntPtr settings, [MarshalAs(UnmanagedType.LPUTF8Str)] string name, double value);
 
+    // The options of a string setting (e.g. the audio devices of a driver: "audio.wasapi.device"), one call each.
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate void OptionCallback(IntPtr data, IntPtr name, IntPtr option);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void fluid_settings_foreach_option(IntPtr settings, [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
+                                                            IntPtr data, OptionCallback callback);
+
     // ---------- Synthesizer ----------
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr new_fluid_synth(IntPtr settings);
@@ -71,6 +79,13 @@ static class FluidSynthNative
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern void fluid_synth_set_gain(IntPtr synth, float gain);
+
+    // chan -1: all the channels. Methods: 0 none, 1 linear, 4 4th order, 5 / 6 sinc of 11th / 17th order.
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_interp_method(IntPtr synth, int chan, int method);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_polyphony(IntPtr synth, int polyphony);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_noteon(IntPtr synth, int chan, int key, int vel);
