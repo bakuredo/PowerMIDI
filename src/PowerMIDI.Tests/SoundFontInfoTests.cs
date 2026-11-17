@@ -21,7 +21,24 @@ public class SoundFontInfoTests
 
     static byte[] Zstr(string text, Encoding encoding = null) => (encoding ?? Encoding.ASCII).GetBytes(text).Append((byte)0).ToArray();
 
-    // presets: number of presets; the phdr list has one more record (the terminal one).
+    // phdr records: name on 20 bytes, program, bank, then 14 bytes (bag index, library, genre, morphology); the
+    // terminal record "EOP" closes the list.
+    static byte[] Phdr(params (string Name, int Program, int Bank)[] presets)
+    {
+        var bytes = new List<byte>();
+        foreach (var (name, program, bank) in presets.Append(("EOP", 0, 0)))
+        {
+            var text = new byte[20];
+            Encoding.ASCII.GetBytes(name).CopyTo(text, 0);
+            bytes.AddRange(text);
+            bytes.AddRange(BitConverter.GetBytes((ushort)program));
+            bytes.AddRange(BitConverter.GetBytes((ushort)bank));
+            bytes.AddRange(new byte[14]);
+        }
+        return bytes.ToArray();
+    }
+
+    // presets: number of presets (named "Preset n", program n - 1, bank 0).
     static string Write(int presets, byte[] author)
     {
         var info = List("INFO",
@@ -30,7 +47,8 @@ public class SoundFontInfoTests
             Chunk("IENG", author),
             Chunk("ICOP", Zstr("Free")));
         var sdta = List("sdta", Chunk("smpl", new byte[100]));
-        var pdta = List("pdta", Chunk("phdr", new byte[38 * (presets + 1)]), Chunk("pbag", new byte[4]));
+        var records = Enumerable.Range(0, presets).Select(n => ($"Preset {n + 1}", n, 0)).ToArray();
+        var pdta = List("pdta", Chunk("phdr", Phdr(records)), Chunk("pbag", new byte[4]));
         var body = Encoding.ASCII.GetBytes("sfbk").Concat(info).Concat(sdta).Concat(pdta).ToArray();
         var path = Path.Combine(Path.GetTempPath(), $"powermidi-test-{Guid.NewGuid():N}.sf2");
         File.WriteAllBytes(path, Chunk("RIFF", body));
@@ -50,6 +68,7 @@ public class SoundFontInfoTests
             Assert.Null(info.Comment);
             Assert.Equal("2.01", info.Version);
             Assert.Equal(3, info.Presets);
+            Assert.Equal(new SoundFontPreset(0, 2, "Preset 3"), info.PresetList[2]);
         }
         finally { File.Delete(path); }
     }

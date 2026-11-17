@@ -58,6 +58,13 @@ public sealed class MixerViewModel : ObservableObject
         set { if (Set(ref standard, value)) { OnPropertyChanged(nameof(IsXg)); OnPropertyChanged(nameof(IsGs)); } }
     }
 
+    // Another SoundFont loaded (SF2 mode): the names of its presets, on every channel.
+    public void SoundFontChanged()
+    {
+        foreach (var ch in Channels) ch.InstrumentKey = "";
+        Refresh();
+    }
+
     // XG mode: the voice map list is shown under the channels.
     public bool IsXg => HasXgBanks;
 
@@ -345,7 +352,7 @@ public sealed class MixerViewModel : ObservableObject
     {
         "XG" => GetCurrentSound(c).Msb is 126 or 127,
         "GM2" => InstrumentDefinitions.IsGm2Drum(c, GetCurrentSound(c).Msb),
-        "GS" or "MT-32" => ChannelMixer.Rhythm(c) > 0,
+        "GS" or "MT-32" or InstrumentDefinitions.Sf2Standard => ChannelMixer.Rhythm(c) > 0,
         _ => c == 9,
     };
 
@@ -412,13 +419,15 @@ public sealed class MixerViewModel : ObservableObject
                                            : (InstrumentDefinitions.Gm2MelodicMsb, msb == InstrumentDefinitions.Gm2MelodicMsb ? lsb : 0);
         // XG: a board voice asked by the other bank of its songs is listed by its own (see InstrumentDefinitions.XgListedMsb).
         if (HasXgBanks) msb = InstrumentDefinitions.XgListedMsb(msb);
-        // In GS, the LSB only selects the map: compare program and MSB only.
+        // In GS, the LSB only selects the map: compare program and MSB only. SF2: the bank LSB is ignored, and a drum
+        // channel ignores the MSB too (its kits are those of bank 128): the program alone.
         bool compareLsb = Standard is "XG" or "GM2";
+        bool compareMsb = !(Standard == InstrumentDefinitions.Sf2Standard && drum);
         int index = -1;
         for (int i = 0; i < choices.Count; i++)
         {
             var x = choices[i];
-            if (x.Program == program && x.Msb == msb && (!compareLsb || x.Lsb == lsb)) { index = i; break; }
+            if (x.Program == program && (!compareMsb || x.Msb == msb) && (!compareLsb || x.Lsb == lsb)) { index = i; break; }
         }
         return (choices, index, program, fileInfo);
     }

@@ -382,6 +382,7 @@ public sealed class InstrumentDefinitions
     // the bank and the GS drum mode (rhythm > 0).
     public InstrumentInfo Resolve(string standard, int channel, int program, int msb, int lsb, int rhythm)
     {
+        if (standard == Sf2Standard && sf2Presets.Count > 0) return ResolveSoundFont(program, msb, rhythm);
         var pcText = $"PC {program + 1} · MSB {msb} / LSB {lsb}";
 
         // MT-32 (MT-32.xml): 128 preset patches, no banks; the rhythm part (channel 10 by default) ignores
@@ -465,12 +466,13 @@ public sealed class InstrumentDefinitions
     // mu50Only (XG, MU Basic voice map): only the drum kits and the SFX voices the MU50 also has.
     public IReadOnlyList<InstrumentChoice> GetChoices(string standard, bool drum, int lsb, bool mu50Only = false)
     {
+        if (standard == Sf2Standard && sf2Presets.Count > 0) return drum ? sf2Drums : sf2Sounds;
         // MT-32: the 128 preset patches, or the rhythm part.
         bool mt32 = standard == "MT-32" && Mt32Voices.Count > 0;
         // GM2: the 256 sounds (MSB 121 + LSB) or the 9 kits (MSB 120).
         bool gm2 = !mt32 && standard == "GM2" && Gm2Voices.Count > 0;
         bool useXg = !mt32 && !gm2 && standard == "XG" && XgVoices.Count > 0;
-        bool useGs = !mt32 && !gm2 && !useXg && standard != "GM" && standard != "GM2" && GsVoices.Count > 0;
+        bool useGs = !mt32 && !gm2 && !useXg && standard is not ("GM" or "GM2" or Sf2Standard) && GsVoices.Count > 0;   // SF2 without SoundFont: GM
         int map = useXg ? (XgMapNames.ContainsKey(lsb) ? lsb : XgNativeMap) : lsb >= 1 && lsb <= 4 ? lsb : ChannelMixer.GsDefaultMap;
         mu50Only &= useXg;
         var cacheKey = $"{mt32}/{gm2}/{useXg}/{useGs}/{drum}/{map}/{mu50Only}";
@@ -507,5 +509,57 @@ public sealed class InstrumentDefinitions
             }).ToList();
         choiceCache[cacheKey] = choices;
         return choices;
+    }
+
+    // ---------- SoundFont (SF2 mode: the SoundFont engine is the port) ----------
+    // The presets of the SoundFont it plays, set when it is loaded: banks 0-127 are melodic sounds, bank 128 the drum
+    // kits. They are found as the engine does (FluidSynth, GS bank style): a melodic channel plays the preset of bank
+    // MSB (CC0) and program, the bank LSB is ignored; a drum channel (GS drum part: channel 10 by default) plays the
+    // kit of bank 128 with that program. A missing preset: FluidSynth plays the same program in bank 0, otherwise
+    // program 1 of bank 0; a missing kit: the kit of program 1.
+    public const string Sf2Standard = "SF2";
+    public const int Sf2DrumBank = 128;
+    Dictionary<(int Bank, int Program), string> sf2Presets = new();
+    IReadOnlyList<InstrumentChoice> sf2Sounds = Array.Empty<InstrumentChoice>(), sf2Drums = Array.Empty<InstrumentChoice>();
+
+    public bool HasSoundFont => sf2Presets.Count > 0;
+
+    public void SetSoundFont(IEnumerable<SoundFontPreset> presets)
+    {
+        var table = new Dictionary<(int, int), string>();
+        foreach (var p in presets) table.TryAdd((p.Bank, p.Program), p.Name);   // the first one, as FluidSynth
+        // Sounds: by program, then bank; the first preset of a program shows its number, the others (other banks)
+        // are indented under it, with their bank. Kits: by program. The kits are sent with bank MSB 0 (a drum channel
+        // ignores it).
+        var sounds = table.Where(kv => kv.Key.Item1 < Sf2DrumBank).OrderBy(kv => kv.Key.Item2).ThenBy(kv => kv.Key.Item1).ToList();
+        sf2Sounds = sounds.Select((kv, i) => new InstrumentChoice
+        {
+            Text = i == 0 || sounds[i - 1].Key.Item2 != kv.Key.Item2 ? $"{kv.Key.Item2 + 1:000} {kv.Value}" : $"      · {kv.Value} (bank {kv.Key.Item1})",
+            Msb = kv.Key.Item1, Program = kv.Key.Item2,
+        }).ToList();
+        sf2Drums = table.Where(kv => kv.Key.Item1 == Sf2DrumBank).OrderBy(kv => kv.Key.Item2)
+                        .Select(kv => new InstrumentChoice { Text = $"{kv.Key.Item2 + 1:000} {kv.Value}", Program = kv.Key.Item2 }).ToList();
+        sf2Presets = table;
+    }
+
+    InstrumentInfo ResolveSoundFont(int program, int msb, int rhythm)
+    {
+        if (rhythm > 0)
+        {
+            var note = "";
+            if (!sf2Presets.TryGetValue((Sf2DrumBank, program), out var kit))
+            {
+                note = " · kit missing, first kit";
+                kit = sf2Presets.GetValueOrDefault((Sf2DrumBank, 0), "Drums");
+            }
+            return new InstrumentInfo($"Drums · {kit}", $"SF2 · bank {Sf2DrumBank} · PC {program + 1}{note}", true, note != "");
+        }
+        var missing = "";
+        if (!sf2Presets.TryGetValue((msb, program), out var name))
+        {
+            if (sf2Presets.TryGetValue((0, program), out name)) missing = " · bank missing, bank 0";
+            else { name = sf2Presets.GetValueOrDefault((0, 0), $"Program {program + 1}"); missing = " · program missing, first sound"; }
+        }
+        return new InstrumentInfo(name, $"SF2 · bank {msb} · PC {program + 1}{missing}", false, missing != "");
     }
 }

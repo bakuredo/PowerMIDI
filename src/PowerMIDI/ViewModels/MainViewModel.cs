@@ -252,6 +252,7 @@ public sealed partial class MainViewModel : ObservableObject
         Stop();
         ClosePort();   // the port asked for may be gone (unplugged): never left with the closed one
         IsSoundFontEngine = name == SoundFontOutput.PortName;
+        ShowStandard(modeStandard);   // SF2 with the engine, the mode's standard on a module
         if (IsSoundFontEngine)
         {
             outputName = name;
@@ -289,6 +290,19 @@ public sealed partial class MainViewModel : ObservableObject
     bool isSoundFontEngine;
     public bool IsSoundFontEngine { get => isSoundFontEngine; private set => Set(ref isSoundFontEngine, value); }
 
+    // Standard of the Mixer and Effects tabs: SF2 with the SoundFont engine (the names and lists of its SoundFont's
+    // presets), otherwise the mode's (the file's in Auto). The mode still applies inside (ChannelMixer: resets, SysEx
+    // of the file).
+    string modeStandard = MidiTools.DefaultStandard;
+
+    void ShowStandard(string std)
+    {
+        modeStandard = std;
+        var shown = IsSoundFontEngine ? InstrumentDefinitions.Sf2Standard : std;
+        Mixer.Standard = shown;
+        Effects.Standard = shown;
+    }
+
     int engineLoad;   // number of the last load asked: a load that ends after another port or file was chosen is dropped
     PlaylistItem playWhenReady;   // added while the engine was loading: played once it is ready (if still in the playlist)
 
@@ -308,7 +322,8 @@ public sealed partial class MainViewModel : ObservableObject
         SoundFonts.EngineState = $"Loading {file}…";
         Status = $"Loading SoundFont {file}…";
         SoundFontOutput engine;
-        try { engine = await Task.Run(() => new SoundFontOutput(path)); }
+        IReadOnlyList<SoundFontPreset> presets;
+        try { (engine, presets) = await Task.Run(() => (new SoundFontOutput(path), ReadPresets(path))); }
         catch (Exception ex)
         {
             if (load != engineLoad) return;
@@ -320,6 +335,8 @@ public sealed partial class MainViewModel : ObservableObject
         Run(() =>
         {
             output = engine;
+            defs.SetSoundFont(presets);   // the Mixer lists its presets
+            Mixer.SoundFontChanged();
             PortOpened();
             SoundFonts.EngineState = $"Running: {file} (FluidSynth {SoundFontOutput.Version})";
             Status = $"SoundFont {file} loaded";
@@ -327,6 +344,13 @@ public sealed partial class MainViewModel : ObservableObject
             playWhenReady = null;
             if (pending != null && Playlist.Contains(pending) && state == "stopped") StartTrack(pending);
         });
+    }
+
+    // Presets of a SoundFont (none if it cannot be read: the Mixer then shows the GM names).
+    static IReadOnlyList<SoundFontPreset> ReadPresets(string path)
+    {
+        try { return SoundFontInfo.Read(path).PresetList; }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or EndOfStreamException) { return Array.Empty<SoundFontPreset>(); }
     }
 
     // Another SoundFont chosen in the SoundFonts tab: remembered, and loaded if the engine is the port.
@@ -384,8 +408,7 @@ public sealed partial class MainViewModel : ObservableObject
         ChannelMixer.GsMode = std == "GS";
         if (output != null) MidiTools.SendReset(output, std);
         ChannelMixer.ResetChannelState(std == "XG");
-        Mixer.Standard = std;
-        Effects.Standard = std;
+        ShowStandard(std);
         if (output != null)
         {
             ChannelMixer.SetMasterVolume(output, (int)MasterVolume);
@@ -908,8 +931,7 @@ public sealed partial class MainViewModel : ObservableObject
         MidiTools.SendReset(output, std);
         ChannelMixer.ResetChannelState(std == "XG");
         ChannelMixer.SetMasterVolume(output, (int)MasterVolume);
-        Mixer.Standard = std;
-        Effects.Standard = std;
+        ShowStandard(std);
         ApplyMixerState();   // same track played again: the chosen instruments are resent
 
         loopsDone = 0;

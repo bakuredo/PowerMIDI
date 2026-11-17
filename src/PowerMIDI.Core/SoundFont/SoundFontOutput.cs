@@ -177,8 +177,12 @@ public sealed class SoundFontOutput : IOutputDevice
         catch { }
     }
 
-    // A SysEx: given to FluidSynth (it handles the resets, GS Use for Rhythm Part and MIDI Tuning, and ignores the
-    // others). The universal Master Volume (7F dd 04 01 ll mm), which it ignores, sets its gain.
+    // A SysEx: given to FluidSynth (it handles GS Use for Rhythm Part and MIDI Tuning, and ignores the others).
+    // - The universal Master Volume (7F dd 04 01 ll mm), which it ignores, sets its gain.
+    // - A reset of a mode (GM / GM2 On, GS Reset, XG System On) resets the synthesizer, but is not given to it: it
+    //   would switch its bank style to that mode's (XG: bank = bank LSB; GM: banks ignored), and the bank of the
+    //   SoundFont presets chosen in the Mixer (bank MSB) would no longer be found. The style stays GS (bank = MSB, the
+    //   style of most SoundFonts; a drum channel plays the kits of bank 128).
     void PlaySysEx(byte[] data)
     {
         var s = synth;
@@ -189,10 +193,22 @@ public sealed class SoundFontOutput : IOutputDevice
             fluid_synth_set_gain(s, FullGain * ((data[5] << 7) | data[4]) / 16383f);
             return;
         }
+        if (IsModeReset(data, length))
+        {
+            fluid_synth_system_reset(s);
+            return;
+        }
         if (length < 1) return;
         var message = length == data.Length ? data : data[..length];
         fluid_synth_sysex(s, message, message.Length, IntPtr.Zero, IntPtr.Zero, out _, 0);
     }
+
+    // GM System On / Off and GM2 System On (7E dd 09 01-03), GS Reset or System Mode Set, XG System On
+    // (43 1n 4C 00 00 7E 00).
+    public static bool IsModeReset(byte[] d, int length) =>
+        (length >= 4 && d[0] == 0x7E && d[2] == 0x09 && d[3] is >= 0x01 and <= 0x03)
+        || MidiTools.IsGsReset(d)
+        || (length >= 7 && d[0] == 0x43 && (d[1] & 0xF0) == 0x10 && d[2] == 0x4C && d[3] == 0 && d[4] == 0 && d[5] == 0x7E && d[6] == 0);
 
     // The timer and the audio output first (nothing calls the synthesizer any more), then the sequencer, the
     // synthesizer (its samples freed) and the settings.

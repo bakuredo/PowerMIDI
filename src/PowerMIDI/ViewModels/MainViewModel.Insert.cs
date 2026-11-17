@@ -67,8 +67,7 @@ public sealed partial class MainViewModel
         ChannelMixer.Gm2Mode = std == "GM2";
         ChannelMixer.XgMode = std == "XG";
         ChannelMixer.GsMode = std == "GS";
-        Mixer.Standard = std;
-        Effects.Standard = std;
+        ShowStandard(std);
         CurrentStandard = std;
         RebuildFileState(editedFile, tick, std);
         Mixer.Refresh();
@@ -138,8 +137,7 @@ public sealed partial class MainViewModel
         ChannelMixer.XgMode = std == "XG";
         ChannelMixer.GsMode = std == "GS";
         ChannelMixer.DropManufacturers = Array.Empty<int>();
-        Mixer.Standard = std;
-        Effects.Standard = std;
+        ShowStandard(std);
         ShowTrackInfo(midi, item, std);
         RebuildFileState(midi, tick, std);
 

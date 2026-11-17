@@ -2,13 +2,19 @@ using System.Text;
 
 namespace PowerMIDI.Core;
 
+// A preset of a SoundFont: its bank (0-127: melodic sounds; 128: drum kits), its program (0-127) and its name.
+public sealed record SoundFontPreset(int Bank, int Program, string Name);
+
 // What a .sf2 file says about itself, read without loading its samples:
 // - from its INFO list: name (INAM), author (IENG), copyright (ICOP), comment (ICMT), date (ICRD), tool (ISFT) and
 //   version (ifil);
-// - its number of presets, from the phdr records of its pdta list (38 bytes each, the last one closing the list).
+// - its presets, from the phdr records of its pdta list (38 bytes each: name on 20 bytes, program, bank…; the last
+//   one closing the list).
 public sealed record SoundFontInfo(string Name, string Author, string Copyright, string Comment, string Date, string Tool,
-                                   string Version, int Presets)
+                                   string Version, IReadOnlyList<SoundFontPreset> PresetList)
 {
+    public int Presets => PresetList.Count;
+
     public static SoundFontInfo Read(string path)
     {
         using var stream = File.OpenRead(path);
@@ -19,7 +25,7 @@ public sealed record SoundFontInfo(string Name, string Author, string Copyright,
 
         var texts = new Dictionary<string, string>();
         string version = null;
-        int presets = 0;
+        var presets = new List<SoundFontPreset>();
         while (stream.Position + 8 <= stream.Length)
         {
             var id = Id(reader);
@@ -39,7 +45,13 @@ public sealed record SoundFontInfo(string Name, string Author, string Copyright,
                     else if (type == "INFO" && length <= 65536)
                         texts[sub] = Text(reader.ReadBytes((int)length));
                     else if (type == "pdta" && sub == "phdr")
-                        presets = Math.Max(0, (int)(length / 38) - 1);
+                        for (long n = length / 38 - 1; n > 0; n--)
+                        {
+                            var name = Text(reader.ReadBytes(20));
+                            int program = reader.ReadUInt16(), bank = reader.ReadUInt16();
+                            reader.ReadBytes(14);   // bag index, library, genre, morphology
+                            presets.Add(new SoundFontPreset(bank, program, name));
+                        }
                     stream.Position = after;
                 }
             }

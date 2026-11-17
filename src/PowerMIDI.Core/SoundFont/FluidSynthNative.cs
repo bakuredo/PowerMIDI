@@ -101,6 +101,9 @@ static class FluidSynthNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_all_sounds_off(IntPtr synth, int chan);
 
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_system_reset(IntPtr synth);
+
     // ---------- Sequencer ----------
     // Events given a time (ms) are played by the synthesizer at that time of its rendering, 64 samples (1.5 ms) at a
     // time, however its audio output computes the sound (in bursts). Without the system timer, its clock is the
