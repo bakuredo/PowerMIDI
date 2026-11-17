@@ -1021,7 +1021,7 @@
     </ListView>
 
     <!-- Empty playlist: what to do, over the list (not hit by the mouse: the files dropped there reach the list). -->
-    <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24,0,0" IsHitTestVisible="False">
+    <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,8" IsHitTestVisible="False">
       <StackPanel.Style>
         <Style TargetType="StackPanel">
           <Setter Property="Visibility" Value="Collapsed"/>
