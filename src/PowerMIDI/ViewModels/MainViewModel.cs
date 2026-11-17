@@ -26,7 +26,8 @@ public sealed partial class MainViewModel : ObservableObject
     readonly DispatcherTimer ledTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     readonly Random random = new();
 
-    OutputDevice output;
+    IOutputDevice output;            // the MIDI port, or the SoundFont engine
+    string outputName;               // its name in the port list (set while the SoundFont engine loads, output still null)
     Playback playback;
     PlaylistItem current;            // playlist item currently playing
     string state = "stopped";        // stopped | playing | paused
@@ -44,6 +45,7 @@ public sealed partial class MainViewModel : ObservableObject
         Effects = new EffectsViewModel(defs, () => output, view.ShowError);
         Library = new LibraryViewModel(view, Path.Combine(AppContext.BaseDirectory, "library"), s => Status = s,
                                        path => Run(() => PlayFromLibrary(path)), paths => Run(() => AddFiles(paths)));
+        SoundFonts = new SoundFontsViewModel(Path.Combine(AppContext.BaseDirectory, "soundfonts"), () => Run(OnSoundFontChosen));
 
         AddFilesCommand = Command(AddFilesFromDialog);
         AddFolderCommand = Command(AddFolderFromDialog);
@@ -113,8 +115,9 @@ public sealed partial class MainViewModel : ObservableObject
     public MixerViewModel Mixer { get; }
     public EffectsViewModel Effects { get; }
     public LibraryViewModel Library { get; }
+    public SoundFontsViewModel SoundFonts { get; }
 
-    // Tab of the right panel: 0 = Mixer, 1 = Effects, 2 = Library, 3 = About.
+    // Tab of the right panel: 0 = Mixer, 1 = Effects, 2 = Library, 3 = SoundFonts, 4 = About.
     int selectedTab;
     public int SelectedTab { get => selectedTab; set => Set(ref selectedTab, value); }
     public ObservableCollection<PlaylistItem> Playlist { get; } = new();
@@ -166,6 +169,7 @@ public sealed partial class MainViewModel : ObservableObject
         ledTimer.Stop();
         ChannelMixer.Device = null;
         try { StopTrack(); } catch { }
+        engineLoad++;   // a SoundFont still loading is dropped when it ends
         output?.Dispose();
         output = null;
     }
@@ -181,14 +185,16 @@ public sealed partial class MainViewModel : ObservableObject
         lastFolder = ini.Get("Playback", "LastFolder");
         if (ini.GetInt("Playback", "MasterVolume") is int volume && volume is >= 0 and <= 127) MasterVolume = volume;
         Library.LoadSettings(ini);
+        SoundFonts.LoadSettings(ini);
     }
 
     public void WriteSettings(IniFile ini)
     {
-        ini.Set("MIDI", "Port", savedPort ?? output?.Name ?? "");
+        ini.Set("MIDI", "Port", savedPort ?? outputName ?? "");
         ini.Set("Playback", "MasterVolume", (int)MasterVolume);
         ini.Set("Playback", "LastFolder", lastFolder ?? "");
         Library.WriteSettings(ini);
+        SoundFonts.WriteSettings(ini);
     }
 
     // ---------- MIDI port ----------
@@ -218,11 +224,13 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // Selected port: the one already open, otherwise the last chosen one (PowerMIDI.ini) if connected,
-    // otherwise the preferred port (Sound Canvas, then the Windows GS synth).
+    // otherwise the preferred port (Sound Canvas, then the Windows GS synth). The SoundFont engine comes last, when its
+    // library is next to the program.
     public void UpdatePortList()
     {
-        var names = MidiTools.GetOutputNames();
-        var selected = output != null ? output.Name
+        var names = MidiTools.GetOutputNames().ToList();
+        if (SoundFontOutput.IsAvailable) names.Add(SoundFontOutput.PortName);
+        var selected = outputName != null ? outputName
                      : savedPort != null && names.Contains(savedPort) ? savedPort
                      : MidiTools.GetPreferredOutput(names);
         updatingPorts = true;
@@ -238,18 +246,98 @@ public sealed partial class MainViewModel : ObservableObject
 
     void OpenPort(string name)
     {
-        if (string.IsNullOrEmpty(name) || output?.Name == name) return;
+        if (string.IsNullOrEmpty(name) || name == outputName) return;
         // Playback stopped as by the Stop button (back to the start), not restarted on the new port: the user starts it
         // when the module is ready.
         Stop();
-        ChannelMixer.Device = null;
-        output?.Dispose();
-        output = null;   // the port asked for may be gone (unplugged): never left with the closed one
+        ClosePort();   // the port asked for may be gone (unplugged): never left with the closed one
+        IsSoundFontEngine = name == SoundFontOutput.PortName;
+        if (IsSoundFontEngine)
+        {
+            outputName = name;
+            OpenSoundFontEngine();
+            return;
+        }
+        playWhenReady = null;   // a file waiting for the engine: not played on this port
         output = OutputDevice.GetByName(name);
+        outputName = name;
+        PortOpened();
+        Status = "";   // the port is shown in its list
+    }
+
+    void ClosePort()
+    {
+        ChannelMixer.Device = null;
+        engineLoad++;   // a SoundFont still loading is dropped when it ends
+        var old = output;
+        output = null;
+        outputName = null;
+        old?.Dispose();
+        SoundFonts.EngineState = "Stopped";
+    }
+
+    void PortOpened()
+    {
         ChannelMixer.Device = output;   // for resending after a reset sent by the file
         ChannelMixer.SetMasterVolume(output, (int)MasterVolume);
         ApplyMixerState();
-        Status = "";   // the port is shown in its list
+    }
+
+    // ---------- SoundFont engine ----------
+
+    // The SoundFont engine is the MIDI port: the Mode list shows SF2, greyed (the mode is imposed).
+    bool isSoundFontEngine;
+    public bool IsSoundFontEngine { get => isSoundFontEngine; private set => Set(ref isSoundFontEngine, value); }
+
+    int engineLoad;   // number of the last load asked: a load that ends after another port or file was chosen is dropped
+    PlaylistItem playWhenReady;   // added while the engine was loading: played once it is ready (if still in the playlist)
+
+    // The engine is created and its SoundFont loaded outside the interface's thread (a large one takes a few seconds).
+    // Meanwhile there is no port (output null): nothing plays.
+    async void OpenSoundFontEngine()
+    {
+        var path = SoundFonts.SelectedPath;
+        if (path == null)
+        {
+            SoundFonts.EngineState = "Stopped: no SoundFont";
+            Status = $"No SoundFont (.sf2) in {SoundFonts.Folder}";
+            return;
+        }
+        int load = ++engineLoad;
+        var file = Path.GetFileName(path);
+        SoundFonts.EngineState = $"Loading {file}…";
+        Status = $"Loading SoundFont {file}…";
+        SoundFontOutput engine;
+        try { engine = await Task.Run(() => new SoundFontOutput(path)); }
+        catch (Exception ex)
+        {
+            if (load != engineLoad) return;
+            SoundFonts.EngineState = "Stopped: error";
+            Status = ex.Message;
+            return;
+        }
+        if (load != engineLoad) { engine.Dispose(); return; }
+        Run(() =>
+        {
+            output = engine;
+            PortOpened();
+            SoundFonts.EngineState = $"Running: {file} (FluidSynth {SoundFontOutput.Version})";
+            Status = $"SoundFont {file} loaded";
+            var pending = playWhenReady;
+            playWhenReady = null;
+            if (pending != null && Playlist.Contains(pending) && state == "stopped") StartTrack(pending);
+        });
+    }
+
+    // Another SoundFont chosen in the SoundFonts tab: remembered, and loaded if the engine is the port.
+    void OnSoundFontChosen()
+    {
+        view.SaveSettings();
+        if (!IsSoundFontEngine) return;
+        var name = outputName ?? SoundFontOutput.PortName;
+        Stop();
+        ClosePort();
+        OpenPort(name);
     }
 
     // Controllers, chosen instruments and fixed effects (start of track, seek, port change).
@@ -306,7 +394,7 @@ public sealed partial class MainViewModel : ObservableObject
         Mixer.Refresh();
         Effects.Refresh();
         DisplayText = ModuleDisplay.Text;   // the screen emptied (ResetChannelState) at once, not at the next timer tick
-        if (say) Status = output != null ? $"Mode {std}: reset sent to {output.Name}" : $"Mode {std}";
+        if (say) Status = output != null ? $"Mode {std}: reset sent to {outputName}" : $"Mode {std}";
     }
 
     // Forced mode: any mode chosen in the list other than Auto is forced on the file.
@@ -374,6 +462,8 @@ public sealed partial class MainViewModel : ObservableObject
         // track paused is in progress), as a playback.
         var firstAdded = items.FirstOrDefault();
         if (firstAdded != null && output != null && (play || state == "stopped")) StartTrack(firstAdded);
+        // The SoundFont engine still loading (e.g. PowerMIDI started with a file): the file plays once it is ready.
+        else if (firstAdded != null && output == null && IsSoundFontEngine && (play || state == "stopped")) playWhenReady = firstAdded;
     }
 
     // From this number of files added at once, they are read in the background.
@@ -791,7 +881,7 @@ public sealed partial class MainViewModel : ObservableObject
         // settings.
         var midi = ReadTrackFile(item.Path);   // with its changes (Event Editor: changes, Record)
         StopTrack();
-        if (output == null) throw new InvalidOperationException("No MIDI port selected.");
+        if (output == null) throw new InvalidOperationException(IsSoundFontEngine ? "SoundFont engine not ready (SoundFont loading or missing)." : "No MIDI port selected.");
         if (mixerAppendTick != null) { mixerAppendTick = null; NotifyInsert(); }   // Append of the Mixer: over (its position is the old playback's)
 
         // Another file: the manual settings of the previous track (instruments, volume, pan, effects,

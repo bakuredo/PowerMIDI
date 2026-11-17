@@ -140,15 +140,16 @@
     <Style TargetType="TextBlock">
       <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
-    <!-- Dark tabs: wider headers, light text; selected tab is lighter. -->
+    <!-- Dark tabs: wider headers, light text; selected tab is lighter. Five tabs on one row (SoundFonts: its own minimum
+         width, that of its text in bold, so that it does not widen when selected). -->
     <Style TargetType="TabItem">
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-      <Setter Property="MinWidth" Value="100"/>
+      <Setter Property="MinWidth" Value="88"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="TabItem">
             <Border x:Name="Bd" Background="{DynamicResource ButtonBrush}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1,1,1,0"
-                    CornerRadius="4,4,0,0" Padding="20,5" Margin="0,0,3,0">
+                    CornerRadius="4,4,0,0" Padding="14,5" Margin="0,0,3,0">
               <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
             <ControlTemplate.Triggers>
@@ -874,6 +875,63 @@
       </ListView>
     </DockPanel>
     </TabItem>
+    <!-- SoundFonts: the .sf2 files of the soundfonts folder next to the program, the one played by the SoundFont engine
+         (MIDI OUT "SoundFont engine (FluidSynth)", remembered in PowerMIDI.ini), what it says about itself, and the state
+         of the engine. -->
+    <TabItem Header="SoundFonts" MinWidth="102" DataContext="{Binding SoundFonts}" d:DataContext="{d:DesignInstance vm:SoundFontsViewModel}">
+    <DockPanel>
+      <!-- File, Refresh and Open folder; as the collection row of the Library tab. -->
+      <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+        <Button DockPanel.Dock="Right" Content="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
+                Command="{Binding OpenFolderCommand}" ToolTip="Open soundfonts folder (place for .sf2 files)"/>
+        <Button DockPanel.Dock="Right" Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
+                Command="{Binding RefreshCommand}" ToolTip="Refresh list"/>
+        <TextBlock Text="&#xE8D6;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
+                   ToolTip="SoundFont" AutomationProperties.Name="SoundFont"/>
+        <ComboBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" IsEnabled="{Binding HasFiles}" Padding="6,2.5,2,3.5"
+                  AutomationProperties.Name="SoundFont file"/>
+      </DockPanel>
+      <TextBlock DockPanel.Dock="Bottom" Margin="0,8,0,0" Foreground="{DynamicResource TextSoftBrush}" TextTrimming="CharacterEllipsis"
+                 Text="{Binding EngineState, StringFormat=Engine: {0}}" ToolTip="{Binding EngineState}"/>
+      <Grid>
+        <!-- No file: where to put them. -->
+        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextSoftBrush}"
+                   Text="No SoundFont: place .sf2 files in soundfonts folder">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock">
+              <Setter Property="Visibility" Value="Collapsed"/>
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding HasFiles}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding HasFiles, Converter={StaticResource BoolToVisibility}}">
+          <Grid Margin="0,2,6,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock Grid.ColumnSpan="2" Text="{Binding InfoName}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <TextBlock Grid.Row="1" Text="Author" Foreground="{DynamicResource TextSoftBrush}" Margin="0,0,12,4"/>
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding InfoAuthor}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+            <TextBlock Grid.Row="2" Text="Copyright" Foreground="{DynamicResource TextSoftBrush}" Margin="0,0,12,4"/>
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding InfoCopyright}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+            <TextBlock Grid.Row="3" Text="File" Foreground="{DynamicResource TextSoftBrush}" Margin="0,0,12,4"/>
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding InfoDetails}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+            <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding InfoComment}" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource TextSoftBrush}"/>
+          </Grid>
+        </ScrollViewer>
+      </Grid>
+    </DockPanel>
+    </TabItem>
     <!-- About: the logo (same drawing as Icon.svg / PowerMIDI.ico, as vectors), the name and the version
          (set in MainWindow.xaml.cs from the version of the program). -->
     <TabItem Header="About">
@@ -971,17 +1029,31 @@
         </Viewbox>
       </Button>
       <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" AutomationProperties.Name="MIDI OUT"/>
-      <!-- Mode, right after the port (no label: its tooltip says what it is). -->
-      <ComboBox Width="120" Margin="6,0,0,0" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
-                ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
-        <ComboBoxItem Content="Auto"/>
-        <ComboBoxItem Content="GS"/>
-        <ComboBoxItem Content="XG"/>
-        <ComboBoxItem Content="GM"/>
-        <ComboBoxItem Content="GM2"/>
-        <ComboBoxItem Content="MT-32"
-                      ToolTip="Roland MT-32 / CM-32L"/>
-      </ComboBox>
+      <!-- Mode, right after the port (no label: its tooltip says what it is). The SoundFont engine imposes SF2: a greyed
+           list in its place. -->
+      <Grid Width="120" Margin="6,0,0,0">
+        <ComboBox SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
+                  ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
+          <ComboBox.Style>
+            <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSoundFontEngine}" Value="True"><Setter Property="Visibility" Value="Hidden"/></DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </ComboBox.Style>
+          <ComboBoxItem Content="Auto"/>
+          <ComboBoxItem Content="GS"/>
+          <ComboBoxItem Content="XG"/>
+          <ComboBoxItem Content="GM"/>
+          <ComboBoxItem Content="GM2"/>
+          <ComboBoxItem Content="MT-32"
+                        ToolTip="Roland MT-32 / CM-32L"/>
+        </ComboBox>
+        <ComboBox SelectedIndex="0" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="Mode: SF2, imposed by SoundFont engine"
+                  Visibility="{Binding IsSoundFontEngine, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Mode SF2">
+          <ComboBoxItem Content="SF2"/>
+        </ComboBox>
+      </Grid>
     </DockPanel>
 
     <!-- Playlist: double click (see the ListViewItem style) or Enter plays the track, Del removes the selected tracks;

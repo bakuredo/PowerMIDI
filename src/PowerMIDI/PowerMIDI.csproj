@@ -48,6 +48,14 @@
           CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
+  <!-- SoundFont engine: the FluidSynth library (..\..\fluidsynth: libfluidsynth-3.dll and sndfile.dll, from the official
+       Windows x64 release), copied next to the program in its fluidsynth folder, outside the single file (loaded from
+       there by FluidSynthNative, only when the engine is used). -->
+  <ItemGroup>
+    <None Include="..\..\fluidsynth\*.dll" Link="fluidsynth\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
   <!-- Color themes: compiled into the program, and copied next to it (themes folder) where they can be edited
        or completed (see Themes.cs). -->
   <ItemGroup>
