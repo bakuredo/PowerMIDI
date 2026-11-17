@@ -196,11 +196,59 @@ public sealed class SoundFontOutput : IOutputDevice
         if (IsModeReset(data, length))
         {
             fluid_synth_system_reset(s);
+            ApplyEffects(s);   // the reverb and chorus chosen stay
             return;
         }
         if (length < 1) return;
         var message = length == data.Length ? data : data[..length];
         fluid_synth_sysex(s, message, message.Length, IntPtr.Zero, IntPtr.Zero, out _, 0);
+    }
+
+    // ---------- Reverb and chorus (see SoundFontEffects) ----------
+    // Applied at once (not dated: they are settings of the engine, not events of the music), and again after a reset
+    // of the synthesizer. Kept as one object each, replaced whole: the audio thread (reset) reads them without the gate.
+    sealed record ReverbValues(bool On, double RoomSize, double Damping, double Width, double Level);
+    sealed record ChorusValues(bool On, int Voices, double Level, double Speed, double Depth, int Wave);
+    volatile ReverbValues reverb;
+    volatile ChorusValues chorus;
+
+    public void SetReverb(bool on, double roomSize, double damping, double width, double level)
+    {
+        lock (gate)
+        {
+            reverb = new ReverbValues(on, roomSize, damping, width, level);
+            if (synth != IntPtr.Zero) ApplyEffects(synth);
+        }
+    }
+
+    public void SetChorus(bool on, int voices, double level, double speed, double depth, int wave)
+    {
+        lock (gate)
+        {
+            chorus = new ChorusValues(on, voices, level, speed, depth, wave);
+            if (synth != IntPtr.Zero) ApplyEffects(synth);
+        }
+    }
+
+    void ApplyEffects(IntPtr s)
+    {
+        if (reverb is { } r)
+        {
+            fluid_synth_set_reverb_group_roomsize(s, -1, r.RoomSize);
+            fluid_synth_set_reverb_group_damp(s, -1, r.Damping);
+            fluid_synth_set_reverb_group_width(s, -1, r.Width);
+            fluid_synth_set_reverb_group_level(s, -1, r.Level);
+            fluid_synth_reverb_on(s, -1, r.On ? 1 : 0);
+        }
+        if (chorus is { } c)
+        {
+            fluid_synth_set_chorus_group_nr(s, -1, c.Voices);
+            fluid_synth_set_chorus_group_level(s, -1, c.Level);
+            fluid_synth_set_chorus_group_speed(s, -1, c.Speed);
+            fluid_synth_set_chorus_group_depth(s, -1, c.Depth);
+            fluid_synth_set_chorus_group_type(s, -1, c.Wave);
+            fluid_synth_chorus_on(s, -1, c.On ? 1 : 0);
+        }
     }
 
     // GM System On / Off and GM2 System On (7E dd 09 01-03), GS Reset or System Mode Set, XG System On

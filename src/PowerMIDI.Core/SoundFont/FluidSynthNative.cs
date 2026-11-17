@@ -104,6 +104,41 @@ static class FluidSynthNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_system_reset(IntPtr synth);
 
+    // ---------- Reverb and chorus (fxGroup -1: all the effect groups; there is one) ----------
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_reverb_on(IntPtr synth, int fxGroup, int on);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_reverb_group_roomsize(IntPtr synth, int fxGroup, double roomSize);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_reverb_group_damp(IntPtr synth, int fxGroup, double damping);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_reverb_group_width(IntPtr synth, int fxGroup, double width);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_reverb_group_level(IntPtr synth, int fxGroup, double level);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_chorus_on(IntPtr synth, int fxGroup, int on);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_chorus_group_nr(IntPtr synth, int fxGroup, int voices);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_chorus_group_level(IntPtr synth, int fxGroup, double level);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_chorus_group_speed(IntPtr synth, int fxGroup, double speed);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_chorus_group_depth(IntPtr synth, int fxGroup, double depthMs);
+
+    // 0 = sine, 1 = triangle (enum fluid_chorus_mod).
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_chorus_group_type(IntPtr synth, int fxGroup, int type);
+
     // ---------- Sequencer ----------
     // Events given a time (ms) are played by the synthesizer at that time of its rendering, 64 samples (1.5 ms) at a
     // time, however its audio output computes the sound (in bursts). Without the system timer, its clock is the

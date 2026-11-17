@@ -311,7 +311,7 @@ public sealed partial class EffectsViewModel : ObservableObject
         xgTabs.Insert(XgBlocksWithoutInsertion, insertionTab);   // after Reverb, Chorus, Variation
 
         // GS and XG: one block at a time, chosen in the tab strip (see Tabs); the first one at start.
-        foreach (var group in new[] { gsBlocks, xgTabs, gm2Blocks, mt32Blocks })
+        foreach (var group in new[] { gsBlocks, xgTabs, gm2Blocks, mt32Blocks, sf2Blocks })
         {
             foreach (var block in group)
                 block.Selected = () =>
@@ -345,25 +345,26 @@ public sealed partial class EffectsViewModel : ObservableObject
     }
 
     // GS effects in GS; MT-32 reverb in MT-32 (MT-32 SysEx, for a real MT-32 / CM-32L); XG effects in XG;
-    // GM2 reverb and chorus in GM2 (universal SysEx).
-    string Mode => standard switch { "XG" => "XG", "MT-32" => "MT-32", "GM2" => "GM2", "GS" => "GS", _ => "" };
+    // GM2 reverb and chorus in GM2 (universal SysEx); SF2: the reverb and chorus of the SoundFont engine.
+    const string Sf2 = InstrumentDefinitions.Sf2Standard;
+    string Mode => standard switch { "XG" => "XG", "MT-32" => "MT-32", "GM2" => "GM2", "GS" => "GS", Sf2 => Sf2, _ => "" };
     public bool IsAvailable => Mode != "";
     // Blocks of the current standard; none in a standard without effects (GM): showing the GS ones grayed out looked
     // as if the tab had not followed the mode.
     static readonly EffectBlockViewModel[] NoBlocks = Array.Empty<EffectBlockViewModel>();
     public IReadOnlyList<EffectBlockViewModel> Blocks =>
-        Mode switch { "XG" => xgBlocks, "MT-32" => mt32Blocks, "GM2" => gm2Blocks, "GS" => gsBlocks, _ => NoBlocks };
+        Mode switch { "XG" => xgBlocks, "MT-32" => mt32Blocks, "GM2" => gm2Blocks, "GS" => gsBlocks, Sf2 => sf2Blocks, _ => NoBlocks };
     // Layout: the block of the tab strip at full width (see Tabs).
     public IEnumerable<EffectBlockViewModel> OtherBlocks =>
         !HasTabs ? Blocks
         : selectedTabs[TabGroup] == insertionTab ? new[] { insertionSelector, insertionBlocks[insertion] }
         : new[] { selectedTabs[TabGroup] };
-    IReadOnlyList<EffectBlockViewModel> TabGroup => Mode switch { "XG" => xgTabs, "GM2" => gm2Blocks, "MT-32" => mt32Blocks, _ => gsBlocks };
+    IReadOnlyList<EffectBlockViewModel> TabGroup => Mode switch { "XG" => xgTabs, "GM2" => gm2Blocks, "MT-32" => mt32Blocks, Sf2 => sf2Blocks, _ => gsBlocks };
 
     // GS, XG and GM2: one block at a time at full width, chosen in a tab strip (GS: Reverb, Chorus, Delay, EQ, EFX, Drums,
     // Part; XG: Reverb, Chorus, Variation, Insertion (1 to 4), Multi EQ, Drums, Part; GM2: Reverb, Chorus, Drums, Part;
-    // MT-32: Reverb, Drums, Part).
-    public bool HasTabs => Mode is "GS" or "XG" or "GM2" or "MT-32";
+    // MT-32: Reverb, Drums, Part; SF2: Reverb, Chorus).
+    public bool HasTabs => Mode is "GS" or "XG" or "GM2" or "MT-32" or Sf2;
     public IReadOnlyList<EffectBlockViewModel> Tabs =>
         !HasTabs ? NoBlocks : Mode == "XG" && !showInsertion ? xgTabs.Take(XgBlocksWithoutInsertion).Append(xgDrums.Block).Append(xgPart.Block).ToList() : TabGroup;
     // The XG insertion effects and Multi EQ are not offered with the MU Basic voice map: an XG Level 1 module has none
@@ -384,7 +385,7 @@ public sealed partial class EffectsViewModel : ObservableObject
     public string Title => Mode switch
     {
         "XG" => "XG effects", "MT-32" => "MT-32 effects", "GM2" => "GM2 effects",
-        "GS" => "GS effects",
+        "GS" => "GS effects", Sf2 => "SoundFont effects",
         _ => $"{standard} effects",
     };
     public string InfoText => IsAvailable ? null : $"No effect settings in {standard} mode";
@@ -436,9 +437,17 @@ public sealed partial class EffectsViewModel : ObservableObject
     }
 
     // Reset button: all effects return to the file values (types first), MT-32 and GM2 effects and XG drum setups included.
+    // SF2: the reverb and chorus of the engine return to their defaults.
     public void Reset()
     {
         var device = output();
+        if (Mode == Sf2)
+        {
+            SoundFontEffects.Reset();
+            SoundFontEffects.Apply(device as SoundFontOutput);
+            Refresh();
+            return;
+        }
         foreach (var m in ModuleSettings.All) m.ClearAll(m.IsActive() ? device : null);
         Refresh();
     }

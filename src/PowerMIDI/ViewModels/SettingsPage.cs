@@ -73,6 +73,8 @@ public sealed class SettingsPage
 
     // Texts: of an unknown value (tooltip), and the start of a description (Event Editor, Append / Replace): group, note.
     public string AutoText { get; init; } = "Set by module";
+    // Where the values not fixed come from, in the tooltips ("File value", "Fixed (file: …)"); SF2: the defaults.
+    public string SourceText { get; init; } = "file";
     public Func<int, int, string> DescribePrefix { get; init; }
 
     readonly List<EffectChannelViewModel> groupButtons = new();
@@ -224,8 +226,8 @@ public sealed class SettingsPage
             bool isFixed = param.OwnIsFixed?.Invoke(Group) ?? IsFixed(Group, n, p);
             bool visible = param.Visible?.Invoke(Group) ?? true;
             var suffix = param.ToolTipSuffix?.Invoke() ?? "";
-            var toolTip = (isFixed ? $"Fixed (file: {(fileValue < 0 ? AutoText.ToLowerInvariant() : param.Text(fileValue))})"
-                           : v < 0 ? AutoText : "File value") + suffix;
+            var toolTip = (isFixed ? $"Fixed ({SourceText}: {(fileValue < 0 ? AutoText.ToLowerInvariant() : param.Text(fileValue))})"
+                           : v < 0 ? AutoText : $"{char.ToUpperInvariant(SourceText[0])}{SourceText[1..]} value") + suffix;
             row.Show($"{Group}/{n}/{v}/{isFixed}/{fileValue}/{visible}/{suffix}", v, isFixed, toolTip, param.Text(v), param.AutoPosition, visible);
         }
     }

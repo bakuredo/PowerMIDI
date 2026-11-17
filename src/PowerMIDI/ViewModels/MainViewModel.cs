@@ -335,8 +335,10 @@ public sealed partial class MainViewModel : ObservableObject
         Run(() =>
         {
             output = engine;
+            SoundFontEffects.Apply(engine);   // its reverb and chorus, as set in the Effects tab
             defs.SetSoundFont(presets);   // the Mixer lists its presets
             Mixer.SoundFontChanged();
+            Effects.Refresh();
             PortOpened();
             SoundFonts.EngineState = $"Running: {file} (FluidSynth {SoundFontOutput.Version})";
             Status = $"SoundFont {file} loaded";

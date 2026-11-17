@@ -113,13 +113,19 @@ public sealed class SoundFontsViewModel : ObservableObject
     }
 
     // ---------- Settings (PowerMIDI.ini) ----------
+    // The file chosen, and the reverb and chorus of the engine (SoundFontEffects, set in the Effects tab).
     public void LoadSettings(IniFile ini)
     {
+        SoundFontEffects.Read(ini);
         savedFile = ini.Get("SoundFont", "File");
         if (savedFile == "") savedFile = null;
         selectedFile = null;   // the remembered file chosen by the refresh
         Refresh(notify: false);
     }
 
-    public void WriteSettings(IniFile ini) => ini.Set("SoundFont", "File", selectedFile ?? savedFile ?? "");
+    public void WriteSettings(IniFile ini)
+    {
+        ini.Set("SoundFont", "File", selectedFile ?? savedFile ?? "");
+        SoundFontEffects.Write(ini);
+    }
 }

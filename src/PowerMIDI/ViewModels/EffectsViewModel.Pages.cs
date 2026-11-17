@@ -10,8 +10,9 @@ namespace PowerMIDI.ViewModels;
 // and Part (patch values, partial reserve).
 public sealed partial class EffectsViewModel
 {
-    SettingsPage xgDrums, xgPart, gsDrums, gsPart, gm2Drums, gm2Part, mt32Drums, mt32Part;
+    SettingsPage xgDrums, xgPart, gsDrums, gsPart, gm2Drums, gm2Part, mt32Drums, mt32Part, sf2Reverb, sf2Chorus;
     readonly List<SettingsPage> pages = new();
+    readonly List<EffectBlockViewModel> sf2Blocks = new();
 
     // XG Drums page: buttons of the channels under the setup buttons, pressed if their part uses the setup shown.
     const int DrumPartBase = 3100;   // + channel
@@ -39,7 +40,11 @@ public sealed partial class EffectsViewModel
         gm2Blocks.Add(gm2Part.Block);
         mt32Blocks.Insert(1, mt32Drums.Block);   // Reverb, Drums, Part
         mt32Blocks.Add(mt32Part.Block);
-        pages.AddRange(new[] { xgDrums, xgPart, gsDrums, gsPart, gm2Drums, gm2Part, mt32Drums, mt32Part });
+        sf2Reverb = Sf2Page(6000, 0, SoundFontEffects.ChorusFirst, "Reverb");
+        sf2Chorus = Sf2Page(6100, SoundFontEffects.ChorusFirst, SoundFontEffects.Count, "Chorus");
+        sf2Blocks.Add(sf2Reverb.Block);
+        sf2Blocks.Add(sf2Chorus.Block);
+        pages.AddRange(new[] { xgDrums, xgPart, gsDrums, gsPart, gm2Drums, gm2Part, mt32Drums, mt32Part, sf2Reverb, sf2Chorus });
 
         // Texts of the settings (Event Editor, Append / Replace), with the names and units of the pages.
         ModuleSettings.GsXgFx.Describe = (k, v) => DescribeEffect(k.C, v);
@@ -54,6 +59,42 @@ public sealed partial class EffectsViewModel
         ModuleSettings.Gm2Drums.Describe = (k, v) => gm2Drums.Describe(k.A, k.B, k.C, v);
         ModuleSettings.Mt32Part.Describe = (k, v) => mt32Part.Describe(k.A, 0, k.C, v);
         ModuleSettings.Mt32Drums.Describe = (k, v) => mt32Drums.Describe(0, k.B, k.C, v);
+    }
+
+    // ---------- SF2 (SoundFont engine) ----------
+
+    // Reverb or Chorus page of the SoundFont engine: the parameters first .. last - 1 of SoundFontEffects, given to the
+    // engine at once. Its values are settings of the engine (defaults in place of file values; right click: back to
+    // the default).
+    SettingsPage Sf2Page(int baseIndex, int first, int last, string title)
+    {
+        void Apply(IOutputDevice device) => SoundFontEffects.Apply(device as SoundFontOutput);
+        return new SettingsPage(this, baseIndex, last - first)
+        {
+            Params = Enumerable.Range(first, last - first).Select(p =>
+            {
+                var param = SoundFontEffects.Params[p];
+                return new PageParam
+                {
+                    Label = param.Label, Min = param.Min, Max = param.Max, Format = v => SoundFontEffects.Format(p, v),
+                    Choices = param.Choices != null ? IndexedChoices(param.Choices) : null,
+                };
+            }).ToList(),
+            GroupLabels = Array.Empty<string>(),
+            Value = (_, _, p) => SoundFontEffects.Value(first + p),
+            FileValue = (_, _, p) => SoundFontEffects.Params[first + p].Default,
+            IsFixed = (_, _, p) => SoundFontEffects.IsChanged(first + p),
+            IsNoteFixed = (_, _) => false, IsGroupFixed = _ => false,
+            Set = (device, _, _, p, v) => { SoundFontEffects.Set(first + p, v); Apply(device); },
+            Clear = (device, _, _, p) =>
+            {
+                for (int q = first; q < last; q++) if (p < 0 || q == first + p) SoundFontEffects.Clear(q);
+                Apply(device);
+            },
+            IsActive = () => output() is SoundFontOutput,
+            SourceText = "default",
+            DescribePrefix = (_, _) => title,
+        }.Build(title, title, "");
     }
 
     // ---------- XG ----------
