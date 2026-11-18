@@ -119,6 +119,35 @@ static class FluidSynthNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_system_reset(IntPtr synth);
 
+    // ---------- Modulators (a source controller drives a generator of the voices) ----------
+    // Flags of a source: 2 bipolar (centered: -1..1), 12 switch (0 below the middle, 1 from it), 16 a MIDI CC (the
+    // source is its number). Generators: SF2 numbers (fluid_gen_type).
+    public const int ModBipolar = 2, ModSwitch = 12, ModCc = 16;
+    public const int GenVibLfoToPitch = 6, GenFilterFc = 8, GenFilterQ = 9, GenVibLfoDelay = 23, GenVibLfoFreq = 24,
+                     GenVolEnvAttack = 34, GenVolEnvDecay = 36, GenVolEnvRelease = 38;
+    public const int SynthAddModOverwrite = 0;   // FLUID_SYNTH_OVERWRITE
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr new_fluid_mod();
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void delete_fluid_mod(IntPtr mod);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void fluid_mod_set_source1(IntPtr mod, int src, int flags);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void fluid_mod_set_source2(IntPtr mod, int src, int flags);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void fluid_mod_set_dest(IntPtr mod, int dest);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void fluid_mod_set_amount(IntPtr mod, double amount);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_add_default_mod(IntPtr synth, IntPtr mod, int mode);
+
     // ---------- Reverb and chorus (fxGroup -1: all the effect groups; there is one) ----------
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_reverb_on(IntPtr synth, int fxGroup, int on);
@@ -153,6 +182,28 @@ static class FluidSynthNative
     // 0 = sine, 1 = triangle (enum fluid_chorus_mod).
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_set_chorus_group_type(IntPtr synth, int fxGroup, int type);
+
+    // ---------- SoundFont loader with file callbacks (see PatchedLoader) ----------
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate IntPtr SfOpen([MarshalAs(UnmanagedType.LPUTF8Str)] string filename);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate int SfRead(IntPtr buffer, long count, IntPtr handle);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate int SfSeek(IntPtr handle, long offset, int origin);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate long SfTell(IntPtr handle);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    public delegate int SfClose(IntPtr handle);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern IntPtr new_fluid_defsfloader(IntPtr settings);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_sfloader_set_callbacks(IntPtr loader, SfOpen open, SfRead read, SfSeek seek, SfTell tell, SfClose close);
+
+    // The synthesizer owns the loader (freed with it); added before any SoundFont is loaded, it is tried first.
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern void fluid_synth_add_sfloader(IntPtr synth, IntPtr loader);
 
     // ---------- Sequencer ----------
     // Events given a time (ms) are played by the synthesizer at that time of its rendering, 64 samples (1.5 ms) at a

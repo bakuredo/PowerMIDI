@@ -55,8 +55,20 @@ public sealed class MixerViewModel : ObservableObject
     public string Standard
     {
         get => standard;
-        set { if (Set(ref standard, value)) { OnPropertyChanged(nameof(IsXg)); OnPropertyChanged(nameof(IsGs)); } }
+        set
+        {
+            if (!Set(ref standard, value)) return;
+            OnPropertyChanged(nameof(IsXg));
+            OnPropertyChanged(nameof(IsGs));
+            OnPropertyChanged(nameof(IsSoundFont));
+            if (IsSoundFont && shownController == VariationSend) ShownController = ChannelMixer.Volume;
+        }
     }
+
+    // SF2 mode: the SoundFont engine has no third effect, the Variation / Delay send (CC94) is not used: greyed in the
+    // Sliders list ("(Not used)"); shown, the sliders go back to Volume.
+    public bool IsSoundFont => standard == InstrumentDefinitions.Sf2Standard;
+    const int VariationSend = 4;   // CC94 (ControllerNames)
 
     // Another SoundFont loaded (SF2 mode): the names of its presets, on every channel.
     public void SoundFontChanged()

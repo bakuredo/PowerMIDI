@@ -271,6 +271,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         ChannelMixer.Device = null;
         engineLoad++;   // a SoundFont still loading is dropped when it ends
+        engineLoading = false;
         var old = output;
         output = null;
         outputName = null;
@@ -306,20 +307,61 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     int engineLoad;   // number of the last load asked: a load that ends after another port or file was chosen is dropped
-    PlaylistItem playWhenReady;   // added while the engine was loading: played once it is ready (if still in the playlist)
+    PlaylistItem playWhenReady;   // asked to play while the engine was loading: played once it is ready (if still in the playlist)
+    double playWhenReadyFrom;     // from that position (s)
+    string confirmedPath;         // track whose start was confirmed (unsaved settings left) before it waited for the engine
+    SoundFontFinder.Result engineSoundFont;   // SoundFont the engine has (or loads), and how it was found
+    bool engineLoading;                       // the engine is being created (its SoundFont loading)
+
+    // SoundFont of a track (see SoundFontFinder): its SF_BANK tag, a .sf2 next to it, or the SoundFonts tab's choice.
+    // No track: the tab's. midi: the track already read (null: read here, for its tag).
+    SoundFontFinder.Result SoundFontFor(PlaylistItem item, MidiFile midi = null)
+    {
+        if (item == null) return new SoundFontFinder.Result(SoundFonts.SelectedPath, SoundFontFinder.Source.Default);
+        if (midi == null)
+            try { midi = ReadTrackFile(item.Path); }
+            catch (Exception) { }   // unreadable: no tag (its error is shown when it is played)
+        return SoundFontFinder.Find(item.Path, midi, SoundFonts.Folder, SoundFonts.SelectedPath);
+    }
+
+    // SF2 mode, a track about to start: false if its SoundFont is not the engine's. The engine then loads it (playback
+    // stopped), and the track starts once it is ready (from the same position).
+    bool EngineReadyFor(PlaylistItem item, MidiFile midi, double from)
+    {
+        if (!IsSoundFontEngine) return true;
+        var wanted = SoundFontFor(item, midi);
+        bool same = SamePath(wanted.Path, engineSoundFont?.Path);
+        if (same && output != null) { engineSoundFont = wanted; return true; }
+        playWhenReady = item;
+        playWhenReadyFrom = from;
+        confirmedPath = item.Path;
+        if (!same || !engineLoading)   // another SoundFont, or the same one that could not be loaded: (again) loaded
+        {
+            Stop();
+            ClosePort();
+            outputName = SoundFontOutput.PortName;
+            OpenSoundFontEngine(wanted);
+        }
+        return false;
+    }
 
     // The engine is created and its SoundFont loaded outside the interface's thread (a large one takes a few seconds).
-    // Meanwhile there is no port (output null): nothing plays.
-    async void OpenSoundFontEngine()
+    // Meanwhile there is no port (output null): nothing plays. target: the SoundFont to load (null: the current
+    // track's, see SoundFontFor).
+    async void OpenSoundFontEngine(SoundFontFinder.Result target = null)
     {
-        var path = SoundFonts.SelectedPath;
+        target ??= SoundFontFor(current);
+        engineSoundFont = target;
+        var path = target.Path;
+        var missingText = target.Missing != null ? $" — {SoundFontFinder.Tag} file not found: {target.Missing}" : "";
         if (path == null)
         {
             SoundFonts.EngineState = "Stopped: no SoundFont";
-            Status = $"No SoundFont (.sf2) in {SoundFonts.Folder}";
+            Status = $"No SoundFont (.sf2) in {SoundFonts.Folder}{missingText}";
             return;
         }
         int load = ++engineLoad;
+        engineLoading = true;
         var file = Path.GetFileName(path);
         SoundFonts.EngineState = $"Loading {file}…";
         Status = $"Loading SoundFont {file}…";
@@ -330,11 +372,13 @@ public sealed partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             if (load != engineLoad) return;
+            engineLoading = false;
             SoundFonts.EngineState = "Stopped: error";
             Status = ex.Message;
             return;
         }
         if (load != engineLoad) { engine.Dispose(); return; }
+        engineLoading = false;
         Run(() =>
         {
             output = engine;
@@ -344,12 +388,13 @@ public sealed partial class MainViewModel : ObservableObject
             Effects.Refresh();
             PortOpened();
             var driverName = SoundFontEngineOptions.Drivers.FirstOrDefault(d => d.Value == engine.DriverUsed).Text ?? engine.DriverUsed;
-            SoundFonts.EngineState = $"Running: {file} (FluidSynth {SoundFontOutput.Version}, {driverName})" +
-                                     (engine.DriverUsed != options.Driver ? " — chosen output unavailable" : "");
-            Status = $"SoundFont {file} loaded";
+            var reordered = engine.ZonesReordered > 0 ? $" — {engine.ZonesReordered} zones read in SF2 order (key ranges out of place)" : "";
+            SoundFonts.EngineState = $"Running: {file} · {target.FromText} (FluidSynth {SoundFontOutput.Version}, {driverName})" +
+                                     (engine.DriverUsed != options.Driver ? " — chosen output unavailable" : "") + reordered;
+            Status = $"SoundFont {file} loaded ({target.FromText}){reordered}{missingText}";
             var pending = playWhenReady;
             playWhenReady = null;
-            if (pending != null && Playlist.Contains(pending) && state == "stopped") StartTrack(pending);
+            if (pending != null && Playlist.Contains(pending) && state == "stopped") StartTrack(pending, playWhenReadyFrom);
         });
     }
 
@@ -515,7 +560,7 @@ public sealed partial class MainViewModel : ObservableObject
         var firstAdded = items.FirstOrDefault();
         if (firstAdded != null && output != null && (play || state == "stopped")) StartTrack(firstAdded);
         // The SoundFont engine still loading (e.g. PowerMIDI started with a file): the file plays once it is ready.
-        else if (firstAdded != null && output == null && IsSoundFontEngine && (play || state == "stopped")) playWhenReady = firstAdded;
+        else if (firstAdded != null && output == null && IsSoundFontEngine && (play || state == "stopped")) (playWhenReady, playWhenReadyFrom) = (firstAdded, 0);
     }
 
     // From this number of files added at once, they are read in the background.
@@ -927,11 +972,14 @@ public sealed partial class MainViewModel : ObservableObject
     // from: start position (seconds), when the track is played from a point of the position bar.
     void StartTrack(PlaylistItem item, double from = 0)
     {
-        // Another file with unsaved settings: ask before losing them.
-        if (settingsFile != null && settingsFile != item.Path && !ConfirmLeaveSettings()) return;
+        // Another file with unsaved settings: ask before losing them (once: not again when it waited for the engine).
+        if (settingsFile != null && settingsFile != item.Path && confirmedPath != item.Path && !ConfirmLeaveSettings()) return;
+        confirmedPath = null;
         // Read first: an unreadable file (its error shown) changes nothing, neither the track being played nor its
         // settings.
         var midi = ReadTrackFile(item.Path);   // with its changes (Event Editor: changes, Record)
+        // SF2 mode: its SoundFont loaded first, if it is not the engine's (the track then starts when it is ready).
+        if (!EngineReadyFor(item, midi, from)) return;
         StopTrack();
         if (output == null) throw new InvalidOperationException(IsSoundFontEngine ? "SoundFont engine not ready (SoundFont loading or missing)." : "No MIDI port selected.");
         if (mixerAppendTick != null) { mixerAppendTick = null; NotifyInsert(); }   // Append of the Mixer: over (its position is the old playback's)

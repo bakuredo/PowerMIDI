@@ -225,8 +225,23 @@
           <ComboBoxItem Content="Pan (CC10)"/>
           <ComboBoxItem Content="Reverb (CC91)"/>
           <ComboBoxItem Content="Chorus (CC93)"/>
-          <ComboBoxItem Content="Variation / Delay (CC94)"
-                        ToolTip="Variation send in XG, Delay send in GS"/>
+          <!-- SF2 mode: not used by the SoundFont engine (greyed). -->
+          <ComboBoxItem>
+            <ComboBoxItem.Style>
+              <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                <Setter Property="Content" Value="Variation / Delay (CC94)"/>
+                <Setter Property="ToolTip" Value="Variation send in XG, Delay send in GS"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsSoundFont}" Value="True">
+                    <Setter Property="Content" Value="Variation / Delay (CC94) (Not used)"/>
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="ToolTip" Value="Not used by SoundFont engine"/>
+                    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </ComboBoxItem.Style>
+          </ComboBoxItem>
           <ComboBoxItem Content="Attack Time (CC73)"
                         ToolTip="Envelope attack, relative to original sound"/>
           <ComboBoxItem Content="Decay Time (CC75)"

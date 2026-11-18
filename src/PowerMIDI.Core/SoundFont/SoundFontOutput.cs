@@ -49,6 +49,10 @@ public sealed class SoundFontOutput : IOutputDevice
     // Audio driver actually used (the one chosen, or WASAPI / DirectSound when it could not start), e.g. "wasapi".
     public string DriverUsed { get; private set; }
 
+    // Zones of the SoundFont whose generators were put in the order of the specification when it was read (see
+    // SoundFontRepair; 0: none needed).
+    public int ZonesReordered => PatchedLoader.ZonesReordered(SoundFontPath);
+
     public SoundFontOutput(string soundFontPath, SoundFontEngineOptions options)
     {
         SoundFontPath = soundFontPath;
@@ -68,6 +72,8 @@ public sealed class SoundFontOutput : IOutputDevice
             fluid_settings_setint(settings, "audio.periods", options.Buffer);
             synth = new_fluid_synth(settings);
             if (synth == IntPtr.Zero) throw Failure("cannot create synthesizer");
+            PatchedLoader.Install(settings, synth);   // SoundFonts with zones out of order read as BASSMIDI does
+            AddSoundControllers(synth);
             if (fluid_synth_sfload(synth, soundFontPath, 1) < 0) throw Failure($"cannot load {Path.GetFileName(soundFontPath)}");
             fluid_synth_set_interp_method(synth, -1, options.Interpolation);
             fullGain = (float)options.Gain;
@@ -112,36 +118,51 @@ public sealed class SoundFontOutput : IOutputDevice
 
     public void PrepareForEventsSending() { }
 
+    // ---------- Events, in their order ----------
+    // Within one tick (millisecond), FluidSynth's sequencer sorts its events by type, whatever the order they were sent
+    // in (measured): a program change came before the bank select (CC0) sent just before it, so the program was taken
+    // from the previous bank (a manual choice of another bank, or a file's bank and program at the same moment, played
+    // a wrong instrument); a SysEx (GS Reset) came after the program changes sent after it, and cancelled them.
+    // The events are therefore not given to the sequencer one by one: each tick has one timer event to this engine,
+    // with the list of the events of that tick, played in the order they were sent (OnSequencerEvent), at that time of
+    // the rendering, as the sequencer's own events.
+    enum Kind : byte { NoteOn, NoteOff, Control, Program, PitchBend, ChannelPressure, KeyPressure, SysEx }
+
+    readonly record struct Pending(Kind Kind, byte Channel, byte Data1, int Data2, byte[] SysEx = null);
+
     public void SendEvent(MidiEvent midiEvent)
     {
+        Pending item;
+        switch (midiEvent)
+        {
+            // A Note On of velocity 0 is a Note Off.
+            case NoteOnEvent on when on.Velocity == 0: item = new(Kind.NoteOff, on.Channel, on.NoteNumber, 0); break;
+            case NoteOnEvent on: item = new(Kind.NoteOn, on.Channel, on.NoteNumber, on.Velocity); break;
+            case NoteOffEvent off: item = new(Kind.NoteOff, off.Channel, off.NoteNumber, 0); break;
+            case ControlChangeEvent cc: item = new(Kind.Control, cc.Channel, cc.ControlNumber, cc.ControlValue); break;
+            case ProgramChangeEvent pc: item = new(Kind.Program, pc.Channel, pc.ProgramNumber, 0); break;
+            case PitchBendEvent pb: item = new(Kind.PitchBend, pb.Channel, 0, pb.PitchValue); break;
+            case ChannelAftertouchEvent at: item = new(Kind.ChannelPressure, at.Channel, 0, at.AftertouchValue); break;
+            case NoteAftertouchEvent nat: item = new(Kind.KeyPressure, nat.Channel, nat.NoteNumber, nat.AftertouchValue); break;
+            case NormalSysExEvent sysEx when sysEx.Data is { Length: > 0 } data: item = new(Kind.SysEx, 0, 0, 0, data); break;
+            default: return;
+        }
         lock (gate)
         {
             if (sequencer == IntPtr.Zero) return;
-            var e = sequencerEvent;
-            short destination = synthClient;
-            switch (midiEvent)
+            uint at = Date();
+            long id;
+            lock (pending)
             {
-                // A Note On of velocity 0 is a Note Off.
-                case NoteOnEvent on when on.Velocity == 0: fluid_event_noteoff(e, on.Channel, on.NoteNumber); break;
-                case NoteOnEvent on: fluid_event_noteon(e, on.Channel, on.NoteNumber, on.Velocity); break;
-                case NoteOffEvent off: fluid_event_noteoff(e, off.Channel, off.NoteNumber); break;
-                case ControlChangeEvent cc: fluid_event_control_change(e, cc.Channel, cc.ControlNumber, cc.ControlValue); break;
-                case ProgramChangeEvent pc: fluid_event_program_change(e, pc.Channel, pc.ProgramNumber); break;
-                case PitchBendEvent pb: fluid_event_pitch_bend(e, pb.Channel, pb.PitchValue); break;
-                case ChannelAftertouchEvent at: fluid_event_channel_pressure(e, at.Channel, at.AftertouchValue); break;
-                case NoteAftertouchEvent nat: fluid_event_key_pressure(e, nat.Channel, nat.NoteNumber, nat.AftertouchValue); break;
-                // A SysEx (no such sequencer event): a timer event to this engine, which gives it to the synthesizer at
-                // its time (OnSequencerEvent).
-                case NormalSysExEvent sysEx when sysEx.Data is { Length: > 0 } data:
-                    long id;
-                    lock (pending) { id = ++lastSysEx; pending[id] = data; }
-                    fluid_event_timer(e, (IntPtr)id);
-                    destination = ownClient;
-                    break;
-                default: return;
+                // The tick of the previous event, not played yet: this event joins its list.
+                if (at == batchDate && pending.TryGetValue(batchId, out var batch)) { batch.Add(item); return; }
+                id = batchId = ++lastBatch;
+                batchDate = at;
+                pending[id] = new List<Pending> { item };
             }
-            fluid_event_set_dest(e, destination);
-            fluid_sequencer_send_at(sequencer, e, Date(), 1);
+            fluid_event_timer(sequencerEvent, (IntPtr)id);
+            fluid_event_set_dest(sequencerEvent, ownClient);
+            fluid_sequencer_send_at(sequencer, sequencerEvent, at, 1);
         }
     }
 
@@ -156,7 +177,6 @@ public sealed class SoundFontOutput : IOutputDevice
     // the synthesizer.
     const double StartMargin = 10, LeadFall = 0.001;   // ms, ms per ms
     double lead, lastMeasure;
-    uint lastDate;
 
     void MeasureLead()
     {
@@ -167,6 +187,8 @@ public sealed class SoundFontOutput : IOutputDevice
     }
 
     // Date of an event sent now: never before one sent earlier (the order of the events is kept).
+    uint lastDate;
+
     uint Date()
     {
         MeasureLead();
@@ -177,20 +199,34 @@ public sealed class SoundFontOutput : IOutputDevice
         return at;
     }
 
-    // ---------- SysEx at their time ----------
-    readonly Dictionary<long, byte[]> pending = new();   // dated SysEx not played yet, by number
-    long lastSysEx;
+    // Events not played yet: the list of each tick (its timer event's number), in the order they were sent.
+    readonly Dictionary<long, List<Pending>> pending = new();
+    long lastBatch, batchId;
+    uint batchDate;
 
-    // Called by the sequencer on the audio thread: never takes the gate (SendEvent may hold it while waiting for the
-    // sequencer), never lets an error out.
+    // Called by the sequencer on the audio thread, at the time of a tick: its events given to the synthesizer, in order.
+    // Never takes the gate (SendEvent may hold it while waiting for the sequencer), never lets an error out.
     void OnSequencerEvent(uint time, IntPtr evt, IntPtr seq, IntPtr data)
     {
         try
         {
             if (fluid_event_get_type(evt) != SeqTimer) return;
-            byte[] sysEx;
-            lock (pending) { if (!pending.Remove((long)fluid_event_get_data(evt), out sysEx)) return; }
-            PlaySysEx(sysEx);
+            List<Pending> batch;
+            lock (pending) { if (!pending.Remove((long)fluid_event_get_data(evt), out batch)) return; }
+            var s = synth;
+            if (s == IntPtr.Zero) return;
+            foreach (var e in batch)
+                switch (e.Kind)
+                {
+                    case Kind.NoteOn: fluid_synth_noteon(s, e.Channel, e.Data1, e.Data2); break;
+                    case Kind.NoteOff: fluid_synth_noteoff(s, e.Channel, e.Data1); break;
+                    case Kind.Control: fluid_synth_cc(s, e.Channel, e.Data1, e.Data2); break;
+                    case Kind.Program: fluid_synth_program_change(s, e.Channel, e.Data1); break;
+                    case Kind.PitchBend: fluid_synth_pitch_bend(s, e.Channel, e.Data2); break;
+                    case Kind.ChannelPressure: fluid_synth_channel_pressure(s, e.Channel, e.Data2); break;
+                    case Kind.KeyPressure: fluid_synth_key_pressure(s, e.Channel, e.Data1, e.Data2); break;
+                    case Kind.SysEx: PlaySysEx(e.SysEx); break;
+                }
         }
         catch { }
     }
@@ -221,6 +257,41 @@ public sealed class SoundFontOutput : IOutputDevice
         if (length < 1) return;
         var message = length == data.Length ? data : data[..length];
         fluid_synth_sysex(s, message, message.Length, IntPtr.Zero, IntPtr.Zero, out _, 0);
+    }
+
+    // ---------- Sound controllers (CC71-78) ----------
+    // FluidSynth has no default modulators for the sound controllers of GS / XG / GM2 (measured: CC71-78 change
+    // nothing). They are added, as on a module: 64 (their value after a reset) changes nothing, the value moves the
+    // sound's own setting up or down (bipolar, linear), by at most:
+    // - CC74 brightness: cutoff ± 4800 cents (4 octaves); CC71 resonance: Q ± 24 dB (only up has an effect);
+    // - CC73 attack: ± 9600 timecents (× / ÷ 256); CC75 decay and CC72 release: ± 4800 timecents (× / ÷ 16);
+    // - CC76 vibrato rate: ± 2400 cents (× / ÷ 4); CC78 vibrato delay: ± 9600 timecents;
+    // - CC77 vibrato depth: up to 100 cents, above 64 only (a second source, the same CC as a switch, cancels it
+    //   below: there is no vibrato to take away, and a negative depth would still be a vibrato).
+    // Starting values, to be adjusted by ear.
+    static readonly (int Cc, int Generator, double Amount, bool UpOnly)[] SoundControllers =
+    {
+        (74, GenFilterFc, 4800, false), (71, GenFilterQ, 240, false),
+        (73, GenVolEnvAttack, 9600, false), (75, GenVolEnvDecay, 4800, false), (72, GenVolEnvRelease, 4800, false),
+        (76, GenVibLfoFreq, 2400, false), (77, GenVibLfoToPitch, 100, true), (78, GenVibLfoDelay, 9600, false),
+    };
+
+    static void AddSoundControllers(IntPtr synth)
+    {
+        foreach (var (cc, generator, amount, upOnly) in SoundControllers)
+        {
+            var mod = new_fluid_mod();
+            if (mod == IntPtr.Zero) continue;
+            try
+            {
+                fluid_mod_set_source1(mod, cc, ModCc | ModBipolar);
+                fluid_mod_set_source2(mod, upOnly ? cc : 0, upOnly ? ModCc | ModSwitch : 0);   // 0 with no flags: none
+                fluid_mod_set_dest(mod, generator);
+                fluid_mod_set_amount(mod, amount);
+                fluid_synth_add_default_mod(synth, mod, SynthAddModOverwrite);   // the synthesizer keeps a copy
+            }
+            finally { delete_fluid_mod(mod); }
+        }
     }
 
     // ---------- Settings taken at once (SoundFonts tab) ----------
