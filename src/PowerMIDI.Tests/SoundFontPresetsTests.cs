@@ -28,9 +28,15 @@ public class SoundFontPresetsTests
         var defs = WithSoundFont();
         Assert.Equal("Bright Piano", defs.Resolve(Sf2, 0, 0, 8, 0, 0).Name);
         Assert.False(defs.Resolve(Sf2, 0, 0, 8, 3, 0).Missing);                 // the bank LSB is ignored
-        var fallback = defs.Resolve(Sf2, 0, 4, 16, 0, 0);                        // no bank 16: bank 0
-        Assert.Equal("E.Piano", fallback.Name);
-        Assert.True(fallback.Missing);
+        var noBank = defs.Resolve(Sf2, 0, 4, 16, 0, 0);                          // no bank 16 at all: bank 0 is meant
+        Assert.Equal("E.Piano", noBank.Name);
+        Assert.False(noBank.Missing);
+        Assert.Contains("no bank 16", noBank.Detail);
+        var notInBank = defs.Resolve(Sf2, 0, 4, 8, 0, 0);                        // bank 8 exists, without program 5
+        Assert.Equal("E.Piano", notInBank.Name);
+        Assert.True(notInBank.Missing);
+        Assert.Equal(0, defs.SoundFontBank(16, 4));
+        Assert.Equal(8, defs.SoundFontBank(8, 0));
         Assert.Equal("Grand Piano", defs.Resolve(Sf2, 0, 50, 0, 0, 0).Name);    // no program 51: the first sound
         Assert.Equal("Grand Piano", defs.Resolve(Sf2, 0, 7, 0, 0, 0).Name);     // program 8 only in bank 1
     }

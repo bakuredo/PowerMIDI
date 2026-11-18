@@ -70,11 +70,14 @@ public sealed class SoundFontOutput : IOutputDevice
             fluid_settings_setint(settings, "synth.dynamic-sample-loading", options.LoadOnDemand ? 1 : 0);
             fluid_settings_setnum(settings, "synth.sample-rate", options.SampleRate);
             fluid_settings_setint(settings, "audio.periods", options.Buffer);
+            // Channels: 16 per MIDI port, for the files on several ports (see MidiPorts, OtherPortsPlayer).
+            fluid_settings_setint(settings, "synth.midi-channels", Channels);
             synth = new_fluid_synth(settings);
             if (synth == IntPtr.Zero) throw Failure("cannot create synthesizer");
             PatchedLoader.Install(settings, synth);   // SoundFonts with zones out of order read as BASSMIDI does
             AddSoundControllers(synth);
             if (fluid_synth_sfload(synth, soundFontPath, 1) < 0) throw Failure($"cannot load {Path.GetFileName(soundFontPath)}");
+            SetDrumChannels(synth);
             fluid_synth_set_interp_method(synth, -1, options.Interpolation);
             fullGain = (float)options.Gain;
             fluid_synth_set_gain(synth, fullGain);
@@ -130,8 +133,29 @@ public sealed class SoundFontOutput : IOutputDevice
 
     readonly record struct Pending(Kind Kind, byte Channel, byte Data1, int Data2, byte[] SysEx = null);
 
-    public void SendEvent(MidiEvent midiEvent)
+    // Channels of the synthesizer: 4 ports of 16 (port p: channels 16 p + 1 to 16 p + 16).
+    public const int Channels = 64;
+
+    // The 10th channel of each port is a drum channel, as on a module with several ports (SC-88: part 10 of port B).
+    // FluidSynth makes only channel 10 one (measured); the others are set after its creation and after each reset: drum
+    // type, bank 128 (the type alone keeps bank 0: a channel keeps its bank), the first kit.
+    static void SetDrumChannels(IntPtr synth)
     {
+        for (int channel = 16 + 9; channel < Channels; channel += 16)
+        {
+            fluid_synth_set_channel_type(synth, channel, 1);
+            fluid_synth_bank_select(synth, channel, InstrumentDefinitions.Sf2DrumBank);
+            fluid_synth_program_change(synth, channel, 0);
+        }
+    }
+
+    public void SendEvent(MidiEvent midiEvent) => SendEvent(midiEvent, 0);
+
+    // An event of a MIDI port: its channel moved by 16 per port (port 1: channels 17-32).
+    public void SendEvent(MidiEvent midiEvent, int port)
+    {
+        if (port < 0 || port >= Channels / 16) return;
+        int offset = port * 16;
         Pending item;
         switch (midiEvent)
         {
@@ -147,6 +171,7 @@ public sealed class SoundFontOutput : IOutputDevice
             case NormalSysExEvent sysEx when sysEx.Data is { Length: > 0 } data: item = new(Kind.SysEx, 0, 0, 0, data); break;
             default: return;
         }
+        if (offset > 0 && item.Kind != Kind.SysEx) item = item with { Channel = (byte)(item.Channel + offset) };
         lock (gate)
         {
             if (sequencer == IntPtr.Zero) return;
@@ -251,6 +276,7 @@ public sealed class SoundFontOutput : IOutputDevice
         if (IsModeReset(data, length))
         {
             fluid_synth_system_reset(s);
+            SetDrumChannels(s);
             ApplyEffects(s);   // the reverb and chorus chosen stay
             return;
         }

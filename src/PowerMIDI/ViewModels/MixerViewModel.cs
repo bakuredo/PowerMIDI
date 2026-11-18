@@ -431,6 +431,8 @@ public sealed class MixerViewModel : ObservableObject
                                            : (InstrumentDefinitions.Gm2MelodicMsb, msb == InstrumentDefinitions.Gm2MelodicMsb ? lsb : 0);
         // XG: a board voice asked by the other bank of its songs is listed by its own (see InstrumentDefinitions.XgListedMsb).
         if (HasXgBanks) msb = InstrumentDefinitions.XgListedMsb(msb);
+        // SF2: the preset played (bank 0 when the SoundFont does not have the one asked for).
+        if (Standard == InstrumentDefinitions.Sf2Standard && !drum) msb = defs.SoundFontBank(msb, program);
         // In GS, the LSB only selects the map: compare program and MSB only. SF2: the bank LSB is ignored, and a drum
         // channel ignores the MSB too (its kits are those of bank 128): the program alone.
         bool compareLsb = Standard is "XG" or "GM2";

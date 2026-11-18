@@ -943,6 +943,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------- Playback ----------
 
+    OtherPortsPlayer otherPorts;   // the other MIDI ports of the track, on the SoundFont engine (see CreatePlayback)
+
     void StopTrack()
     {
         ReleaseKeyboardNotes();
@@ -952,6 +954,8 @@ public sealed partial class MainViewModel : ObservableObject
             playback.Dispose();
             playback = null;
         }
+        otherPorts?.Dispose();   // its notes cut
+        otherPorts = null;
         if (output != null) MidiTools.SendPanic(output);
         SetState("stopped");
     }
@@ -1043,6 +1047,13 @@ public sealed partial class MainViewModel : ObservableObject
         if (custom) parts.Add(syxName != null ? $"Custom SysEx patches detected ({syxName})" : "Custom SysEx patches detected");
         else if (syxName != null) parts.Add($"SysEx from {syxName}");
         if (item.Library is { } libraryKey) parts.Add(Library.ShownPath(libraryKey));
+        // A file on several MIDI ports: their channels with the SoundFont engine, merged on a module.
+        if (MidiPorts.HasOtherPorts(midi))
+        {
+            int last = Math.Min(midi.GetTrackChunks().Max(MidiPorts.TrackPort), SoundFontOutput.Channels / 16 - 1);
+            var ports = last == 1 ? "Port B" : $"Ports B-{(char)('A' + last)}";
+            parts.Add(otherPorts != null ? $"{ports} on SoundFont channels 17-{16 * (last + 1)} (not in Mixer)" : "File on several MIDI ports: merged on 16 channels");
+        }
         Status = string.Join(" — ", parts);
     }
 
@@ -1061,8 +1072,15 @@ public sealed partial class MainViewModel : ObservableObject
     volatile Exception playbackError;   // set by the playback thread, read by the timer
 
     // Playback of a track (with its changes) on the output, its tempo map and duration.
+    // A file on several MIDI ports (MidiPorts) with the SoundFont engine: the playback (and the Mixer) has the first
+    // port; the tracks of the other ports are played on the engine's channels above 16 by OtherPortsPlayer, which
+    // follows it.
     Playback CreatePlayback(MidiFile midi)
     {
+        otherPorts?.Dispose();
+        otherPorts = null;
+        IReadOnlyList<PortEvent> others = null;
+        if (output is SoundFontOutput && MidiPorts.HasOtherPorts(midi)) (midi, others) = MidiPorts.Split(midi);
         var pb = midi.GetPlayback(output);
         playedFile = midi;
         ChannelMixer.Passages = InstrumentPassages.Read(midi, !ChannelMixer.ForceMode);   // the instruments chosen per passage
@@ -1093,6 +1111,12 @@ public sealed partial class MainViewModel : ObservableObject
         playbackError = null;
         pb.ErrorOccurred += (_, e) => { if (playback == pb) playbackError = e.Exception; };
         playback = pb;
+        // The other ports: their player follows this playback while it is the current one (created after it is: its
+        // first look would otherwise find another playback, and end).
+        if (others is { Count: > 0 } && output is SoundFontOutput engine)
+            otherPorts = new OtherPortsPlayer(others, midi.GetTempoMap(),
+                () => playback != pb ? null : (pb.IsRunning, (long)pb.GetCurrentTime<MidiTimeSpan>().TimeSpan, pb.Speed),
+                (e, port) => engine.SendEvent(e, port), () => transposeSemitones);
         tempoMap = midi.GetTempoMap();
         eventsPending = true;   // the Event Editor lists it at the next timer tick (after the start)
         TimeSpan length = pb.GetDuration<MetricTimeSpan>();

@@ -520,6 +520,7 @@ public sealed class InstrumentDefinitions
     public const string Sf2Standard = "SF2";
     public const int Sf2DrumBank = 128;
     Dictionary<(int Bank, int Program), string> sf2Presets = new();
+    HashSet<int> sf2Banks = new();
     IReadOnlyList<InstrumentChoice> sf2Sounds = Array.Empty<InstrumentChoice>(), sf2Drums = Array.Empty<InstrumentChoice>();
 
     public bool HasSoundFont => sf2Presets.Count > 0;
@@ -539,8 +540,12 @@ public sealed class InstrumentDefinitions
         }).ToList();
         sf2Drums = table.Where(kv => kv.Key.Item1 == Sf2DrumBank).OrderBy(kv => kv.Key.Item2)
                         .Select(kv => new InstrumentChoice { Text = $"{kv.Key.Item2 + 1:000} {kv.Value}", Program = kv.Key.Item2 }).ToList();
+        sf2Banks = table.Keys.Select(k => k.Item1).ToHashSet();
         sf2Presets = table;
     }
+
+    // Bank of the preset the engine plays for a melodic channel (see ResolveSoundFont): the one asked for, otherwise 0.
+    public int SoundFontBank(int msb, int program) => sf2Presets.ContainsKey((msb, program)) ? msb : 0;
 
     InstrumentInfo ResolveSoundFont(int program, int msb, int rhythm)
     {
@@ -554,12 +559,19 @@ public sealed class InstrumentDefinitions
             }
             return new InstrumentInfo($"Drums · {kit}", $"SF2 · bank {Sf2DrumBank} · PC {program + 1}{note}", true, note != "");
         }
-        var missing = "";
+        // A bank the SoundFont does not have at all (a converter's bank select, e.g. bank 1 everywhere): bank 0 is the
+        // sound meant, not shown as missing. A bank it has without this program, or a program it has nowhere: missing.
+        var fallback = "";
+        bool missing = false;
         if (!sf2Presets.TryGetValue((msb, program), out var name))
         {
-            if (sf2Presets.TryGetValue((0, program), out name)) missing = " · bank missing, bank 0";
-            else { name = sf2Presets.GetValueOrDefault((0, 0), $"Program {program + 1}"); missing = " · program missing, first sound"; }
+            if (sf2Presets.TryGetValue((0, program), out name))
+            {
+                missing = sf2Banks.Contains(msb);
+                fallback = missing ? $" · not in bank {msb}, bank 0" : $" · no bank {msb} in SoundFont, bank 0";
+            }
+            else { name = sf2Presets.GetValueOrDefault((0, 0), $"Program {program + 1}"); fallback = " · program missing, first sound"; missing = true; }
         }
-        return new InstrumentInfo(name, $"SF2 · bank {msb} · PC {program + 1}{missing}", false, missing != "");
+        return new InstrumentInfo(name, $"SF2 · bank {msb} · PC {program + 1}{fallback}", false, missing);
     }
 }

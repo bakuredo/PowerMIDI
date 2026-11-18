@@ -119,6 +119,14 @@ static class FluidSynthNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_system_reset(IntPtr synth);
 
+    // type: 0 melodic, 1 drum (enum fluid_midi_channel_type).
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_channel_type(IntPtr synth, int chan, int type);
+
+    // The bank of a channel, whatever its bank style (a drum channel keeps its own: 128).
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_bank_select(IntPtr synth, int chan, int bank);
+
     // ---------- Modulators (a source controller drives a generator of the voices) ----------
     // Flags of a source: 2 bipolar (centered: -1..1), 12 switch (0 below the middle, 1 from it), 16 a MIDI CC (the
     // source is its number). Generators: SF2 numbers (fluid_gen_type).
