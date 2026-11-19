@@ -269,6 +269,55 @@ public class MidiPortsTests
         Assert.Equal(3, MidiEventEdits.TrackOfChannel(midi, 5, Port(1)));
     }
 
+    // Port 0: program 5, a note at 96; port 1: program 40 and a volume at 0, a note at 48, a change of volume at 240.
+    static MidiFile Listed() => new(
+        Track(null, (0, new SetTempoEvent(500000))),
+        Track(0, (0, Pc(0, 5)), (96, On(0, 60)), (192, Off(0, 60))),
+        Track(1, (0, Pc(0, 40)), (0, Cc(0, 7, 90)), (48, On(0, 72)), (240, Cc(0, 7, 50)), (480, Off(0, 72))))
+    { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+
+    [Fact]
+    public void Event_list_by_port_follows_channels_of_each_port()
+    {
+        var midi = Listed();
+        Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) => $"P{program}";
+        // On 16 channels: the note of port A named after the Program Change of port B before it (both on channel 1).
+        var merged = MidiEventList.Build(midi, name);
+        Assert.Equal("P40", merged.Single(r => r.Type == "Note" && r.Track == 2).Description);
+        Assert.All(merged, r => Assert.Equal(0, r.Port));
+
+        // By port: the channels of each port on their own; the rows of track 3 on port B.
+        var rows = MidiEventList.Build(midi, name, byPort: true);
+        Assert.Equal("P5", rows.Single(r => r.Type == "Note" && r.Track == 2).Description);
+        Assert.Equal("P40", rows.Single(r => r.Type == "Note" && r.Track == 3).Description);
+        Assert.All(rows.Where(r => r.Track == 2), r => Assert.Equal(0, r.Port));
+        Assert.All(rows.Where(r => r.Track == 3), r => Assert.Equal(1, r.Port));
+
+        // In blue: the rows of B1 its settings in the Mixer tab replace (instrument chosen; volume fixed until its first
+        // change, at 240).
+        var (main, others) = MidiPorts.Split(midi);
+        PortInstruments.Clear();
+        PortControllers.Clear();
+        try
+        {
+            PortInstruments.Set(1, 0, InstrumentPassages.First, 0, 0, 50);
+            PortControllers.Set(1, 0, ChannelMixer.Volume, 30, false);
+            var follow = new Follow();
+            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 0, Passages(midi));
+            var pc = rows.Single(r => r.Track == 3 && r.Type == "Program Change");
+            Assert.Equal("Mixer: P50 (bank 0 / 0, PC 51)", MidiEventList.FixedText(pc, name, player));
+            var volumes = rows.Where(r => r.Track == 3 && r.Type == "Control Change").ToList();
+            Assert.Equal("Fixed in Mixer tab: 30", MidiEventList.FixedText(volumes[0], name, player));
+            Assert.Null(MidiEventList.FixedText(volumes[1], name, player));
+            Assert.Null(MidiEventList.FixedText(pc, name));   // no player: the ports are not played apart
+        }
+        finally
+        {
+            PortInstruments.Clear();
+            PortControllers.Clear();
+        }
+    }
+
     static List<(int Port, int Channel, MidiEvent Event)> Settings(params (int Port, int Channel, MidiEvent Event)[] events) => events.ToList();
 
     [Fact]

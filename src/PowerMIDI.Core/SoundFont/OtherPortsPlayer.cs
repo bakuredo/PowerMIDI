@@ -113,6 +113,8 @@ public sealed class OtherPortsPlayer : IDisposable
 
     // Does the fixed value of controller k replace the file's now? Its value now: that one, otherwise the file's.
     public bool IsFixedActive(int port, int channel, int k) => Valid(port, channel) && FixedAt(port, channel, k, Volatile.Read(ref lastTick)) != null;
+    // The value that replaces the file's at a tick (an event there, see MidiEventList.FixedText), or null.
+    public int? FixedValueAt(int port, int channel, int k, long tick) => Valid(port, channel) ? FixedAt(port, channel, k, tick) : null;
     public int Value(int port, int channel, int k) => FixedAt(port, channel, k, Volatile.Read(ref lastTick)) ?? FileValue(port, channel, k);
 
     // A value fixed in the Mixer (slider moved), sent at once. Set past the first passage of the controller, it is for the

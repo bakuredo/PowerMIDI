@@ -953,11 +953,14 @@ public sealed partial class MainViewModel : ObservableObject
     // its settings are saved port by port (see WriteSettings).
     bool playedOnPorts;
 
-    // The rows of the other ports hidden: no track played on several ports any more (removed, port changed).
+    // The rows of the other ports hidden: no track played on several ports any more (removed, port changed). The Event
+    // Editor lists the track again, on 16 channels.
     void ForgetOtherPorts()
     {
-        otherPorts?.Dispose();
+        if (otherPorts == null) return;
+        otherPorts.Dispose();
         otherPorts = null;
+        eventsPending = true;
     }
 
     void StopTrack()

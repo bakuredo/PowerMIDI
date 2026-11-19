@@ -55,10 +55,16 @@ public static class MidiTools
     public static void PlayNote(IOutputDevice device, int channel, int note, int velocity, TimeSpan length)
     {
         if (device == null) return;
-        device.SendEvent(NoteOn(channel, note, Math.Clamp(velocity, 1, 127)));
+        PlayNote(device.SendEvent, channel, note, velocity, length);
+    }
+
+    // Same, sent through send (e.g. to another MIDI port of the SoundFont engine).
+    public static void PlayNote(Action<MidiEvent> send, int channel, int note, int velocity, TimeSpan length)
+    {
+        send(NoteOn(channel, note, Math.Clamp(velocity, 1, 127)));
         Task.Delay(length).ContinueWith(_ =>
         {
-            try { device.SendEvent(NoteOff(channel, note, 0)); }
+            try { send(NoteOff(channel, note, 0)); }
             catch (Exception) { }   // port closed meanwhile
         });
     }

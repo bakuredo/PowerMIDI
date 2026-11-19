@@ -11,12 +11,13 @@ namespace PowerMIDI.ViewModels;
 // A row of the Event Editor: an event of the current track (see MidiEventList), with its position as bar:beat:tick and
 // its time, worked out when the row is shown (the list only shows its visible rows: a long file is listed at once).
 // FixedText: what replaces the event (a value fixed in the Mixer or Effects tab: the row is blue, its description says
-// it), or null.
+// it), or null. ByPort: a file whose MIDI ports are played apart: the channel named with its port (A1-A16, B1-B16).
 public sealed class EventRowViewModel : ObservableObject
 {
     public MidiEventRow Row { get; init; }
     public TempoMap TempoMap { get; init; }
     public Func<MidiEventRow, string> FixedOf { get; init; }   // what replaces an event (EventEditorViewModel.FixedOf)
+    public bool ByPort { get; init; }
     string position, time;
 
     public string Position => position ??= MidiTools.FormatPosition(Row.Tick, TempoMap);
@@ -24,7 +25,7 @@ public sealed class EventRowViewModel : ObservableObject
     public double Seconds => ((TimeSpan)TimeConverter.ConvertTo<MetricTimeSpan>(Row.Tick, TempoMap)).TotalSeconds;
 
     public string Track => Row.Track > 0 ? Row.Track.ToString() : "";   // a setting: none
-    public string Channel => Row.Channel >= 0 ? (Row.Channel + 1).ToString() : "";
+    public string Channel => Row.Channel < 0 ? "" : EventEditorViewModel.ChannelName(Row.Port, Row.Channel, ByPort);
     public string Type => Row.Type;
     public string Data => Row.Data;
     public string Description => fixedText == null || Row.Kind == EventKind.Setting ? Row.Description
@@ -76,8 +77,11 @@ public interface IEventEditing
     bool MixerAppendPending { get; }
     void FinishMixerAppend();
     void CancelMixerAppend();
-    // Audition: plays a note on its own (Note Off after length).
-    void PlayNote(int channel, int note, int velocity, TimeSpan length);
+    // Audition: plays a note on its own (Note Off after length), on a MIDI port (see OtherPorts).
+    void PlayNote(int port, int channel, int note, int velocity, TimeSpan length);
+    // The player of the other MIDI ports of the track, when they are played apart (rows B1-B16 of the Mixer tab); null:
+    // none (the events are then listed on 16 channels).
+    OtherPortsPlayer OtherPorts { get; }
     // Append / Replace cancelled: the settings in blue go back to the file's values.
     void DropFixed();
     void Undo();
@@ -139,14 +143,16 @@ public sealed class EventEditorViewModel : ObservableObject
     // ---------- Track ----------
 
     // Builds the list of a track (file, or its copy with the changes), in its standard (names of the instruments). The
-    // filters are kept while it is the same file.
+    // filters are kept while it is the same file. A file whose MIDI ports the SoundFont engine plays apart (see
+    // IEventEditing.OtherPorts): listed by port, as the Mixer tab shows its channels (A1-A16, B1-B16).
     public void Load(MidiFile midi, string standard, string fileName)
     {
         tempoMap = midi.GetTempoMap();
         Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) => defs.Resolve(standard, c, program, msb, lsb, rhythm).Name;
-        var list = MidiEventList.Build(midi, name, DescribeSysEx);
+        byPort = editing.OtherPorts != null && MidiPorts.HasOtherPorts(midi);
+        var list = MidiEventList.Build(midi, name, DescribeSysEx, byPort);
         instrumentName = name;
-        rows = list.Select(r => new EventRowViewModel { Row = r, TempoMap = tempoMap, FixedOf = FixedOf }).ToList();
+        rows = list.Select(r => new EventRowViewModel { Row = r, TempoMap = tempoMap, FixedOf = FixedOf, ByPort = byPort }).ToList();
         settingCount = 0;
         RefreshFixed(false);
         Title = $"Events · {fileName}";
@@ -155,8 +161,15 @@ public sealed class EventEditorViewModel : ObservableObject
         var names = list.Where(r => r.Kind == EventKind.Meta && r.Type == "Track Name").GroupBy(r => r.Track).ToDictionary(g => g.Key, g => g.First().Data);
         Tracks = new[] { "All tracks" }.Concat(list.Select(r => r.Track).Distinct().OrderBy(t => t)
                                                    .Select(t => names.TryGetValue(t, out var n) && n != "" ? $"{t} · {n}" : $"{t}")).ToList();
+        // Channels: the 16 of each port with channel events (the first one always: its settings).
+        var choices = list.Where(r => r.Channel >= 0).Select(r => r.Port).Append(0).Distinct().OrderBy(p => p)
+                          .SelectMany(p => Enumerable.Range(0, 16).Select(c => (p, c))).ToList();
+        var channelNames = ChannelList(choices, byPort);
+        bool sameChannels = channelNames.SequenceEqual(Channels);
+        if (!sameChannels) (channelChoices, Channels) = (choices, channelNames);
         var file = fileName.TrimEnd(' ', '*');
         if (file != loadedFile || trackFilter >= Tracks.Count) trackFilter = 0;
+        if (!sameChannels) channelFilter = 0;
         if (file != loadedFile) { channelFilter = kindFilter = 0; searchText = ""; SetPending(null); }   // another track: Append / Replace over
         loadedFile = file;
         OnPropertyChanged(nameof(TrackFilter));
@@ -219,7 +232,7 @@ public sealed class EventEditorViewModel : ObservableObject
         if (row.Kind == EventKind.Setting)
             return row.Description.StartsWith("Instrument from ", StringComparison.Ordinal) ? "Sent from that time: change it in Mixer tab"
                                                                                              : "Sent at start: change it in Mixer / Effects tab";
-        var text = MidiEventList.FixedText(row, instrumentName);
+        var text = MidiEventList.FixedText(row, instrumentName, byPort ? editing.OtherPorts : null);
         if (text == null || !text.StartsWith("Fixed in Effects tab", StringComparison.Ordinal)) return text;
         var texts = new List<string>();
         foreach (var m in ModuleSettings.All)
@@ -271,9 +284,10 @@ public sealed class EventEditorViewModel : ObservableObject
         var selected = selectedRow;
         rows.RemoveRange(0, settingCount);
         // No track loaded: no settings to list either.
-        var settings = (tempoMap == null ? Enumerable.Empty<(int Channel, string Tab, string Text)>() : Settings()).Select(s => new EventRowViewModel
+        var settings = (tempoMap == null ? Enumerable.Empty<(int Port, int Channel, string Tab, string Text)>() : Settings()).Select(s => new EventRowViewModel
         {
-            Row = new MidiEventRow(0, 0, s.Channel, EventKind.Setting, "Setting", s.Tab, s.Text), TempoMap = tempoMap, FixedOf = FixedOf,
+            Row = new MidiEventRow(0, 0, s.Channel, EventKind.Setting, "Setting", s.Tab, s.Text, Port: s.Port), TempoMap = tempoMap, FixedOf = FixedOf,
+            ByPort = byPort,
         }).ToList();
         rows.InsertRange(0, settings);
         settingCount = settings.Count;
@@ -283,50 +297,74 @@ public sealed class EventEditorViewModel : ObservableObject
         UpdateCount();
         // A setting selected: the same one again if it is still there (same channel, tab and name).
         if (selected?.Row.Kind == EventKind.Setting)
-            SelectedRow = settings.FirstOrDefault(r => r.Row.Channel == selected.Row.Channel && r.Row.Data == selected.Row.Data &&
+            SelectedRow = settings.FirstOrDefault(r => r.Row.Port == selected.Row.Port && r.Row.Channel == selected.Row.Channel && r.Row.Data == selected.Row.Data &&
                                                        r.Row.Description.Split(':')[0] == selected.Row.Description.Split(':')[0]);
     }
 
-    // The values fixed in the Mixer tab (instruments, drum parts, controllers, maps) and in the Effects tab (the settings
-    // modules of the mode of the track), named as by Append / Replace; channel -1: none.
-    IEnumerable<(int Channel, string Tab, string Text)> Settings()
+    // The values fixed in the Mixer tab (instruments, drum parts, controllers, maps; listed by port: those of the rows
+    // B1-B16 too) and in the Effects tab (the settings modules of the mode of the track), named as by Append / Replace;
+    // channel -1: none.
+    IEnumerable<(int Port, int Channel, string Tab, string Text)> Settings()
     {
         var instruments = ChannelMixer.Instruments();
         for (int c = 0; c < 16; c++)
         {
             // One per passage (see InstrumentPassages): named by the time of its Program Change.
             foreach (var (_, passage, msb, lsb, program) in instruments.Where(x => x.Channel == c))
-            {
-                var name = instrumentName?.Invoke(c, program, msb, lsb, ChannelMixer.Rhythm(c));
-                var from = passage == InstrumentPassages.First ? "" : $" from {MidiTools.FormatTime(TimeConverter.ConvertTo<MetricTimeSpan>(passage, tempoMap))}";
-                yield return (c, "Mixer", $"Instrument{from}: {(string.IsNullOrEmpty(name) ? "" : name + " ")}(bank {msb} / {lsb}, PC {program + 1})");
-            }
+                yield return (0, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, ChannelMixer.Rhythm(c)));
             if (ChannelMixer.RhythmOverride[c] >= 0)
-                yield return (c, "Mixer", ChannelMixer.RhythmOverride[c] == 0 ? "Part: normal" : $"Part: drum part {ChannelMixer.RhythmOverride[c]}");
+                yield return (0, c, "Mixer", ChannelMixer.RhythmOverride[c] == 0 ? "Part: normal" : $"Part: drum part {ChannelMixer.RhythmOverride[c]}");
             for (int k = 0; k < ChannelMixer.ControllerNames.Length; k++)
                 if (ChannelMixer.IsFixed(k, c))
-                    yield return (c, "Mixer", $"{char.ToUpperInvariant(ChannelMixer.ControllerNames[k][0])}{ChannelMixer.ControllerNames[k][1..]}: {ChannelMixer.FixedValue(k, c)}" +
-                                              (ChannelMixer.CcWholeTrack[k, c] ? "" : " until first change"));
+                    yield return (0, c, "Mixer", ControllerSetting(k, ChannelMixer.FixedValue(k, c), ChannelMixer.CcWholeTrack[k, c]));
+        }
+        if (byPort)
+        {
+            // The rows of the other ports (see OtherPortsPlayer): no drum part to choose, the 10th channel plays drums.
+            foreach (var (port, c, passage, msb, lsb, program) in PortInstruments.All())
+                yield return (port, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, c == 9 ? 1 : 0));
+            foreach (var (port, c, k, value, wholeTrack) in PortControllers.All())
+                yield return (port, c, "Mixer", ControllerSetting(k, value, wholeTrack));
         }
         // The maps chosen in the Mixer tab play only in their mode (see ChannelMixer.ApplyVoiceMap, ApplyGsDefaultMap).
-        if (ChannelMixer.XgMode && ChannelMixer.VoiceMapOverride >= 0) yield return (-1, "Mixer", $"XG voice map: {MixerViewModel.VoiceMapNames[2 - ChannelMixer.VoiceMapOverride]}");
-        if (ChannelMixer.GsMode && ChannelMixer.GsDefaultMapOverride >= 1) yield return (-1, "Mixer", $"GS default map: {MixerViewModel.GsDefaultMapNames[5 - ChannelMixer.GsDefaultMapOverride]}");
+        if (ChannelMixer.XgMode && ChannelMixer.VoiceMapOverride >= 0) yield return (0, -1, "Mixer", $"XG voice map: {MixerViewModel.VoiceMapNames[2 - ChannelMixer.VoiceMapOverride]}");
+        if (ChannelMixer.GsMode && ChannelMixer.GsDefaultMapOverride >= 1) yield return (0, -1, "Mixer", $"GS default map: {MixerViewModel.GsDefaultMapNames[5 - ChannelMixer.GsDefaultMapOverride]}");
         foreach (var m in ModuleSettings.All)
         {
             if (!m.IsActive()) continue;
             foreach (var (key, value) in m.Fixed())
-                yield return (m.ChannelOf(key), "Effects", m.Describe?.Invoke(key, value) ?? $"{m.Name} {key.A}/{key.B}/{key.C} = {value}");
+                yield return (0, m.ChannelOf(key), "Effects", m.Describe?.Invoke(key, value) ?? $"{m.Name} {key.A}/{key.B}/{key.C} = {value}");
         }
     }
+
+    string InstrumentSetting(int c, long passage, int msb, int lsb, int program, int rhythm)
+    {
+        var name = instrumentName?.Invoke(c, program, msb, lsb, rhythm);
+        var from = passage == InstrumentPassages.First ? "" : $" from {MidiTools.FormatTime(TimeConverter.ConvertTo<MetricTimeSpan>(passage, tempoMap))}";
+        return $"Instrument{from}: {(string.IsNullOrEmpty(name) ? "" : name + " ")}(bank {msb} / {lsb}, PC {program + 1})";
+    }
+
+    static string ControllerSetting(int k, int value, bool wholeTrack) =>
+        $"{char.ToUpperInvariant(ChannelMixer.ControllerNames[k][0])}{ChannelMixer.ControllerNames[k][1..]}: {value}" + (wholeTrack ? "" : " until first change");
 
     // ---------- Filters ----------
 
     public IReadOnlyList<string> Tracks { get => tracks; private set => Set(ref tracks, value); }
     IReadOnlyList<string> tracks = new[] { "All tracks" };
 
-    public IReadOnlyList<string> Channels => ChannelNames;
-    static readonly IReadOnlyList<string> ChannelNames = new[] { "All channels" }.Concat(Enumerable.Range(1, 16).Select(c => $"Channel {c}"))
-                                                                                    .Append("No channel").ToList();
+    // The channels to choose from: All, those of each port (see Load), No channel.
+    List<(int Port, int Channel)> channelChoices = Enumerable.Range(0, 16).Select(c => (0, c)).ToList();
+    IReadOnlyList<string> channels;
+    public IReadOnlyList<string> Channels { get => channels ??= ChannelList(channelChoices, false); private set => Set(ref channels, value); }
+
+    static List<string> ChannelList(IEnumerable<(int Port, int Channel)> choices, bool byPort) =>
+        new[] { "All channels" }.Concat(choices.Select(x => $"Channel {ChannelName(x.Port, x.Channel, byPort)}")).Append("No channel").ToList();
+
+    // A channel as the Mixer tab names it: listed by port, with its letter (A1, B16); otherwise its number.
+    internal static string ChannelName(int port, int channel, bool byPort) =>
+        byPort ? $"{(char)('A' + port)}{channel + 1}" : (channel + 1).ToString(CultureInfo.InvariantCulture);
+
+    bool byPort;   // the track listed by port (see Load)
 
     public IReadOnlyList<string> Kinds => KindNames;
     static readonly IReadOnlyList<string> KindNames =
@@ -351,8 +389,8 @@ public sealed class EventEditorViewModel : ObservableObject
     {
         var row = ((EventRowViewModel)item).Row;
         if (trackFilter > 0 && row.Track != TrackNumber(trackFilter)) return false;
-        if (channelFilter is > 0 and <= 16 && row.Channel != channelFilter - 1) return false;
-        if (channelFilter == 17 && row.Channel >= 0) return false;
+        if (channelFilter > 0 && channelFilter <= channelChoices.Count && (row.Port, row.Channel) != channelChoices[channelFilter - 1]) return false;
+        if (channelFilter == channelChoices.Count + 1 && row.Channel >= 0) return false;
         if (KindOf[kindFilter] is { } kinds && !kinds.Contains(row.Kind)) return false;
         return searchText == "" || row.Type.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
                row.Data.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
@@ -405,7 +443,7 @@ public sealed class EventEditorViewModel : ObservableObject
         if (!audition || row?.Row.Event is not NoteOnEvent on || on.Velocity == 0) return;
         double seconds = row.Row.Length > 0 && tempoMap != null
             ? ((TimeSpan)LengthConverter.ConvertTo<MetricTimeSpan>(row.Row.Length, row.Row.Tick, tempoMap)).TotalSeconds : 0.5;
-        editing.PlayNote(on.Channel, on.NoteNumber, on.Velocity, TimeSpan.FromSeconds(Math.Clamp(seconds, 0.1, 2)));
+        editing.PlayNote(row.Row.Port, on.Channel, on.NoteNumber, on.Velocity, TimeSpan.FromSeconds(Math.Clamp(seconds, 0.1, 2)));
     }
 
     // The row to bring into view (the window scrolls to it).

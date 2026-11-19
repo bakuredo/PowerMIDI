@@ -72,7 +72,15 @@ public sealed partial class MainViewModel : IEventEditing
     public string EditBlocked =>
         current == null || settingsFile == null ? "Play track first." : null;
 
-    public void PlayNote(int channel, int note, int velocity, TimeSpan length) => MidiTools.PlayNote(output, channel, note, velocity, length);
+    // A note of another MIDI port (rows B1-B16): on its channels of the SoundFont engine (see OtherPortsPlayer).
+    public void PlayNote(int port, int channel, int note, int velocity, TimeSpan length)
+    {
+        if (port > 0 && output is SoundFontOutput engine) MidiTools.PlayNote(e => engine.SendEvent(e, port), channel, note, velocity, length);
+        else MidiTools.PlayNote(output, channel, note, velocity, length);
+    }
+
+    // The player of the other MIDI ports of the track (null: none), for the Event Editor (see CreatePlayback).
+    public OtherPortsPlayer OtherPorts => otherPorts;
 
     public bool CanUndo => undoEdits.Count > 0;
     public bool CanRedo => redoEdits.Count > 0;
