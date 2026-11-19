@@ -9,8 +9,9 @@ namespace PowerMIDI.ViewModels;
 // in the whole track (WriteSettingsInTrack), so that nothing is blue. The settings are then changed in the Mixer and
 // Effects tabs (heard right away). Second click: those settings (Mixer: drum parts, instruments, controllers; Effects
 // tab: every settings module) are written as events at the event selected (Append: after it; Replace: instead of the
-// selected events). They go into the copy of the track the Event Editor changes (MainViewModel.Events.cs: undo, saved by
-// "Save MIDI file…"); the settings written become free again: the file's values, now set by these events.
+// selected events); a file played on several MIDI ports: those of the ports other than the one of its track, in tracks
+// of their port (see WriteFixed). They go into the copy of the track the Event Editor changes (MainViewModel.Events.cs:
+// undo, saved by "Save MIDI file…"); the settings written become free again: the file's values, now set by these events.
 public sealed partial class MainViewModel
 {
     TempoMap tempoMap;   // tempo map of the current track
@@ -23,30 +24,34 @@ public sealed partial class MainViewModel
         path == settingsFile && editedFile != null ? editedFile.Clone() : MidiTools.ReadFile(path);
 
     // Writes the settings in blue as events of a track at a position: after the event at index (-1: before the events
-    // there), or, with replaced, instead of those events (at the place of the event at index, one of them). Returns
-    // what was written (null: nothing in blue). Playback stays where it is.
+    // there), or, with replaced, instead of those events (at the place of the event at index, one of them). A file played
+    // on several MIDI ports: there, those of the rows of the port of that track (A1-A16 and the effects, or B1-B16); those
+    // of the other rows at the same position, each channel in a track of its port (as the Append of the Mixer: a setting
+    // of port A in a track of port B would act on port B); nothing of the port of the track: the events replaced stay.
+    // Returns what was written (null: nothing in blue). Playback stays where it is.
     public string WriteFixed(int track, int index, long tick, IReadOnlyList<(int Track, int Index)> replaced)
     {
         if (EditBlocked != null) return null;
         var (tagged, description) = BuildInsertion();
-        if (tagged.Count == 0) return null;
-        var events = tagged.Select(e => e.Event).ToList();
+        var (portEvents, portTexts) = BuildPortInsertion();
+        if (tagged.Count == 0 && portEvents.Count == 0) return null;
         // The controllers written: those whose fixed value is heard here (see BuildInsertion).
         var written = ActiveControllers();
+        // The rows of port B written: back to the file's values now, by the player that has them (see FinishMixerAppend).
+        ClearPortSettings(false);
+        bool onPorts = playedOnPorts;
         long position = CurrentTick();
         bool wasPlaying = state == "playing";
-        Edit(file =>
-        {
-            int place = MidiEventEdits.Insert(file, track, index, tick, events, replaced);
-            return (track, place + events.Count - 1);   // the last event written: selected
-        }, position, false);
+        var all = tagged.Select(e => (Port: 0, e.Channel, e.Event)).Concat(portEvents).ToList();
+        // Selected: the last event written at the place chosen.
+        Edit(file => MidiEventEdits.InsertSettings(file, track, index, tick, all, replaced, onPorts), position, false);
         // The file's values as they are now at the position (with the events written), sent as the settings are freed.
         RebuildFileState(editedFile, position, CurrentStandard);
         ClearWrittenSettings(written);
         Mixer.Refresh();
         Effects.Refresh();
         if (wasPlaying) { playback.Start(); SetState("playing"); UpdateNumbers(); }
-        return description;
+        return string.Join(" · ", new[] { description }.Concat(portTexts).Where(s => s != ""));
     }
 
     // The settings of the whole track (blue values, forced mode) become events of its copy, as the save writes them
@@ -75,12 +80,60 @@ public sealed partial class MainViewModel
         if (wasPlaying) { playback.Start(); SetState("playing"); UpdateNumbers(); }
     }
 
-    // Append / Replace cancelled: the settings in blue go back to the file's values (sent).
+    // Append / Replace cancelled: the settings in blue go back to the file's values (sent), those of the rows of port B too.
     public void DropFixed()
     {
         ClearWrittenSettings();
+        ClearPortSettings(true);
         Mixer.Refresh();
         Effects.Refresh();
+    }
+
+    // Events of the settings in blue of the rows of the other MIDI ports (B1-B16, see OtherPortsPlayer), as BuildInsertion:
+    // per channel the instrument chosen for the passage played, then the controllers whose fixed value is heard here.
+    // Port: the one of the event, to write it in a track of that port; texts: "ch B3: …".
+    (List<(int Port, int Channel, MidiEvent Event)> Events, List<string> Texts) BuildPortInsertion()
+    {
+        var events = new List<(int Port, int Channel, MidiEvent Event)>();
+        var texts = new List<string>();
+        if (!playedOnPorts || otherPorts is not { } player) return (events, texts);
+        static ControlChangeEvent Cc(int c, int number, int value) =>
+            new((SevenBitNumber)(byte)number, (SevenBitNumber)(byte)value) { Channel = (FourBitNumber)(byte)c };
+        for (int port = 1; port < OtherPortsPlayer.Ports; port++)
+            for (int c = 0; c < 16; c++)
+            {
+                var parts = new List<string>();
+                if (PortInstruments.Of(port, c, player.Passage(port, c)) is var (msb, lsb, program))
+                {
+                    events.Add((port, c, Cc(c, 0, msb)));
+                    events.Add((port, c, Cc(c, 32, lsb)));
+                    events.Add((port, c, new ProgramChangeEvent((SevenBitNumber)(byte)program) { Channel = (FourBitNumber)(byte)c }));
+                    parts.Add(Mixer.OtherInstrumentName(port, c));
+                }
+                for (int k = 0; k < MixerViewModel.ControllerCount; k++)
+                {
+                    if (!player.IsFixedActive(port, c, k) || PortControllers.Of(port, c, k) is not { } f) continue;
+                    events.Add((port, c, Cc(c, ChannelMixer.ControllerNumbers[k], f.Value)));
+                    if (k == ChannelMixer.PortamentoTime) events.Add((port, c, Cc(c, ChannelMixer.PortamentoSwitch, ChannelMixer.PortamentoSwitchFor(f.Value))));
+                    parts.Add($"{MixerViewModel.ControllerNames[k]} {MixerViewModel.FormatControllerValue(k, f.Value)}");
+                }
+                if (parts.Count > 0) texts.Add($"ch {(char)('A' + port)}{c + 1}: {string.Join(", ", parts)}");
+            }
+        return (events, texts);
+    }
+
+    // The settings of the rows of port B back to the file's values, sent by the player of the other ports (stores cleared
+    // without it): the instruments chosen (all passages, as ClearWrittenSettings), the fixed values heard at the position
+    // (those written by BuildPortInsertion; all: every fixed value, an Append / Replace cancelled).
+    void ClearPortSettings(bool all)
+    {
+        var player = otherPorts;
+        foreach (var (port, c) in PortInstruments.All().Select(x => (x.Port, x.Channel)).Distinct().ToList())
+            if (player != null) player.ClearInstrument(port, c, true);
+            else PortInstruments.Remove(port, c, InstrumentPassages.First, true);
+        foreach (var f in PortControllers.All())
+            if (player == null) PortControllers.Remove(f.Port, f.Channel, f.K);
+            else if (all || player.IsFixedActive(f.Port, f.Channel, f.K)) player.ClearController(f.Port, f.Channel, f.K);
     }
 
     // Controllers whose fixed value replaces the file's at the position (not those fixed until a first change already

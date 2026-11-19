@@ -100,15 +100,58 @@ public static class MidiEventEdits
     }
 
     // The track (from 1) of the events of a channel: the first one with notes on it, otherwise with other events of it,
-    // otherwise the first track.
-    public static int TrackOfChannel(MidiFile file, int channel)
+    // otherwise the first track. among: the tracks to choose from (null: all), e.g. those of one MIDI port of a file
+    // played on several ports (see MidiPorts); none of them with events of the channel: the first of them.
+    public static int TrackOfChannel(MidiFile file, int channel, Func<TrackChunk, bool> among = null)
     {
         var chunks = file.GetTrackChunks().ToList();
+        bool Accepted(TrackChunk chunk) => among == null || among(chunk);
         int Find(Func<ChannelEvent, bool> kind) =>
-            chunks.FindIndex(c => c.Events.OfType<ChannelEvent>().Any(e => e.Channel == channel && kind(e))) + 1;
+            chunks.FindIndex(c => Accepted(c) && c.Events.OfType<ChannelEvent>().Any(e => e.Channel == channel && kind(e))) + 1;
         int track = Find(e => e is NoteOnEvent);
         if (track == 0) track = Find(_ => true);
+        if (track == 0) track = chunks.FindIndex(Accepted) + 1;
         return track > 0 ? track : 1;
+    }
+
+    // Events of settings at a position (Append / Replace, see MainViewModel.Insert.cs), each with its MIDI port (0: the
+    // first one, see MidiPorts) and channel (-1: an effect, not one of a channel). onPorts: a file played on several MIDI
+    // ports, whose settings go into tracks of their port (one of port A in a track of port B would act on port B).
+
+    // Each channel in the track of its events (see TrackOfChannel), after the other events there and before its notes;
+    // the effects in the first track. In the order given, track by track (GroupBy keeps the order of the first event of
+    // each track). Returns the place of the first one written (null: none).
+    public static (int Track, int Index)? InsertByChannel(MidiFile file, long time, IEnumerable<(int Port, int Channel, MidiEvent Event)> events,
+                                                          bool onPorts)
+    {
+        Func<TrackChunk, bool> TracksOf(int port) => onPorts ? chunk => MidiPorts.TrackPort(chunk) == port : null;
+        (int Track, int Index)? first = null;
+        foreach (var group in events.GroupBy(e => e.Channel < 0 ? 1 : TrackOfChannel(file, e.Channel, TracksOf(e.Port))))
+        {
+            int place = InsertBeforeNotes(file, group.Key, time, group.Select(e => e.Event).ToList());
+            first ??= (group.Key, place);
+        }
+        return first;
+    }
+
+    // At a place chosen in a track (see Insert: after the event at index, or instead of the events replaced), those of the
+    // port of that track; the others as InsertByChannel. None of that port: the events replaced stay. Returns the place
+    // of the last one written there, otherwise of the first one written elsewhere (null: none).
+    public static (int Track, int Index)? InsertSettings(MidiFile file, int track, int index, long time,
+                                                         IReadOnlyList<(int Port, int Channel, MidiEvent Event)> events,
+                                                         IEnumerable<(int Track, int Index)> replaced, bool onPorts)
+    {
+        int port = onPorts ? MidiPorts.TrackPort(Track(file, track)) : 0;
+        var here = events.Where(e => e.Port == port).Select(e => e.Event).ToList();
+        (int Track, int Index)? last = null;
+        if (here.Count > 0)
+        {
+            // First: it deletes the events replaced, whose places the other insertions could move.
+            int place = Insert(file, track, index, time, here, replaced);
+            last = (track, place + here.Count - 1);
+        }
+        var first = InsertByChannel(file, time, events.Where(e => e.Port != port), onPorts);
+        return last ?? first;
     }
 
     // Inserts events at a position of a track: right after the event at index (-1: before the events already there).

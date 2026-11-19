@@ -257,6 +257,67 @@ public class MidiPortsTests
     }
 
     [Fact]
+    public void Track_of_channel_among_tracks_of_a_port()
+    {
+        var midi = TwoPorts();   // tracks: 1 tempo, 2 port 0, 3 port 1; channel 1 in tracks 2 and 3
+        Func<TrackChunk, bool> Port(int p) => chunk => MidiPorts.TrackPort(chunk) == p;
+        Assert.Equal(2, MidiEventEdits.TrackOfChannel(midi, 0));
+        Assert.Equal(2, MidiEventEdits.TrackOfChannel(midi, 0, Port(0)));
+        Assert.Equal(3, MidiEventEdits.TrackOfChannel(midi, 0, Port(1)));
+        // A channel with no event: the first track of the port.
+        Assert.Equal(1, MidiEventEdits.TrackOfChannel(midi, 5, Port(0)));
+        Assert.Equal(3, MidiEventEdits.TrackOfChannel(midi, 5, Port(1)));
+    }
+
+    static List<(int Port, int Channel, MidiEvent Event)> Settings(params (int Port, int Channel, MidiEvent Event)[] events) => events.ToList();
+
+    [Fact]
+    public void Append_of_Mixer_writes_settings_of_each_port_in_its_tracks()
+    {
+        // Volume of A1, instrument of B1, at 48: each before the notes there, in the track of its channel and port.
+        var midi = TwoPorts();
+        var first = MidiEventEdits.InsertByChannel(midi, 48, Settings((0, 0, Cc(0, 7, 20)), (1, 0, Pc(0, 50))), true);
+        var tracks = midi.GetTrackChunks().ToList();
+        Assert.Equal((2, 3), first);
+        var a = tracks[1].GetTimedEvents().ToList();
+        Assert.Equal((48L, 20), (a[3].Time, (int)((ControlChangeEvent)a[3].Event).ControlValue));
+        var b = tracks[2].GetTimedEvents().ToList();
+        Assert.Equal((48L, 50), (b[3].Time, (int)((ProgramChangeEvent)b[3].Event).ProgramNumber));
+        Assert.IsType<NoteOnEvent>(b[4].Event);
+    }
+
+    [Fact]
+    public void Append_at_event_of_port_B_writes_settings_of_port_A_in_its_tracks()
+    {
+        // After the Note On of track 3 (port B, index 3, at 48): instrument and volume of B1 there, the last one selected;
+        // the volume of A1 at the same position in the track of channel 1 of port A.
+        var midi = TwoPorts();
+        var selected = MidiEventEdits.InsertSettings(midi, 3, 3, 48, Settings((0, 0, Cc(0, 7, 20)), (1, 0, Pc(0, 50)), (1, 0, Cc(0, 7, 30))),
+                                                     Array.Empty<(int, int)>(), true);
+        var tracks = midi.GetTrackChunks().ToList();
+        Assert.Equal((3, 5), selected);
+        var b = tracks[2].GetTimedEvents().ToList();
+        Assert.IsType<NoteOnEvent>(b[3].Event);
+        Assert.Equal((48L, 50), (b[4].Time, (int)((ProgramChangeEvent)b[4].Event).ProgramNumber));
+        Assert.Equal((48L, 30), (b[5].Time, (int)((ControlChangeEvent)b[5].Event).ControlValue));
+        var a = Assert.Single(tracks[1].GetTimedEvents(), t => t.Event is ControlChangeEvent);
+        Assert.Equal((48L, 20), (a.Time, (int)((ControlChangeEvent)a.Event).ControlValue));
+
+        // Replace of the Program Change of track 3 with a setting of A1 only: it stays (nothing of port B to put there).
+        midi = TwoPorts();
+        selected = MidiEventEdits.InsertSettings(midi, 3, 1, 0, Settings((0, 0, Cc(0, 7, 20))), new[] { (3, 1) }, true);
+        tracks = midi.GetTrackChunks().ToList();
+        Assert.Equal((2, 2), selected);
+        Assert.Equal(40, (int)tracks[2].Events.OfType<ProgramChangeEvent>().Single().ProgramNumber);
+
+        // A file played on one port: all of them at the place chosen, as before.
+        midi = TwoPorts();
+        selected = MidiEventEdits.InsertSettings(midi, 3, 3, 48, Settings((0, 0, Cc(0, 7, 20)), (0, 5, Cc(5, 10, 64))), Array.Empty<(int, int)>(), false);
+        Assert.Equal((3, 5), selected);
+        Assert.Empty(midi.GetTrackChunks().ElementAt(1).Events.OfType<ControlChangeEvent>());
+    }
+
+    [Fact]
     public void Save_writes_settings_of_each_port_in_its_tracks()
     {
         var midi = TwoPorts();
