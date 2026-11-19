@@ -1067,7 +1067,7 @@ public sealed partial class MainViewModel : ObservableObject
         // A file on several MIDI ports: their channels with the SoundFont engine, merged on a module.
         if (MidiPorts.HasOtherPorts(midi))
         {
-            int last = Math.Min(midi.GetTrackChunks().Max(MidiPorts.TrackPort), SoundFontOutput.Channels / 16 - 1);
+            int last = Math.Min(midi.GetTrackChunks().Max(MidiPorts.PortsOf(midi)), SoundFontOutput.Channels / 16 - 1);
             var ports = last == 1 ? "Port B" : $"Ports B-{(char)('A' + last)}";
             parts.Add(otherPorts != null ? $"{ports} on SoundFont channels 17-{16 * (last + 1)}" + (last > 1 ? " (Mixer: port B only)" : "")
                                          : "File on several MIDI ports: merged on 16 channels");
@@ -1105,9 +1105,10 @@ public sealed partial class MainViewModel : ObservableObject
             // from the tracks of that port.
             var file = midi;
             bool followResets = !ChannelMixer.ForceMode;
-            portPassages = midi.GetTrackChunks().Select(MidiPorts.TrackPort).Where(p => p > 0).Distinct()
-                .ToDictionary(p => p, p => new PortPassages(InstrumentPassages.Read(file, followResets, chunk => MidiPorts.TrackPort(chunk) == p),
-                                                            ControllerPassages.Read(file, followResets, chunk => MidiPorts.TrackPort(chunk) == p)));
+            var portOf = MidiPorts.PortsOf(midi);
+            portPassages = midi.GetTrackChunks().Select(portOf).Where(p => p > 0).Distinct()
+                .ToDictionary(p => p, p => new PortPassages(InstrumentPassages.Read(file, followResets, chunk => portOf(chunk) == p),
+                                                            ControllerPassages.Read(file, followResets, chunk => portOf(chunk) == p)));
             (midi, others) = MidiPorts.Split(midi);
         }
         var pb = midi.GetPlayback(output);

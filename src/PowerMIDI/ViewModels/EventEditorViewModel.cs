@@ -320,9 +320,10 @@ public sealed class EventEditorViewModel : ObservableObject
         }
         if (byPort)
         {
-            // The rows of the other ports (see OtherPortsPlayer): no drum part to choose, the 10th channel plays drums.
+            // The rows of the other ports (see OtherPortsPlayer): no drum part to choose, the file's (the 10th channel, and
+            // those of its GS Use for Rhythm Part).
             foreach (var (port, c, passage, msb, lsb, program) in PortInstruments.All())
-                yield return (port, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, c == 9 ? 1 : 0));
+                yield return (port, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, editing.OtherPorts?.Rhythm(port, c) ?? (c == 9 ? 1 : 0)));
             foreach (var (port, c, k, value, wholeTrack) in PortControllers.All())
                 yield return (port, c, "Mixer", ControllerSetting(k, value, wholeTrack));
         }

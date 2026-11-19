@@ -151,7 +151,8 @@ public sealed class SoundFontOutput : IOutputDevice
 
     public void SendEvent(MidiEvent midiEvent) => SendEvent(midiEvent, 0);
 
-    // An event of a MIDI port: its channel moved by 16 per port (port 1: channels 17-32).
+    // An event of a MIDI port: its channel moved by 16 per port (port 1: channels 17-32); a SysEx keeps its port (see
+    // PlaySysEx).
     public void SendEvent(MidiEvent midiEvent, int port)
     {
         if (port < 0 || port >= Channels / 16) return;
@@ -168,13 +169,16 @@ public sealed class SoundFontOutput : IOutputDevice
             case PitchBendEvent pb: item = new(Kind.PitchBend, pb.Channel, 0, pb.PitchValue); break;
             case ChannelAftertouchEvent at: item = new(Kind.ChannelPressure, at.Channel, 0, at.AftertouchValue); break;
             case NoteAftertouchEvent nat: item = new(Kind.KeyPressure, nat.Channel, nat.NoteNumber, nat.AftertouchValue); break;
-            case NormalSysExEvent sysEx when sysEx.Data is { Length: > 0 } data: item = new(Kind.SysEx, 0, 0, 0, data); break;
+            case NormalSysExEvent sysEx when sysEx.Data is { Length: > 0 } data: item = new(Kind.SysEx, (byte)port, 0, 0, data); break;
             default: return;
         }
         if (offset > 0 && item.Kind != Kind.SysEx) item = item with { Channel = (byte)(item.Channel + offset) };
         lock (gate)
         {
             if (sequencer == IntPtr.Zero) return;
+            // A mode reset: counted when sent (see Resets), before anything sent after it.
+            if (item.Kind == Kind.SysEx && IsModeReset(item.SysEx, item.SysEx[^1] == 0xF7 ? item.SysEx.Length - 1 : item.SysEx.Length))
+                Interlocked.Increment(ref resets);
             uint at = Date();
             long id;
             lock (pending)
@@ -250,7 +254,7 @@ public sealed class SoundFontOutput : IOutputDevice
                     case Kind.PitchBend: fluid_synth_pitch_bend(s, e.Channel, e.Data2); break;
                     case Kind.ChannelPressure: fluid_synth_channel_pressure(s, e.Channel, e.Data2); break;
                     case Kind.KeyPressure: fluid_synth_key_pressure(s, e.Channel, e.Data1, e.Data2); break;
-                    case Kind.SysEx: PlaySysEx(e.SysEx); break;
+                    case Kind.SysEx: PlaySysEx(e.SysEx, e.Channel); break;
                 }
         }
         catch { }
@@ -262,12 +266,16 @@ public sealed class SoundFontOutput : IOutputDevice
     //   would switch its bank style to that mode's (XG: bank = bank LSB; GM: banks ignored), and the bank of the
     //   SoundFont presets chosen in the Mixer (bank MSB) would no longer be found. The style stays GS (bank = MSB, the
     //   style of most SoundFonts; a drum channel plays the kits of bank 128).
-    // Number of mode resets played so far: the player of the other MIDI ports (OtherPortsPlayer) sends the settings of
-    // their channels again after one (the reset has set all the channels of the engine back).
+    // - A SysEx of a part of another port (port above 0, see MidiPorts.GsPart): FluidSynth would set the part of the first
+    //   port (it knows only channels 1-16 in SysEx). Its Use for Rhythm Part is played here, as FluidSynth plays it on
+    //   the first port; the others are ignored.
+    // Number of mode resets sent so far (counted when sent: anything sent after one plays after it): the player of the
+    // other MIDI ports (OtherPortsPlayer) sends the state and settings of their channels again after one (the reset sets
+    // all the channels of the engine back).
     int resets;
     public int Resets => Volatile.Read(ref resets);
 
-    void PlaySysEx(byte[] data)
+    void PlaySysEx(byte[] data, int port)
     {
         var s = synth;
         if (s == IntPtr.Zero) return;
@@ -283,12 +291,35 @@ public sealed class SoundFontOutput : IOutputDevice
             fluid_synth_system_reset(s);
             SetDrumChannels(s);
             ApplyEffects(s);   // the reverb and chorus chosen stay
-            Interlocked.Increment(ref resets);
+            return;
+        }
+        if (port > 0)
+        {
+            PlayRhythmPart(s, data, length, port);
             return;
         }
         if (length < 1) return;
         var message = length == data.Length ? data : data[..length];
         fluid_synth_sysex(s, message, message.Length, IntPtr.Zero, IntPtr.Zero, out _, 0);
+    }
+
+    // GS Use for Rhythm Part (41 dd 42 12 40 1x 15 vv sum) of a channel of another port, as FluidSynth plays it on the
+    // first port (fluid_synth_sysex_gs_dt1, version 2.6): device 16 or all (7F), one value of 0-2, a right checksum; the
+    // channel then normal (0) or drums, its controllers reset (CC121), bank 0 or the drum bank, program 1.
+    static void PlayRhythmPart(IntPtr s, byte[] data, int length, int port)
+    {
+        if (length != 9 || data[1] is not (0x10 or 0x7F) || data[7] > 2) return;
+        int channel = ChannelMixer.RhythmPartChannel(data);
+        int sum = 0;
+        for (int i = 4; i < 8; i++) sum += data[i];
+        if (channel < 0 || (128 - sum % 128) % 128 != data[8]) return;
+        bool drums = data[7] > 0;
+        channel += 16 * port;
+        if (channel >= Channels) return;
+        fluid_synth_set_channel_type(s, channel, drums ? 1 : 0);
+        fluid_synth_cc(s, channel, 121, 0);
+        fluid_synth_bank_select(s, channel, drums ? InstrumentDefinitions.Sf2DrumBank : 0);
+        fluid_synth_program_change(s, channel, 0);
     }
 
     // ---------- Sound controllers (CC71-78) ----------

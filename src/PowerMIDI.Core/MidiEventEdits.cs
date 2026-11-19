@@ -124,7 +124,8 @@ public static class MidiEventEdits
     public static (int Track, int Index)? InsertByChannel(MidiFile file, long time, IEnumerable<(int Port, int Channel, MidiEvent Event)> events,
                                                           bool onPorts)
     {
-        Func<TrackChunk, bool> TracksOf(int port) => onPorts ? chunk => MidiPorts.TrackPort(chunk) == port : null;
+        var portOf = MidiPorts.PortsOf(file);   // read before the events are written
+        Func<TrackChunk, bool> TracksOf(int port) => onPorts ? chunk => portOf(chunk) == port : null;
         (int Track, int Index)? first = null;
         foreach (var group in events.GroupBy(e => e.Channel < 0 ? 1 : TrackOfChannel(file, e.Channel, TracksOf(e.Port))))
         {
@@ -141,7 +142,7 @@ public static class MidiEventEdits
                                                          IReadOnlyList<(int Port, int Channel, MidiEvent Event)> events,
                                                          IEnumerable<(int Track, int Index)> replaced, bool onPorts)
     {
-        int port = onPorts ? MidiPorts.TrackPort(Track(file, track)) : 0;
+        int port = onPorts ? MidiPorts.PortsOf(file)(Track(file, track)) : 0;
         var here = events.Where(e => e.Port == port).Select(e => e.Event).ToList();
         (int Track, int Index)? last = null;
         if (here.Count > 0)

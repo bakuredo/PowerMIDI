@@ -10,18 +10,22 @@ namespace PowerMIDI.Core;
 // controllers (ControllerPassages), read on the tracks of that port.
 public sealed record PortPassages(InstrumentPassages Instruments, ControllerPassages Controllers);
 
-// Plays the channel events of the other MIDI ports of a file (MidiPorts.Split) on the SoundFont engine's channels above
-// 16 (port 1: channels 17-32…), following the playback of the rest of the file: its position (ticks), whether it runs,
-// its speed. The playback itself is not changed: it plays the first port with the Mixer as usual; this player only
-// looks at it, every millisecond, on a thread of its own:
+// Plays the events of the other MIDI ports of a file (MidiPorts.Split: their channel events and the GS SysEx of their
+// parts) on the SoundFont engine's channels above 16 (port 1: channels 17-32…), following the playback of the rest of
+// the file: its position (ticks), whether it runs, its speed. The playback itself is not changed: it plays the first
+// port with the Mixer as usual; this player only looks at it, every millisecond, on a thread of its own:
 // - running: the events up to the position are sent (notes transposed as the others, except on drum channels: the
-//   10th of each port);
+//   10th of each port, and those a GS Use for Rhythm Part has made drum parts);
 // - stopped or paused: the notes of the other ports are released;
 // - the position jumps (seek, loop, pause then seek): their sounds are cut, and their state at the new position
-//   (bank, program, controllers, RPN, pitch bend, channel pressure) is sent again, as a module would have it there.
+//   (drum part, bank, program, controllers, RPN, pitch bend, channel pressure) is sent again, as a module would have
+//   it there.
 // The settings of the Mixer replace the file's, as on the first port: the instruments chosen (PortInstruments, by
 // passage) and the controller values fixed (PortControllers, in the first passage of their controller or in the whole
-// track). After a mode reset of the engine they are sent again, with the mutes.
+// track). A mode reset sent to the engine (by the playback of the first port: the file's, or one of the interface) sets
+// all its channels back: the state of the other ports from the events sent so far is sent again after it, with the
+// settings of the Mixer and the mutes. Sent by another thread, a reset at the time of their first events could
+// otherwise come after them, and leave them with the default instruments.
 public sealed class OtherPortsPlayer : IDisposable
 {
     readonly IReadOnlyList<PortEvent> events;
@@ -30,9 +34,10 @@ public sealed class OtherPortsPlayer : IDisposable
     readonly Action<MidiEvent, int> send;                                // an event and its port
     readonly Func<int> transpose;                                        // semitones of the transposition (Pitch slider)
     readonly IReadOnlyDictionary<int, PortPassages> passages;            // per port (null: one passage per channel)
-    readonly Func<int> resets;                                           // mode resets played by the engine so far (null: not followed)
+    readonly Func<int> resets;                                           // mode resets sent to the engine so far (null: not followed)
     int lastResets;
     readonly (int Port, int Channel)[] channels;                         // the channels the events use
+    readonly (int Port, int Channel)[] rhythmChannels;                   // the channels a Use for Rhythm Part of the events sets
     readonly Dictionary<(int Port, int Channel, int Key), Queue<int>> sounding = new();   // note → key sent (transposed)
     readonly Thread thread;
     volatile bool stopping;
@@ -51,6 +56,8 @@ public sealed class OtherPortsPlayer : IDisposable
         this.resets = resets;
         lastResets = resets?.Invoke() ?? 0;
         channels = events.Where(e => e.Event is ChannelEvent).Select(e => (e.Port, (int)((ChannelEvent)e.Event).Channel)).Distinct().ToArray();
+        rhythmChannels = events.Select(RhythmOf).OfType<(int Port, int Channel, int Value)>().Select(r => (r.Port, r.Channel)).Distinct().ToArray();
+        ResetRhythm();
         thread = new Thread(Run) { IsBackground = true, Name = "Other MIDI ports", Priority = ThreadPriority.AboveNormal };
         thread.Start();
     }
@@ -67,6 +74,7 @@ public sealed class OtherPortsPlayer : IDisposable
     readonly int[,,] controls = NewControls();
     readonly long[,] lastNoteOn = new long[Ports, 16];
     readonly bool[,] used = new bool[Ports, 16], muted = new bool[Ports, 16];
+    readonly int[,] rhythm = new int[Ports, 16];   // GS drum part (0: normal part), see ResetRhythm
 
     static int[,,] NewControls()
     {
@@ -77,7 +85,24 @@ public sealed class OtherPortsPlayer : IDisposable
 
     static bool Valid(int port, int channel) => port >= 0 && port < Ports && channel >= 0 && channel < 16;
 
+    // Drum part of a channel after a reset: the 10th of each port plays drums (see SoundFontOutput.SetDrumChannels).
+    static int DefaultRhythm(int channel) => channel == 9 ? 1 : 0;
+
+    void ResetRhythm()
+    {
+        for (int p = 0; p < Ports; p++) for (int c = 0; c < 16; c++) Volatile.Write(ref rhythm[p, c], DefaultRhythm(c));
+    }
+
+    // A GS Use for Rhythm Part (at address 40: for a part of the port it is sent to, see MidiPorts.Split): its channel
+    // and value; among the events, with its port.
+    static (int Channel, int Value)? RhythmPartOf(MidiEvent e) =>
+        e is SysExEvent sx && ChannelMixer.RhythmPartChannel(sx.Data) is int c and >= 0 && sx.Data.Length > 7 ? (c, sx.Data[7]) : null;
+
+    static (int Port, int Channel, int Value)? RhythmOf(PortEvent e) => RhythmPartOf(e.Event) is { } r ? (e.Port, r.Channel, r.Value) : null;
+
     public bool IsUsed(int port, int channel) => Valid(port, channel) && Volatile.Read(ref used[port, channel]);
+    // Drum part of a channel (GS Use for Rhythm Part: 0 normal part, 1 / 2 drum part; the 10th channel: 1 by default).
+    public int Rhythm(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref rhythm[port, channel]) : 0;
     public int Program(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref program[port, channel]) : 0;
     public int BankMsb(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref bankMsb[port, channel]) : 0;
     public int BankLsb(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref bankLsb[port, channel]) : 0;
@@ -159,18 +184,13 @@ public sealed class OtherPortsPlayer : IDisposable
         FixedAt(port, channel, ChannelMixer.PortamentoTime, tick) is int time ? ChannelMixer.PortamentoSwitchFor(time)
                                                                                : Math.Max(Control(port, channel, ChannelMixer.PortamentoSwitch), 0);
 
-    // After a mode reset of the engine (all its channels set back): the settings of the Mixer on these channels again.
-    void Reapply(long tick)
+    // After a mode reset of the engine (all its channels set back, the drum parts too): the state of the channels from
+    // the events sent so far, and the settings of the Mixer, again (see SendState).
+    void AfterReset()
     {
-        foreach (var (port, channel) in channels)
-        {
-            if (!Valid(port, channel)) continue;
-            if (ChosenAt(port, channel, tick) is { } choice) SendInstrument(port, channel, choice, true);
-            else Volatile.Write(ref choiceSent[port, channel], false);
-            if (IsMuted(port, channel)) ApplyController(port, channel, ChannelMixer.Volume, tick);
-        }
-        foreach (var f in PortControllers.All())
-            if (Valid(f.Port, f.Channel) && FixedAt(f.Port, f.Channel, f.K, tick) != null) ApplyController(f.Port, f.Channel, f.K, tick);
+        ResetRhythm();
+        for (int p = 0; p < Ports; p++) for (int c = 0; c < 16; c++) Volatile.Write(ref choiceSent[p, c], false);
+        SendState(next, lastTick + 1);
     }
 
     // ---------- Instruments chosen in the Mixer ----------
@@ -221,6 +241,17 @@ public sealed class OtherPortsPlayer : IDisposable
     // first program change or note, as on the first port (ChannelMixer.Used).
     void Out(MidiEvent e, int port)
     {
+        // A drum part set or taken away: the engine sets the bank and program of the channel back too (see
+        // SoundFontOutput.PlayRhythmPart).
+        if (RhythmPartOf(e) is { } part && Valid(port, part.Channel))
+        {
+            int c = part.Channel;
+            Volatile.Write(ref rhythm[port, c], part.Value);
+            Volatile.Write(ref program[port, c], 0);
+            Volatile.Write(ref bankMsb[port, c], 0);
+            Volatile.Write(ref bankLsb[port, c], 0);
+            Volatile.Write(ref choiceSent[port, c], false);
+        }
         if (e is ChannelEvent ce && Valid(port, ce.Channel))
         {
             int c = ce.Channel;
@@ -286,12 +317,13 @@ public sealed class OtherPortsPlayer : IDisposable
                 catch (ObjectDisposedException) { now = null; }
                 if (now is not { } p) break;
                 Look(p.Running, p.Tick, p.Speed);
-                // A mode reset played by the engine since the last look: the settings of the Mixer again.
-                int played = resets?.Invoke() ?? 0;
-                if (played != lastResets)
+                // A mode reset sent to the engine since the last look: the state of the channels and the settings of the
+                // Mixer again.
+                int sent = resets?.Invoke() ?? 0;
+                if (sent != lastResets)
                 {
-                    lastResets = played;
-                    Reapply(p.Tick);
+                    lastResets = sent;
+                    AfterReset();
                 }
                 Thread.Sleep(1);
             }
@@ -339,7 +371,7 @@ public sealed class OtherPortsPlayer : IDisposable
         {
             case NoteOnEvent on when on.Velocity > 0:
             {
-                int key = TransposedKey(on.Channel, on.NoteNumber);
+                int key = TransposedKey(e.Port, on.Channel, on.NoteNumber);
                 var id = (e.Port, (int)on.Channel, (int)on.NoteNumber);
                 if (!sounding.TryGetValue(id, out var keys)) sounding[id] = keys = new Queue<int>();
                 keys.Enqueue(key);
@@ -359,14 +391,14 @@ public sealed class OtherPortsPlayer : IDisposable
     void NoteOff(int port, FourBitNumber channel, SevenBitNumber note, SevenBitNumber velocity)
     {
         var id = (port, (int)channel, (int)note);
-        int key = sounding.TryGetValue(id, out var keys) && keys.Count > 0 ? keys.Dequeue() : TransposedKey(channel, note);
+        int key = sounding.TryGetValue(id, out var keys) && keys.Count > 0 ? keys.Dequeue() : TransposedKey(port, channel, note);
         Out(new NoteOffEvent((SevenBitNumber)key, velocity) { Channel = channel }, port);
     }
 
-    int TransposedKey(FourBitNumber channel, SevenBitNumber note)
+    int TransposedKey(int port, FourBitNumber channel, SevenBitNumber note)
     {
         int semitones = transpose();
-        if (semitones == 0 || channel == 9) return note;   // the drums are not transposed
+        if (semitones == 0 || Rhythm(port, channel) > 0) return note;   // the drums are not transposed
         int key = note + semitones;
         while (key > 127) key -= 12;
         while (key < 0) key += 12;
@@ -398,15 +430,28 @@ public sealed class OtherPortsPlayer : IDisposable
         sounding.Clear();
     }
 
-    // To a new position: the state of each channel there (the events before it), then the events from it on. The
-    // instruments chosen for the passages there are sent, also on channels whose program the file has not set yet; a
-    // channel the engine plays a chosen instrument on, with no choice there, gets the file's back.
+    // To a new position: the state of each channel there (the events before it), then the events from it on.
     void MoveTo(long tick)
     {
         int index = 0;
         while (index < events.Count && events[index].Tick < tick) index++;
         next = index;
+        SendState(index, tick);
+    }
+
+    // The state of each channel after the events before index (the position: tick). The drum parts first (one sets the
+    // bank and program of its channel back), where the engine has another one. The instruments chosen for the passages
+    // there are sent, also on channels whose program the file has not set yet; a channel the engine plays a chosen
+    // instrument on, with no choice there, gets the file's back. Muted channels: their volume at 0 (back to its default
+    // after a reset).
+    void SendState(int index, long tick)
+    {
         eventTick = tick - 1;   // the state: the passages in effect just before the position
+        var parts = rhythmChannels.ToDictionary(r => r, r => DefaultRhythm(r.Channel));
+        foreach (var e in events.Take(index))
+            if (RhythmOf(e) is { } r) parts[(r.Port, r.Channel)] = r.Value;
+        foreach (var ((port, channel), value) in parts)
+            if (Valid(port, channel) && Rhythm(port, channel) != value) Out(ChannelMixer.RhythmPartEvent(channel, value), port);
         var programmed = new HashSet<(int, int)>();
         foreach (var e in State(events.Take(index)))
         {
@@ -427,10 +472,13 @@ public sealed class OtherPortsPlayer : IDisposable
         // value back where the fixed one no longer replaces it.
         foreach (var f in PortControllers.All())
             if (Valid(f.Port, f.Channel)) ApplyController(f.Port, f.Channel, f.K, tick - 1);
+        foreach (var (port, channel) in channels)
+            if (IsMuted(port, channel)) ApplyController(port, channel, ChannelMixer.Volume, tick - 1);
     }
 
     // State of the channels after events: bank (MSB, LSB) and program, the last value of each other controller, each
-    // RPN with its last data (then the RPN selected last), the pitch bend and the channel pressure.
+    // RPN with its last data (then the RPN selected last), the pitch bend and the channel pressure (the drum parts: see
+    // SendState).
     static IEnumerable<PortEvent> State(IEnumerable<PortEvent> before)
     {
         var program = new Dictionary<(int, int), ProgramChangeEvent>();
@@ -441,7 +489,8 @@ public sealed class OtherPortsPlayer : IDisposable
         var pressure = new Dictionary<(int, int), ChannelAftertouchEvent>();
         foreach (var e in before)
         {
-            var key = (e.Port, (int)((ChannelEvent)e.Event).Channel);
+            if (e.Event is not ChannelEvent channelEvent) continue;
+            var key = (e.Port, (int)channelEvent.Channel);
             switch (e.Event)
             {
                 case ProgramChangeEvent pc: program[key] = pc; break;

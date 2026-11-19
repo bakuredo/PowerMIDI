@@ -60,7 +60,8 @@ public static class MidiFileEditor
     // wholeTrack[k][channel]: the fixed value replaces the file's in the whole track; otherwise only in the first passages
     // of the controller (see ControllerPassages). Null: whole track for all.
     // channelsOf: the tracks whose channel events the settings are for (null: all of them): a file played on several MIDI
-    // ports (see MidiPorts) gets the settings of each port in the tracks of that port only (its SysEx stay in any track).
+    // ports (see MidiPorts) gets the settings of each port in the tracks of that port only (its SysEx stay in any track;
+    // the drum parts chosen replace the Use for Rhythm Part of those tracks only).
     // port: the letter of that port in the report ("B" → "channel B3"), empty otherwise. changeSysEx: false for the
     // settings of another port than the first one, which the SysEx of the file do not act on (left as they are).
     public static string ApplyChanges(MidiFile file, IEnumerable<(int Channel, long Passage, int Msb, int Lsb, int Program)> instruments,
@@ -185,7 +186,8 @@ public static class MidiFileEditor
                     continue;
                 }
                 var sysEx = changeSysEx ? t.Event as SysExEvent : null;
-                int rhythmChannel = sysEx != null ? ChannelMixer.RhythmPartChannel(sysEx.Data) : -1;
+                // (a Use for Rhythm Part of a track of another port sets a part of that port: see MidiPorts.GsPart)
+                int rhythmChannel = sysEx != null && accepted[k] ? ChannelMixer.RhythmPartChannel(sysEx.Data) : -1;
                 if (rhythmChannel >= 0 && rhythm[rhythmChannel] >= 0)
                 {
                     removedRhythm[rhythmChannel]++;

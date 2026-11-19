@@ -110,8 +110,8 @@ public sealed partial class MainViewModel
         Status = "Keyboard mode off: port B rows hidden.";
     }
 
-    // Drum channel played: on port B, its 10th channel (as the SoundFont engine sets it).
-    bool KeyboardOnDrums => keyboardPort > 0 ? keyboardChannel == 9 : Mixer.IsDrumChannel(keyboardChannel);
+    // Drum channel played: on port B, its 10th channel (as the SoundFont engine sets it) or a drum part of the file.
+    bool KeyboardOnDrums => keyboardPort > 0 ? Mixer.IsOtherDrumChannel(keyboardPort, keyboardChannel) : Mixer.IsDrumChannel(keyboardChannel);
 
     string KeyboardHelp()
     {

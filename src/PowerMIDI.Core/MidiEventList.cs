@@ -36,7 +36,8 @@ public static class MidiEventList
     // instrumentName(channel, program, bank MSB, bank LSB, GS rhythm part): name of the instrument the channel plays.
     // describeSysEx(data): description of a SysEx (null: the generic one). byPort: a file whose MIDI ports are played
     // apart (see MidiPorts, OtherPortsPlayer): each row has the port of its track, and the channels of each port are
-    // followed on their own (instruments, RPN / NRPN, passages); the SysEx act on the first port, as they are played.
+    // followed on their own (instruments, RPN / NRPN, passages); a GS Use for Rhythm Part sets the drum part of a channel
+    // of the port it is played for (see MidiPorts.GsPart), the other SysEx act on the first port.
     public static List<MidiEventRow> Build(MidiFile file, Func<int, int, int, int, int, string> instrumentName,
                                            Func<byte[], string> describeSysEx = null, bool byPort = false)
     {
@@ -44,11 +45,12 @@ public static class MidiEventList
         // its Note On with the place and position of its Note Off (the first Note Off of the same channel and key after it).
         var objects = new List<(long Tick, int Track, int Index, MidiEvent Event, int OffIndex, long OffTick)>();
         var portOf = new List<int>();   // port of each track (the track numbered t: portOf[t - 1])
+        var portsOf = byPort ? MidiPorts.PortsOf(file) : null;
         int track = 0;
         foreach (var chunk in file.GetTrackChunks())
         {
             track++;
-            portOf.Add(byPort ? MidiPorts.TrackPort(chunk) : 0);
+            portOf.Add(byPort ? portsOf(chunk) : 0);
             var held = new Dictionary<(int, int), Queue<int>>();   // Note On waiting for their Note Off, by channel and key
             long time = 0;
             for (int i = 0; i < chunk.Events.Count; i++)
@@ -75,16 +77,17 @@ public static class MidiEventList
         // Per port: the state of its channels, the passages of its instruments (those of its tracks; the first port's for
         // the SysEx).
         var states = new Dictionary<int, PortState>();
+        PortState StateOf(int p) => states.TryGetValue(p, out var state) ? state : states[p] = new PortState();
         bool followResets = !ChannelMixer.ForceMode;
         var passages = portOf.Append(0).Distinct().ToDictionary(p => p, p =>
-            InstrumentPassages.Read(file, followResets, byPort ? chunk => MidiPorts.TrackPort(chunk) == p : null));
+            InstrumentPassages.Read(file, followResets, byPort ? chunk => portsOf(chunk) == p : null));
 
         var rows = new List<MidiEventRow>(objects.Count);
         foreach (var (tick, t, index, e, offIndex, offTick) in objects)
         {
             int port = portOf[t - 1];
             int statePort = e is ChannelEvent ? port : 0;
-            if (!states.TryGetValue(statePort, out var s)) states[statePort] = s = new PortState();
+            var s = StateOf(statePort);
             int[] msb = s.Msb, lsb = s.Lsb, program = s.Program, rhythm = s.Rhythm;
             var names = s.Names;
             long? Passage() => passages[statePort].Of(t - 1, index)?.Passage;
@@ -132,8 +135,13 @@ public static class MidiEventList
                 case SysExEvent sx:
                 {
                     var d = sx.Data;
-                    int c = ChannelMixer.RhythmPartChannel(d);
-                    if (c >= 0) (rhythm[c], names[c]) = (d[7], null);
+                    var part = byPort ? MidiPorts.RhythmPart(d, port)
+                                      : ChannelMixer.RhythmPartChannel(d) is int c and >= 0 ? (0, c, d[7]) : null;
+                    if (part is { } p)
+                    {
+                        var target = StateOf(p.Port);
+                        (target.Rhythm[p.Channel], target.Names[p.Channel]) = (p.Value, null);
+                    }
                     rows.Add(Row(-1, EventKind.SysEx, "SysEx", Hex(d), describeSysEx?.Invoke(d) ?? DescribeSysEx(d)) with { Passage = Passage() });
                     break;
                 }
@@ -222,7 +230,7 @@ public static class MidiEventList
             case ControlChangeEvent bank when (int)bank.ControlNumber is 0 or 32:
             {
                 if (row.Passage is not long passage || PortInstruments.Of(port, c, passage) is not { } chosen) return null;
-                var name = instrumentName?.Invoke(c, chosen.Program, chosen.Msb, chosen.Lsb, c == 9 ? 1 : 0);   // the 10th channel: drums
+                var name = instrumentName?.Invoke(c, chosen.Program, chosen.Msb, chosen.Lsb, ports.Rhythm(port, c));   // drums: a kit
                 return string.IsNullOrEmpty(name) ? $"Mixer: bank {chosen.Msb} / {chosen.Lsb}, PC {chosen.Program + 1}"
                                                   : $"Mixer: {name} (bank {chosen.Msb} / {chosen.Lsb}, PC {chosen.Program + 1})";
             }

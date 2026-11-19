@@ -73,6 +73,7 @@ public class MidiPortsTests
             NoteOffEvent off => $"off{off.Channel + 1}/{off.NoteNumber}",
             ProgramChangeEvent pc => $"pc{pc.Channel + 1}/{pc.ProgramNumber}",
             ControlChangeEvent cc => $"cc{cc.Channel + 1}/{cc.ControlNumber}={cc.ControlValue}",
+            SysExEvent sx when ChannelMixer.RhythmPartChannel(sx.Data) is int c and >= 0 => $"rhythm{c + 1}={sx.Data[7]}",
             _ => e.EventType.ToString(),
         };
     }
@@ -384,5 +385,169 @@ public class MidiPortsTests
         Assert.Equal(new[] { 10 }, programs[1]);   // port 0
         Assert.Equal(new[] { 20 }, programs[2]);   // port 1
         Assert.Equal(1, MidiPorts.TrackPort(midi.GetTrackChunks().ElementAt(2)));   // its port kept
+    }
+
+    // ---------- Ports named by Device Name events (FF 09) ----------
+
+    static TrackChunk Named(string device, params (long Time, MidiEvent Event)[] events)
+    {
+        var timed = events.Select(e => new TimedEvent(e.Event, e.Time)).ToList();
+        if (device != null) timed.Insert(0, new TimedEvent(new DeviceNameEvent(device), 0));
+        return timed.ToTrackChunk();
+    }
+
+    static int[] Ports(MidiFile midi)
+    {
+        var portOf = MidiPorts.PortsOf(midi);
+        return midi.GetTrackChunks().Select(portOf).ToArray();
+    }
+
+    [Fact]
+    public void Device_names_set_ports_of_tracks_whose_channels_collide()
+    {
+        // Two outputs of a module: by the last word of their names (B first in the file); a track without one: port A.
+        var midi = new MidiFile(Track(null, (0, new SetTempoEvent(500000))),
+                                Named("Roland SC-8850 PART B", (0, Pc(0, 40))), Named("Roland SC-8850 PART A", (0, Pc(0, 5))));
+        Assert.Equal(new[] { 0, 1, 0 }, Ports(midi));
+        Assert.True(MidiPorts.HasOtherPorts(midi));
+        var (_, others) = MidiPorts.Split(midi);
+        Assert.Equal((1, 40), (others.Single().Port, (int)((ProgramChangeEvent)others.Single().Event).ProgramNumber));
+        Assert.True(MidiPorts.TracksOf(midi, 1)(midi.GetTrackChunks().ElementAt(1)));
+
+        // Names without a port letter: in the order they come in, after the tracks without one.
+        midi = new MidiFile(Named(null, (0, Pc(0, 1))), Named("Synth", (0, Pc(0, 2))), Named("Wavetable", (0, Pc(0, 3))));
+        Assert.Equal(new[] { 0, 1, 2 }, Ports(midi));
+
+        // One port: the channels of the names apart (nothing collides); more names than the engine has ports (instrument
+        // names, for example); a file with MIDI Port events (they decide).
+        midi = new MidiFile(Named("Out A", (0, Pc(0, 1))), Named("Out B", (0, Pc(1, 2))));
+        Assert.False(MidiPorts.HasOtherPorts(midi));
+        midi = new MidiFile(Enumerable.Range(0, 5).Select(i => Named($"Voice {i}x", (0, Pc(0, i)))));
+        Assert.False(MidiPorts.HasOtherPorts(midi));
+        midi = new MidiFile(Named("Out A", (0, Pc(0, 1))), Named("Out B", (0, Pc(0, 2))));
+        Assert.True(MidiPorts.HasOtherPorts(midi));
+        midi.GetTrackChunks().First().Events.Insert(0, new PortPrefixEvent(0));
+        Assert.False(MidiPorts.HasOtherPorts(midi));
+    }
+
+    // ---------- GS SysEx of the parts of a port ----------
+
+    // Use for Rhythm Part of a channel at an address (40, or 50: a part of the other one of ports A and B).
+    static NormalSysExEvent RhythmPart(int address, int channel, int value)
+    {
+        var data = ChannelMixer.RhythmPartEvent(channel, value).Data;
+        data[4] = (byte)address;
+        MidiTools.FixRolandChecksum(data);
+        return new NormalSysExEvent(data);
+    }
+
+    static readonly byte[] GsReset = { 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7F, 0x00, 0x41, 0xF7 };
+
+    [Fact]
+    public void Split_plays_GS_part_SysEx_on_port_of_their_part()
+    {
+        // Port A: a reset, and the drum part of B2 (address 50); port B: the drum part of its channel 3, that of A4
+        // (address 50), and a reset.
+        var midi = new MidiFile(
+            Track(0, (0, new NormalSysExEvent(GsReset)), (0, RhythmPart(0x50, 1, 1)), (0, On(0, 60)), (96, Off(0, 60))),
+            Track(1, (0, RhythmPart(0x40, 2, 2)), (0, RhythmPart(0x50, 3, 1)), (0, new NormalSysExEvent(GsReset)), (48, On(2, 36)), (96, Off(2, 36))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        Assert.Equal((1, 1, 1), MidiPorts.RhythmPart(RhythmPart(0x50, 1, 1).Data, 0));
+        Assert.Equal((0, 3, 1), MidiPorts.RhythmPart(RhythmPart(0x50, 3, 1).Data, 1));
+        Assert.Null(MidiPorts.RhythmPart(RhythmPart(0x50, 3, 1).Data, 2));   // from port C: not known
+        Assert.Null(MidiPorts.RhythmPart(GsReset, 1));
+
+        var (main, others) = MidiPorts.Split(midi);
+        // The main file: both resets (they act on the whole engine, as on a module), and the drum part of A4 at address 40.
+        var kept = main.GetTimedEvents().Select(t => t.Event).OfType<SysExEvent>().ToList();
+        Assert.Equal(2, kept.Count(e => MidiTools.IsGsReset(e.Data)));
+        Assert.Equal(3, ChannelMixer.RhythmPartChannel(Assert.Single(kept, e => ChannelMixer.RhythmPartChannel(e.Data) >= 0).Data));
+        // The others: the drum parts of B2 and B3 at address 40 (right checksum), with the notes of port B.
+        var parts = others.Where(e => e.Event is SysExEvent).Select(e => (e.Port, ChannelMixer.RhythmPartChannel(((SysExEvent)e.Event).Data), (int)((SysExEvent)e.Event).Data[7]));
+        Assert.Equal(new[] { (1, 1, 1), (1, 2, 2) }, parts);
+        foreach (var e in others.Select(e => e.Event).OfType<SysExEvent>())
+        {
+            var data = (byte[])e.Data.Clone();
+            MidiTools.FixRolandChecksum(data);
+            Assert.Equal(data, e.Data);
+        }
+        Assert.Equal(2, others.Count(e => e.Event is ChannelEvent));
+    }
+
+    [Fact]
+    public void Player_follows_drum_parts_and_sends_state_again_after_reset()
+    {
+        // Port B: program 40 on channel 1; channel 2 a drum part at 10, then a note on it (not transposed) and one on
+        // channel 1 (transposed by 2).
+        var midi = new MidiFile(
+            Track(null, (0, new SetTempoEvent(500000))),
+            Track(0, (0, On(0, 60)), (96, Off(0, 60))),
+            Track(1, (0, Pc(0, 40)), (10, RhythmPart(0x40, 1, 1)), (20, On(1, 36)), (30, Off(1, 36)), (40, On(0, 60)), (90, Off(0, 60))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        var (main, others) = MidiPorts.Split(midi);
+        var follow = new Follow();
+        int resets = 0;
+        using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 2, null, () => Volatile.Read(ref resets));
+        follow.WaitFirstLook();
+        Assert.Equal(1, player.Rhythm(1, 9));   // the 10th channel: drums
+        Assert.Equal(0, player.Rhythm(1, 1));
+        follow.Running = true;
+        Interlocked.Exchange(ref follow.Tick, 45);
+        Wait(() => follow.Texts().Contains("1:on1/62"));
+        Assert.Equal(new[] { "1:pc1/40", "1:rhythm2=1", "1:on2/36", "1:off2/36", "1:on1/62" }, follow.Texts());
+        Assert.Equal(1, player.Rhythm(1, 1));
+
+        // A mode reset sent to the engine (all its channels set back): the drum part and the program sent again.
+        follow.Clear();
+        Interlocked.Increment(ref resets);
+        Wait(() => follow.Texts().Contains("1:pc1/40"));
+        Assert.Equal(new[] { "1:rhythm2=1", "1:pc1/40" }, follow.Texts());
+
+        // Back before the drum part: sounds cut, the channel a normal part again.
+        follow.Clear();
+        Interlocked.Exchange(ref follow.Tick, 5);
+        Wait(() => follow.Texts().Contains("1:pc1/40"));
+        Assert.Equal(new[] { "1:cc1/64=0", "1:cc1/120=0", "1:cc2/64=0", "1:cc2/120=0", "1:rhythm2=0", "1:pc1/40" }, follow.Texts());
+        Assert.Equal(0, player.Rhythm(1, 1));
+    }
+
+    [Fact]
+    public void Event_list_by_port_sets_drum_parts_on_their_port()
+    {
+        // The drum part of channel 2 in a track of port B, then a note of B2 and one of A2.
+        Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) => rhythm > 0 ? "drums" : "sound";
+        var midi = new MidiFile(
+            Track(0, (60, On(1, 60)), (96, Off(1, 60))),
+            Track(1, (0, RhythmPart(0x40, 1, 1)), (48, On(1, 36)), (96, Off(1, 36))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        string[] Notes(bool byPort) => MidiEventList.Build(midi, name, byPort: byPort).Where(r => r.Type == "Note").Select(r => r.Description).ToArray();
+        Assert.Equal(new[] { "drums", "drums" }, Notes(false));   // on 16 channels: both
+        Assert.Equal(new[] { "drums", "sound" }, Notes(true));
+
+        // The same from a track of port A, at address 50.
+        midi = new MidiFile(
+            Track(0, (0, RhythmPart(0x50, 1, 1)), (60, On(1, 60)), (96, Off(1, 60))),
+            Track(1, (48, On(1, 36)), (96, Off(1, 36))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        Assert.Equal(new[] { "drums", "sound" }, Notes(true));
+    }
+
+    [Fact]
+    public void Save_of_drum_part_of_port_A_leaves_those_of_port_B()
+    {
+        var midi = new MidiFile(
+            Track(0, (0, RhythmPart(0x40, 1, 1)), (48, On(1, 60)), (96, Off(1, 60))),
+            Track(1, (0, RhythmPart(0x40, 1, 1)), (48, On(1, 36)), (96, Off(1, 36))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        int controllers = ChannelMixer.ControllerNumbers.Length;
+        var noCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
+        var noValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
+        var rhythm = Enumerable.Repeat(-1, 16).ToArray();
+        rhythm[1] = 0;   // A2: normal part
+        MidiFileEditor.ApplyChanges(midi, Array.Empty<(int, long, int, int, int)>(), noCc, noValues, rhythm, true, null, MidiPorts.TracksOf(midi, 0), "A");
+        int[] Parts(int track) => midi.GetTrackChunks().ElementAt(track).Events.OfType<SysExEvent>()
+                                      .Where(e => ChannelMixer.RhythmPartChannel(e.Data) == 1).Select(e => (int)e.Data[7]).ToArray();
+        Assert.Equal(new[] { 0 }, Parts(0));   // port A: replaced
+        Assert.Equal(new[] { 1 }, Parts(1));   // port B: kept
     }
 }

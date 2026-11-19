@@ -97,10 +97,10 @@ public sealed partial class MainViewModel
         if (playedOnPorts)
         {
             // A file played on several MIDI ports: the settings of rows A1-A16 in the tracks of the first port, those of
-            // rows B1-B16 (instruments, fixed values) in the tracks of their port (the SysEx of the file act on the first
-            // port only).
+            // rows B1-B16 (instruments, fixed values) in the tracks of their port (their SysEx are left as they are: the
+            // drum parts are not chosen there).
             report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode, wholeTrack,
-                                                   chunk => MidiPorts.TrackPort(chunk) == 0, "A"));
+                                                   MidiPorts.TracksOf(midi, 0), "A"));
             var portInstruments = PortInstruments.All();
             var portControllers = PortControllers.All();
             var noRhythm = Enumerable.Repeat(-1, 16).ToArray();
@@ -113,7 +113,7 @@ public sealed partial class MainViewModel
                     (portCc[f.K][f.Channel], portValues[f.K][f.Channel], portWhole[f.K][f.Channel]) = (true, f.Value, f.WholeTrack);
                 report.Add(MidiFileEditor.ApplyChanges(midi, portInstruments.Where(x => x.Port == port).Select(x => (x.Channel, x.Passage, x.Msb, x.Lsb, x.Program)),
                                                        portCc, portValues, noRhythm, !ChannelMixer.ForceMode, portWhole,
-                                                       chunk => MidiPorts.TrackPort(chunk) == port, ((char)('A' + port)).ToString(), changeSysEx: false));
+                                                       MidiPorts.TracksOf(midi, port), ((char)('A' + port)).ToString(), changeSysEx: false));
             }
         }
         else report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode, wholeTrack));

@@ -86,7 +86,8 @@ public sealed class MixerViewModel : ObservableObject
             long passage = player.Passage(port, c);
             var choice = PortInstruments.Of(port, c, passage);
             int others = PortInstruments.OtherPassages(port, c, passage);
-            var key = $"{used}/{player.Program(port, c)}/{player.BankMsb(port, c)}/{player.BankLsb(port, c)}/{choice}/{others}";
+            bool drum = player.Rhythm(port, c) > 0;
+            var key = $"{used}/{player.Program(port, c)}/{player.BankMsb(port, c)}/{player.BankLsb(port, c)}/{choice}/{others}/{drum}";
             if (key == ch.InstrumentKey) continue;
             ch.InstrumentKey = key;
             var fileInfo = FileOtherInstrument(port, c);
@@ -98,7 +99,7 @@ public sealed class MixerViewModel : ObservableObject
             var display = new InstrumentChoice { Text = !used ? "—" : ShownName(info), IsDisplay = true };
             Update(ch, () =>
             {
-                ch.IsDrum = c == 9;
+                ch.IsDrum = drum;
                 ch.InstrumentItems = new[] { display };
                 ch.SelectedInstrument = display;
                 ch.InstrumentState = state;
@@ -120,27 +121,31 @@ public sealed class MixerViewModel : ObservableObject
         return PortInstruments.Of(port, c, player.Passage(port, c)) ?? (player.BankMsb(port, c), player.BankLsb(port, c), player.Program(port, c));
     }
 
-    // Instrument of a sound on a channel of another port (the SoundFont's preset; the 10th channel: drums).
-    InstrumentInfo OtherSound(int c, (int Msb, int Lsb, int Program) sound) =>
-        defs.Resolve(InstrumentDefinitions.Sf2Standard, c, sound.Program, sound.Msb, sound.Lsb, c == 9 ? 1 : 0);
+    // Does a channel of another port play drums? Its 10th channel, and those a GS Use for Rhythm Part has made drum parts
+    // (see OtherPortsPlayer.Rhythm).
+    public bool IsOtherDrumChannel(int port, int c) => OtherPorts?.Invoke() is { } player ? player.Rhythm(port, c) > 0 : c == 9;
 
-    InstrumentInfo CurrentOtherInstrument(int port, int c) => OtherSound(c, CurrentOtherSound(port, c));
+    // Instrument of a sound on a channel of another port (the SoundFont's preset; a kit on a drum channel).
+    InstrumentInfo OtherSound(int port, int c, (int Msb, int Lsb, int Program) sound) =>
+        defs.Resolve(InstrumentDefinitions.Sf2Standard, c, sound.Program, sound.Msb, sound.Lsb, IsOtherDrumChannel(port, c) ? 1 : 0);
+
+    InstrumentInfo CurrentOtherInstrument(int port, int c) => OtherSound(port, c, CurrentOtherSound(port, c));
 
     // The file's instrument of a channel of another port (the choice of the Mixer aside).
     InstrumentInfo FileOtherInstrument(int port, int c)
     {
         var player = OtherPorts?.Invoke();
-        return OtherSound(c, player == null ? (0, 0, 0) : (player.BankMsb(port, c), player.BankLsb(port, c), player.Program(port, c)));
+        return OtherSound(port, c, player == null ? (0, 0, 0) : (player.BankMsb(port, c), player.BankLsb(port, c), player.Program(port, c)));
     }
 
     // Name of the instrument of a channel of another port (keyboard mode).
     public string OtherInstrumentName(int port, int c) => ShownName(CurrentOtherInstrument(port, c));
 
-    // Sounds offered for a channel of another port (the SoundFont's presets; kits on the 10th channel) and the place of
+    // Sounds offered for a channel of another port (the SoundFont's presets; kits on a drum channel) and the place of
     // the one it plays (-1 if missing), as GetChannelChoices.
     (IReadOnlyList<InstrumentChoice> Choices, int Index, int Program) GetOtherChoices(int port, int c)
     {
-        bool drum = c == 9;
+        bool drum = IsOtherDrumChannel(port, c);
         var (msb, _, program) = CurrentOtherSound(port, c);
         var choices = defs.GetChoices(InstrumentDefinitions.Sf2Standard, drum, 0);
         msb = defs.SoundFontBank(msb, program);   // bank 0 when the SoundFont does not have the one asked for
