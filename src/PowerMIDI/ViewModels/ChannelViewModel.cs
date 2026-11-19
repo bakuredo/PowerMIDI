@@ -12,7 +12,7 @@ public sealed record MapChoice(string Text, int Map);
 // One row of the mixer. Properties set by the user (slider, mute, map, instrument) call the mixer;
 // MixerViewModel.Refresh updates them from ChannelMixer without calling it back (see Updating).
 // A row of another MIDI port (Port > 0: a file on several ports, with the SoundFont engine) shows that channel as the
-// file plays it (OtherPortsPlayer); its instrument, mute, solo and keyboard mode act, not its slider nor its map.
+// file plays it (OtherPortsPlayer); its instrument, slider, mute, solo and keyboard mode act, not its map.
 public sealed class ChannelViewModel : ObservableObject
 {
     readonly MixerViewModel mixer;
@@ -22,11 +22,16 @@ public sealed class ChannelViewModel : ObservableObject
         this.mixer = mixer;
         Channel = channel;
         Port = port;
-        // The controllers and map of a row of another port do nothing: they are the file's. Its instrument (the
-        // SoundFont's presets), mute, solo and keyboard mode act as on port A.
-        RelayCommand Command(Action action) => new(() => { if (port == 0) mixer.Run(action); });
-        ClearControllerCommand = Command(() => mixer.ClearController(Channel));
-        WholeTrackCommand = Command(() => mixer.ToggleWholeTrack(Channel));
+        // A row of another port: its instrument (the SoundFont's presets), slider, mute, solo and keyboard mode act as on
+        // port A, through the player of that port; its map does nothing.
+        ClearControllerCommand = new RelayCommand(() => mixer.Run(() =>
+        {
+            if (port == 0) mixer.ClearController(Channel); else mixer.ClearOtherController(this);
+        }));
+        WholeTrackCommand = new RelayCommand(() => mixer.Run(() =>
+        {
+            if (port == 0) mixer.ToggleWholeTrack(Channel); else mixer.ToggleOtherWholeTrack(this);
+        }));
         SoloCommand = new RelayCommand(() => mixer.Run(() => mixer.ToggleSolo(this)));
         InstrumentWheelCommand = new RelayCommand(p => mixer.Run(() =>
         {
@@ -38,7 +43,6 @@ public sealed class ChannelViewModel : ObservableObject
 
     public int Channel { get; }
     public int Port { get; }
-    public bool IsEditable => Port == 0;
 
     // Number: "1".."16"; with several ports shown, "A1".."A16", "B1".."B16".
     public string Number => mixer.ShowsOtherPorts ? $"{(char)('A' + Port)}{Channel + 1,-2}" : $"{Channel + 1,2}";
@@ -79,8 +83,11 @@ public sealed class ChannelViewModel : ObservableObject
         get => value;
         set
         {
-            if (Set(ref this.value, value) && !Updating && Port == 0)
-                mixer.Run(() => mixer.SetController(Channel, (int)Math.Round(value)));
+            if (Set(ref this.value, value) && !Updating)
+                mixer.Run(() =>
+                {
+                    if (Port == 0) mixer.SetController(Channel, (int)Math.Round(value)); else mixer.SetOtherController(this, (int)Math.Round(value));
+                });
         }
     }
 

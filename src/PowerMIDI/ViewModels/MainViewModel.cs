@@ -269,6 +269,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     void ClosePort()
     {
+        ForgetOtherPorts();   // it sends to this port
         ChannelMixer.Device = null;
         engineLoad++;   // a SoundFont still loading is dropped when it ends
         engineLoading = false;
@@ -670,7 +671,7 @@ public sealed partial class MainViewModel : ObservableObject
         bool trackGone = false;
         foreach (var item in items)
         {
-            if (item == current) { StopTrack(); current = null; ResetNowPlaying(); trackGone = true; }
+            if (item == current) { StopTrack(); ForgetOtherPorts(); current = null; ResetNowPlaying(); trackGone = true; }
             Playlist.Remove(item);
         }
         if (leaving) ForgetSettingsFile();
@@ -688,6 +689,7 @@ public sealed partial class MainViewModel : ObservableObject
         // reset sent again (the window waits for each one).
         bool loaded = current != null || settingsFile != null;
         StopTrack();
+        ForgetOtherPorts();
         current = null;
         Playlist.Clear();
         ResetNowPlaying();
@@ -943,10 +945,20 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------- Playback ----------
 
-    OtherPortsPlayer otherPorts;   // the other MIDI ports of the track, on the SoundFont engine (see CreatePlayback)
+    // The other MIDI ports of the track, on the SoundFont engine (see CreatePlayback). Stopped with the track, it is kept
+    // until another track is played, the track is removed or the port changes: the Mixer still shows their rows (B1-B16),
+    // and their settings still act, as those of the first port.
+    OtherPortsPlayer otherPorts;
     // The track was last played with its MIDI ports apart (the first one by the playback, the others by otherPorts):
     // its settings are saved port by port (see WriteSettings).
     bool playedOnPorts;
+
+    // The rows of the other ports hidden: no track played on several ports any more (removed, port changed).
+    void ForgetOtherPorts()
+    {
+        otherPorts?.Dispose();
+        otherPorts = null;
+    }
 
     void StopTrack()
     {
@@ -957,8 +969,7 @@ public sealed partial class MainViewModel : ObservableObject
             playback.Dispose();
             playback = null;
         }
-        otherPorts?.Dispose();   // its notes cut
-        otherPorts = null;
+        otherPorts?.Dispose();   // it no longer follows the playback, its notes cut (kept for the Mixer)
         if (output != null) MidiTools.SendPanic(output);
         SetState("stopped");
     }
@@ -1081,16 +1092,19 @@ public sealed partial class MainViewModel : ObservableObject
     // follows it.
     Playback CreatePlayback(MidiFile midi)
     {
-        otherPorts?.Dispose();
-        otherPorts = null;
+        ForgetOtherPorts();
         IReadOnlyList<PortEvent> others = null;
-        Dictionary<int, InstrumentPassages> portPassages = null;
+        Dictionary<int, PortPassages> portPassages = null;
         playedOnPorts = output is SoundFontOutput && MidiPorts.HasOtherPorts(midi);
         if (playedOnPorts)
         {
-            // The passages of the instruments of each other port (see PortInstruments), from the tracks of that port.
+            // The passages of the instruments and controllers of each other port (see PortInstruments, PortControllers),
+            // from the tracks of that port.
+            var file = midi;
+            bool followResets = !ChannelMixer.ForceMode;
             portPassages = midi.GetTrackChunks().Select(MidiPorts.TrackPort).Where(p => p > 0).Distinct()
-                .ToDictionary(p => p, p => InstrumentPassages.Read(midi, !ChannelMixer.ForceMode, chunk => MidiPorts.TrackPort(chunk) == p));
+                .ToDictionary(p => p, p => new PortPassages(InstrumentPassages.Read(file, followResets, chunk => MidiPorts.TrackPort(chunk) == p),
+                                                            ControllerPassages.Read(file, followResets, chunk => MidiPorts.TrackPort(chunk) == p)));
             (midi, others) = MidiPorts.Split(midi);
         }
         var pb = midi.GetPlayback(output);
@@ -1128,7 +1142,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (others is { Count: > 0 } && output is SoundFontOutput engine)
             otherPorts = new OtherPortsPlayer(others, midi.GetTempoMap(),
                 () => playback != pb ? null : (pb.IsRunning, (long)pb.GetCurrentTime<MidiTimeSpan>().TimeSpan, pb.Speed),
-                (e, port) => engine.SendEvent(e, port), () => transposeSemitones, portPassages);
+                (e, port) => engine.SendEvent(e, port), () => transposeSemitones, portPassages, () => engine.Resets);
         tempoMap = midi.GetTempoMap();
         eventsPending = true;   // the Event Editor lists it at the next timer tick (after the start)
         TimeSpan length = pb.GetDuration<MetricTimeSpan>();

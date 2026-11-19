@@ -262,6 +262,11 @@ public sealed class SoundFontOutput : IOutputDevice
     //   would switch its bank style to that mode's (XG: bank = bank LSB; GM: banks ignored), and the bank of the
     //   SoundFont presets chosen in the Mixer (bank MSB) would no longer be found. The style stays GS (bank = MSB, the
     //   style of most SoundFonts; a drum channel plays the kits of bank 128).
+    // Number of mode resets played so far: the player of the other MIDI ports (OtherPortsPlayer) sends the settings of
+    // their channels again after one (the reset has set all the channels of the engine back).
+    int resets;
+    public int Resets => Volatile.Read(ref resets);
+
     void PlaySysEx(byte[] data)
     {
         var s = synth;
@@ -278,6 +283,7 @@ public sealed class SoundFontOutput : IOutputDevice
             fluid_synth_system_reset(s);
             SetDrumChannels(s);
             ApplyEffects(s);   // the reverb and chorus chosen stay
+            Interlocked.Increment(ref resets);
             return;
         }
         if (length < 1) return;

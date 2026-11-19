@@ -411,8 +411,7 @@
 
               <!-- Slider of the displayed controller: moving it fixes the value; right click: back to the file value. -->
               <Slider Grid.Column="4" Minimum="0" Maximum="127" SmallChange="1" LargeChange="8" IsMoveToPointEnabled="True"
-                      VerticalAlignment="Center" Value="{Binding Value}" ToolTip="{Binding SliderToolTip}" b:Wheel.SliderStep="True"
-                      IsHitTestVisible="{Binding IsEditable}" Focusable="{Binding IsEditable}">
+                      VerticalAlignment="Center" Value="{Binding Value}" ToolTip="{Binding SliderToolTip}" b:Wheel.SliderStep="True">
                 <Slider.InputBindings>
                   <MouseBinding MouseAction="RightClick" Command="{Binding ClearControllerCommand}"/>
                 </Slider.InputBindings>

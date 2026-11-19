@@ -50,7 +50,8 @@ public sealed class MixerViewModel : ObservableObject
     // ---------- Other MIDI port (a file on several ports, with the SoundFont engine) ----------
     // The rows of port B (channels 17-32 of the engine) under those of port A, while such a file plays: each channel as
     // the file plays it (OtherPortsPlayer: instrument, value of the controller shown, activity). Their instrument (chosen
-    // per passage, see PortInstruments), mute, solo and keyboard mode act as on port A; their slider shows only.
+    // per passage, see PortInstruments), slider (fixed values, see PortControllers), mute, solo and keyboard mode act as on
+    // port A; not their map (GS and XG only).
     public IReadOnlyList<ChannelViewModel> OtherChannels { get; }
     public IReadOnlyList<ChannelViewModel> Rows { get; }   // the rows of the tab: port A, then port B
     public Func<OtherPortsPlayer> OtherPorts { get; set; }
@@ -199,29 +200,67 @@ public sealed class MixerViewModel : ObservableObject
             SelectOtherInstrument(ch, target);
     }
 
-    // Sliders of the rows of port B (every 30 ms while playing, as those of port A): the value of the controller shown.
+    // Sliders of the rows of port B (every 30 ms while playing, as those of port A): the value of the controller shown,
+    // fixed (see PortControllers) or the file's, as RefreshController.
     void RefreshOtherSliders()
     {
         var player = OtherPorts?.Invoke();
         if (player == null) return;
-        int k = shownController, number = ChannelMixer.ControllerNumbers[k];
-        foreach (var ch in OtherChannels)
+        foreach (var ch in OtherChannels) RefreshOtherSlider(ch, player);
+    }
+
+    void RefreshOtherSlider(ChannelViewModel ch, OtherPortsPlayer player)
+    {
+        int k = shownController, c = ch.Channel, port = ch.Port;
+        int value = player.Value(port, c, k), fileValue = player.FileValue(port, c, k);
+        var fixedSetting = PortControllers.Of(port, c, k);
+        bool isFixed = player.IsFixedActive(port, c, k), hasFixed = fixedSetting != null, wholeTrack = fixedSetting?.WholeTrack == true;
+        int fixedValue = fixedSetting?.Value ?? 0;
+        int position = ToSlider(k, value);
+        var key = $"{k}/{value}/{isFixed}/{hasFixed}/{wholeTrack}/{fixedValue}/{fileValue}";
+        if (key == ch.ShownKey && (int)Math.Round(ch.Value) == position) return;
+        ch.ShownKey = key;
+        var text = FormatShownValue(k, value);
+        var fixedText = FormatShownValue(k, fixedValue);
+        var name = ControllerNames[k];
+        var scope = wholeTrack ? "for whole track" : "until first change";
+        Update(ch, () =>
         {
-            int value = player.Control(ch.Port, ch.Channel, number);
-            if (value < 0) value = ChannelMixer.ControllerDefaults[k];
-            var key = $"{k}/{value}";
-            if (key == ch.ShownKey) continue;
-            ch.ShownKey = key;
-            var text = FormatControllerValue(k, value);
-            Update(ch, () =>
-            {
-                ch.Value = value;
-                ch.ValueText = text;
-                ch.SliderToolTip = $"{ControllerNames[k]} from file: {text} (port {(char)('A' + ch.Port)}: display only)";
-                ch.ValueToolTip = null;
-                ch.IsFixed = ch.IsWholeTrack = false;
-            });
-        }
+            ch.Value = position;
+            ch.ValueText = text;
+            ch.IsFixed = isFixed;
+            ch.IsWholeTrack = isFixed && wholeTrack;
+            ch.SliderToolTip = isFixed ? $"{name} fixed at {text} {scope} (file: {FormatShownValue(k, fileValue)})"
+                             : hasFixed ? $"{name} from file: {text} (fixed at {fixedText} until first change, passed)"
+                             : $"{name} from file: {text}";
+            if (k == ChannelMixer.PortamentoTime)
+                ch.SliderToolTip += isFixed ? $"\nPortamento {(value > 0 ? "on" : "off")} (CC65)" : "\nMoving slider turns portamento on (CC65), 0 turns it off";
+            ch.ValueToolTip = hasFixed ? $"Fixed {scope}. Right click: {(wholeTrack ? "until first change" : "for whole track")}" : null;
+        });
+    }
+
+    // Slider of a row of port B moved: the value of the displayed controller fixed, as on port A (SetController).
+    internal void SetOtherController(ChannelViewModel ch, int position)
+    {
+        if (OtherPorts?.Invoke() is not { } player) return;
+        player.SetController(ch.Port, ch.Channel, shownController, FromSlider(shownController, position));
+        RefreshOtherSlider(ch, player);
+    }
+
+    // Right click on the slider of a row of port B: back to the file's value.
+    internal void ClearOtherController(ChannelViewModel ch)
+    {
+        if (OtherPorts?.Invoke() is not { } player) return;
+        player.ClearController(ch.Port, ch.Channel, shownController);
+        RefreshOtherSlider(ch, player);
+    }
+
+    // Right click on the value of a row of port B: fixed for the whole track, or until the first change again.
+    internal void ToggleOtherWholeTrack(ChannelViewModel ch)
+    {
+        if (OtherPorts?.Invoke() is not { } player || PortControllers.Of(ch.Port, ch.Channel, shownController) is not { } f) return;
+        player.SetWholeTrack(ch.Port, ch.Channel, shownController, !f.WholeTrack);
+        RefreshOtherSlider(ch, player);
     }
 
     // Mute of a row of port B: the player sets the volume of the channel to 0.
@@ -1071,6 +1110,9 @@ public sealed class MixerViewModel : ObservableObject
         foreach (var (port, c) in PortInstruments.All().Select(x => (x.Port, x.Channel)).Distinct().ToList())
             if (player != null) player.ClearInstrument(port, c, true);
             else PortInstruments.Remove(port, c, InstrumentPassages.First, true);
+        foreach (var f in PortControllers.All())
+            if (player != null) player.ClearController(f.Port, f.Channel, f.K);
+            else PortControllers.Remove(f.Port, f.Channel, f.K);
         foreach (var ch in Channels)
         {
             if (ChannelMixer.HasInstruments(ch.Channel)) ChannelMixer.ClearOverride(device, ch.Channel, true);
@@ -1093,7 +1135,8 @@ public sealed class MixerViewModel : ObservableObject
                 if (ChannelMixer.IsFixed(k, c)) { ChannelMixer.ClearController(null, k, c); had = true; }
             if (ChannelMixer.Muted[c]) { SetMute(c, false, false); had = true; }
         }
-        had |= PortInstruments.Clear();   // the instruments of the rows of port B
+        had |= PortInstruments.Clear();   // the instruments and fixed values of the rows of port B
+        had |= PortControllers.Clear();
         return had;
     }
 }

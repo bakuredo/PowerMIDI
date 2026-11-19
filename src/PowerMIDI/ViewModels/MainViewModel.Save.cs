@@ -30,7 +30,7 @@ public sealed partial class MainViewModel
         var (channels, modules, forceMode) = SettingsToWrite();
         // Nothing changed: saved only with the right click (a copy of the track, e.g. a file of the Library tab, with
         // its .syx file in it).
-        bool unchanged = channels.Count == 0 && forceMode == null && modules.Count == 0 && editedFile == null && !HasPortInstruments;
+        bool unchanged = channels.Count == 0 && forceMode == null && modules.Count == 0 && editedFile == null && !HasPortSettings;
         if (unchanged && !ask)
         {
             view.ShowMessage("No instrument, setting or effect has been changed.\nRight click: save copy of track anyway.");
@@ -96,17 +96,25 @@ public sealed partial class MainViewModel
         var report = new List<string>();
         if (playedOnPorts)
         {
-            // A file played on several MIDI ports: the settings of rows A1-A16 in the tracks of the first port, the
-            // instruments of rows B1-B16 in the tracks of their port (the SysEx of the file act on the first port only).
+            // A file played on several MIDI ports: the settings of rows A1-A16 in the tracks of the first port, those of
+            // rows B1-B16 (instruments, fixed values) in the tracks of their port (the SysEx of the file act on the first
+            // port only).
             report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode, wholeTrack,
                                                    chunk => MidiPorts.TrackPort(chunk) == 0, "A"));
-            var noCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
-            var noValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
+            var portInstruments = PortInstruments.All();
+            var portControllers = PortControllers.All();
             var noRhythm = Enumerable.Repeat(-1, 16).ToArray();
-            foreach (var port in PortInstruments.All().GroupBy(x => x.Port))
-                report.Add(MidiFileEditor.ApplyChanges(midi, port.Select(x => (x.Channel, x.Passage, x.Msb, x.Lsb, x.Program)), noCc, noValues, noRhythm,
-                                                       !ChannelMixer.ForceMode, null, chunk => MidiPorts.TrackPort(chunk) == port.Key,
-                                                       ((char)('A' + port.Key)).ToString(), changeSysEx: false));
+            foreach (int port in portInstruments.Select(x => x.Port).Concat(portControllers.Select(x => x.Port)).Distinct().Order())
+            {
+                var portCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
+                var portValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
+                var portWhole = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
+                foreach (var f in portControllers.Where(x => x.Port == port))
+                    (portCc[f.K][f.Channel], portValues[f.K][f.Channel], portWhole[f.K][f.Channel]) = (true, f.Value, f.WholeTrack);
+                report.Add(MidiFileEditor.ApplyChanges(midi, portInstruments.Where(x => x.Port == port).Select(x => (x.Channel, x.Passage, x.Msb, x.Lsb, x.Program)),
+                                                       portCc, portValues, noRhythm, !ChannelMixer.ForceMode, portWhole,
+                                                       chunk => MidiPorts.TrackPort(chunk) == port, ((char)('A' + port)).ToString(), changeSysEx: false));
+            }
         }
         else report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode, wholeTrack));
         // Effects tab: effects, Part and Drums pages (the XG part modes and drum setups share one writer).
@@ -134,8 +142,9 @@ public sealed partial class MainViewModel
         return (channels, modules, isForced ? selectedMode : null);
     }
 
-    // Instruments chosen on the rows of the other MIDI ports (B1-B16), saved with the track played on its ports.
-    bool HasPortInstruments => playedOnPorts && PortInstruments.All().Count > 0;
+    // Instruments chosen and values fixed on the rows of the other MIDI ports (B1-B16), saved with the track played on its
+    // ports.
+    bool HasPortSettings => playedOnPorts && (PortInstruments.All().Count > 0 || PortControllers.All().Count > 0);
 
     // Settings applied to the whole track (fixed values in blue, forced mode), as opposed to the changes of the events.
     bool HasGlobalSettings() => GetSettingsSignature(false) != "";
@@ -147,7 +156,10 @@ public sealed partial class MainViewModel
         var parts = new List<string>();
         foreach (var (c, passage, msb, lsb, program) in ChannelMixer.Instruments()) parts.Add($"i{c}@{passage}={msb}/{lsb}/{program}");
         if (playedOnPorts)
+        {
             foreach (var (port, c, passage, msb, lsb, program) in PortInstruments.All()) parts.Add($"i{port}:{c}@{passage}={msb}/{lsb}/{program}");
+            foreach (var (port, c, k, value, whole) in PortControllers.All()) parts.Add($"c{port}:{k}/{c}={value}{(whole ? "w" : "")}");
+        }
         for (int c = 0; c < 16; c++)
         {
             if (ChannelMixer.RhythmOverride[c] >= 0) parts.Add($"r{c}={ChannelMixer.RhythmOverride[c]}");

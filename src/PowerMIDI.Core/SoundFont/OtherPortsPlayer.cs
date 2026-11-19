@@ -6,6 +6,10 @@ using Melanchall.DryWetMidi.Interaction;
 
 namespace PowerMIDI.Core;
 
+// The passages of a MIDI port of a file, for the settings of the Mixer: of its instruments (InstrumentPassages) and of its
+// controllers (ControllerPassages), read on the tracks of that port.
+public sealed record PortPassages(InstrumentPassages Instruments, ControllerPassages Controllers);
+
 // Plays the channel events of the other MIDI ports of a file (MidiPorts.Split) on the SoundFont engine's channels above
 // 16 (port 1: channels 17-32…), following the playback of the rest of the file: its position (ticks), whether it runs,
 // its speed. The playback itself is not changed: it plays the first port with the Mixer as usual; this player only
@@ -15,7 +19,9 @@ namespace PowerMIDI.Core;
 // - stopped or paused: the notes of the other ports are released;
 // - the position jumps (seek, loop, pause then seek): their sounds are cut, and their state at the new position
 //   (bank, program, controllers, RPN, pitch bend, channel pressure) is sent again, as a module would have it there.
-// The instruments chosen in the Mixer (PortInstruments, by passage) replace the file's, as on the first port.
+// The settings of the Mixer replace the file's, as on the first port: the instruments chosen (PortInstruments, by
+// passage) and the controller values fixed (PortControllers, in the first passage of their controller or in the whole
+// track). After a mode reset of the engine they are sent again, with the mutes.
 public sealed class OtherPortsPlayer : IDisposable
 {
     readonly IReadOnlyList<PortEvent> events;
@@ -23,15 +29,18 @@ public sealed class OtherPortsPlayer : IDisposable
     readonly Func<(bool Running, long Tick, double Speed)?> position;   // null: the playback is over (the player ends)
     readonly Action<MidiEvent, int> send;                                // an event and its port
     readonly Func<int> transpose;                                        // semitones of the transposition (Pitch slider)
-    readonly IReadOnlyDictionary<int, InstrumentPassages> passages;      // per port (null: one passage per channel)
+    readonly IReadOnlyDictionary<int, PortPassages> passages;            // per port (null: one passage per channel)
+    readonly Func<int> resets;                                           // mode resets played by the engine so far (null: not followed)
+    int lastResets;
     readonly (int Port, int Channel)[] channels;                         // the channels the events use
     readonly Dictionary<(int Port, int Channel, int Key), Queue<int>> sounding = new();   // note → key sent (transposed)
     readonly Thread thread;
     volatile bool stopping;
 
-    // passages: the passages of the instruments of each port (InstrumentPassages.Read on the tracks of that port).
+    // passages: the passages of the instruments and controllers of each port (read on the tracks of that port).
     public OtherPortsPlayer(IReadOnlyList<PortEvent> events, TempoMap tempoMap, Func<(bool Running, long Tick, double Speed)?> position,
-                            Action<MidiEvent, int> send, Func<int> transpose, IReadOnlyDictionary<int, InstrumentPassages> passages = null)
+                            Action<MidiEvent, int> send, Func<int> transpose, IReadOnlyDictionary<int, PortPassages> passages = null,
+                            Func<int> resets = null)
     {
         this.events = events;
         this.tempoMap = tempoMap;
@@ -39,6 +48,8 @@ public sealed class OtherPortsPlayer : IDisposable
         this.send = send;
         this.transpose = transpose;
         this.passages = passages;
+        this.resets = resets;
+        lastResets = resets?.Invoke() ?? 0;
         channels = events.Where(e => e.Event is ChannelEvent).Select(e => (e.Port, (int)((ChannelEvent)e.Event).Channel)).Distinct().ToArray();
         thread = new Thread(Run) { IsBackground = true, Name = "Other MIDI ports", Priority = ThreadPriority.AboveNormal };
         thread.Start();
@@ -76,13 +87,88 @@ public sealed class OtherPortsPlayer : IDisposable
     public bool IsMuted(int port, int channel) => Valid(port, channel) && Volatile.Read(ref muted[port, channel]);
 
     // Mute (from the Mixer), as on the first port: the volume of the channel to 0 (its notes are played, not heard; its
-    // volume changes kept for later), back to its volume when unmuted.
+    // volume changes kept for later), back to its volume when unmuted (the fixed one, or the file's).
     public void SetMuted(int port, int channel, bool on)
     {
         if (!Valid(port, channel)) return;
         Volatile.Write(ref muted[port, channel], on);
-        int volume = Control(port, channel, 7);
-        send(Cc(channel, 7, on ? 0 : volume >= 0 ? volume : 100), port);
+        ApplyController(port, channel, ChannelMixer.Volume);
+    }
+
+    // ---------- Controller values fixed in the Mixer ----------
+    // Is a tick in the first passage of controller k on a channel? (without passages, the whole track is one)
+    bool InFirstAt(int port, int channel, int k, long tick) =>
+        passages == null || !passages.TryGetValue(port, out var p) || p.Controllers == null || p.Controllers.InFirst(k, channel, Math.Max(tick, 0));
+
+    // The value fixed for controller k that replaces the file's at a tick, or null (none, or past its first passage).
+    int? FixedAt(int port, int channel, int k, long tick) =>
+        PortControllers.Of(port, channel, k) is { } f && (f.WholeTrack || InFirstAt(port, channel, k, tick)) ? f.Value : null;
+
+    // The file's value of controller k (the value after a reset until the file sets it).
+    public int FileValue(int port, int channel, int k)
+    {
+        int value = Control(port, channel, ChannelMixer.ControllerNumbers[k]);
+        return value >= 0 ? value : ChannelMixer.ControllerDefaults[k];
+    }
+
+    // Does the fixed value of controller k replace the file's now? Its value now: that one, otherwise the file's.
+    public bool IsFixedActive(int port, int channel, int k) => Valid(port, channel) && FixedAt(port, channel, k, Volatile.Read(ref lastTick)) != null;
+    public int Value(int port, int channel, int k) => FixedAt(port, channel, k, Volatile.Read(ref lastTick)) ?? FileValue(port, channel, k);
+
+    // A value fixed in the Mixer (slider moved), sent at once. Set past the first passage of the controller, it is for the
+    // whole track (otherwise it would not be heard until a jump back), as on the first port.
+    public void SetController(int port, int channel, int k, int value)
+    {
+        if (!Valid(port, channel)) return;
+        bool wholeTrack = PortControllers.Of(port, channel, k)?.WholeTrack == true || !InFirstAt(port, channel, k, Volatile.Read(ref lastTick));
+        PortControllers.Set(port, channel, k, value, wholeTrack);
+        ApplyController(port, channel, k);
+    }
+
+    // A fixed value for the whole track, or only in the first passage of its controller.
+    public void SetWholeTrack(int port, int channel, int k, bool wholeTrack)
+    {
+        if (!Valid(port, channel) || PortControllers.Of(port, channel, k) is not { } f) return;
+        PortControllers.Set(port, channel, k, f.Value, wholeTrack);
+        ApplyController(port, channel, k);
+    }
+
+    // Back to the file's value.
+    public void ClearController(int port, int channel, int k)
+    {
+        if (!Valid(port, channel)) return;
+        PortControllers.Remove(port, channel, k);
+        ApplyController(port, channel, k);
+    }
+
+    // Sends the value controller k has at a tick (now by default): the fixed one, or the file's; the volume of a muted
+    // channel: 0. With the portamento time, its switch.
+    void ApplyController(int port, int channel, int k, long? tick = null)
+    {
+        long at = tick ?? Volatile.Read(ref lastTick);
+        int value = k == ChannelMixer.Volume && IsMuted(port, channel) ? 0 : FixedAt(port, channel, k, at) ?? FileValue(port, channel, k);
+        send(Cc(channel, ChannelMixer.ControllerNumbers[k], value), port);
+        if (k == ChannelMixer.PortamentoTime) send(Cc(channel, ChannelMixer.PortamentoSwitch, PortamentoSwitchAt(port, channel, at)), port);
+    }
+
+    // Portamento switch (CC65): on while a Portamento Time fixed above 0 replaces the file's, off at 0 (see
+    // ChannelMixer.PortamentoSwitchValue); otherwise the file's.
+    int PortamentoSwitchAt(int port, int channel, long tick) =>
+        FixedAt(port, channel, ChannelMixer.PortamentoTime, tick) is int time ? ChannelMixer.PortamentoSwitchFor(time)
+                                                                               : Math.Max(Control(port, channel, ChannelMixer.PortamentoSwitch), 0);
+
+    // After a mode reset of the engine (all its channels set back): the settings of the Mixer on these channels again.
+    void Reapply(long tick)
+    {
+        foreach (var (port, channel) in channels)
+        {
+            if (!Valid(port, channel)) continue;
+            if (ChosenAt(port, channel, tick) is { } choice) SendInstrument(port, channel, choice, true);
+            else Volatile.Write(ref choiceSent[port, channel], false);
+            if (IsMuted(port, channel)) ApplyController(port, channel, ChannelMixer.Volume, tick);
+        }
+        foreach (var f in PortControllers.All())
+            if (Valid(f.Port, f.Channel) && FixedAt(f.Port, f.Channel, f.K, tick) != null) ApplyController(f.Port, f.Channel, f.K, tick);
     }
 
     // ---------- Instruments chosen in the Mixer ----------
@@ -90,7 +176,7 @@ public sealed class OtherPortsPlayer : IDisposable
     public long Passage(int port, int channel) => PassageAt(port, channel, Volatile.Read(ref lastTick));
 
     long PassageAt(int port, int channel, long tick) =>
-        tick >= 0 && passages != null && passages.TryGetValue(port, out var p) ? p.At(channel, tick) : InstrumentPassages.First;
+        tick >= 0 && passages != null && passages.TryGetValue(port, out var p) && p.Instruments != null ? p.Instruments.At(channel, tick) : InstrumentPassages.First;
 
     (int Msb, int Lsb, int Program)? ChosenAt(int port, int channel, long tick) => PortInstruments.Of(port, channel, PassageAt(port, channel, tick));
 
@@ -128,8 +214,9 @@ public sealed class OtherPortsPlayer : IDisposable
 
     long eventTick;   // tick of the event of the file being sent (its passage)
 
-    // Every event sent goes through here: the state above follows it; the volume of a muted channel stays at 0. A channel
-    // is used from its first program change or note, as on the first port (ChannelMixer.Used).
+    // Every event sent goes through here: the state above follows it (the file's values); the volume of a muted channel
+    // stays at 0; a fixed value is sent instead of the file's while it replaces it (eventTick). A channel is used from its
+    // first program change or note, as on the first port (ChannelMixer.Used).
     void Out(MidiEvent e, int port)
     {
         if (e is ChannelEvent ce && Valid(port, ce.Channel))
@@ -151,11 +238,21 @@ public sealed class OtherPortsPlayer : IDisposable
                     }
                     break;
                 case ControlChangeEvent cc:
-                    Volatile.Write(ref controls[port, c, cc.ControlNumber], cc.ControlValue);
-                    if (cc.ControlNumber == 0) Volatile.Write(ref bankMsb[port, c], cc.ControlValue);
-                    else if (cc.ControlNumber == 32) Volatile.Write(ref bankLsb[port, c], cc.ControlValue);
-                    else if (cc.ControlNumber == 7 && IsMuted(port, c)) return;
+                {
+                    int number = cc.ControlNumber;
+                    Volatile.Write(ref controls[port, c, number], cc.ControlValue);
+                    if (number == 0) Volatile.Write(ref bankMsb[port, c], cc.ControlValue);
+                    else if (number == 32) Volatile.Write(ref bankLsb[port, c], cc.ControlValue);
+                    else if (number == 7 && IsMuted(port, c)) return;
+                    int k = ChannelMixer.ControllerIndex(number);
+                    if (k >= 0 && FixedAt(port, c, k, eventTick) is int value) { send(Cc(c, number, value), port); return; }
+                    if (number == ChannelMixer.PortamentoSwitch && FixedAt(port, c, ChannelMixer.PortamentoTime, eventTick) != null)
+                    {
+                        send(Cc(c, number, PortamentoSwitchAt(port, c, eventTick)), port);
+                        return;
+                    }
                     break;
+                }
                 case NoteOnEvent on when on.Velocity > 0:
                     Interlocked.Exchange(ref lastNoteOn[port, c], DateTime.UtcNow.Ticks);
                     Volatile.Write(ref used[port, c], true);
@@ -187,6 +284,13 @@ public sealed class OtherPortsPlayer : IDisposable
                 catch (ObjectDisposedException) { now = null; }
                 if (now is not { } p) break;
                 Look(p.Running, p.Tick, p.Speed);
+                // A mode reset played by the engine since the last look: the settings of the Mixer again.
+                int played = resets?.Invoke() ?? 0;
+                if (played != lastResets)
+                {
+                    lastResets = played;
+                    Reapply(p.Tick);
+                }
                 Thread.Sleep(1);
             }
         }
@@ -317,6 +421,10 @@ public sealed class OtherPortsPlayer : IDisposable
             }
             else if (Volatile.Read(ref choiceSent[port, channel])) SendInstrument(port, channel, FileInstrument(port, channel), false);
         }
+        // The fixed values: the one of each controller there (also where the file has not set it yet), or the file's
+        // value back where the fixed one no longer replaces it.
+        foreach (var f in PortControllers.All())
+            if (Valid(f.Port, f.Channel)) ApplyController(f.Port, f.Channel, f.K, tick - 1);
     }
 
     // State of the channels after events: bank (MSB, LSB) and program, the last value of each other controller, each

@@ -47,15 +47,23 @@ public class MidiPortsTests
         Assert.False(MidiPorts.HasOtherPorts(main.Clone()) && main.GetTrackChunks().Any(c => c.Events.OfType<ChannelEvent>().Any() && MidiPorts.TrackPort(c) > 0));
     }
 
-    // A playback position set by the test; the events sent, recorded. The speed given is high: moving the position
-    // forward while running is then playing (not a jump), however fast the test moves it.
+    // A playback position set by the test; the events sent, recorded. The speed given is very high: moving the position
+    // forward while running is then playing (not a jump), however fast the test moves it (a jump forward is more than
+    // twice the music the speed plays between two looks: at speed 1000, two looks 1 ms apart allowed only 2 s).
     sealed class Follow
     {
         public volatile bool Running;
         public long Tick;
         public volatile bool Gone;
+        public int Looks;   // positions asked for by the player
         public readonly List<(MidiEvent Event, int Port)> Sent = new();
-        public (bool, long, double)? Position() => Gone ? null : (Running, Interlocked.Read(ref Tick), 1000.0);
+        public (bool, long, double)? Position()
+        {
+            Interlocked.Increment(ref Looks);
+            return Gone ? null : (Running, Interlocked.Read(ref Tick), 1_000_000.0);
+        }
+        // The player has made its first look (asked again after it): the start position is behind it.
+        public void WaitFirstLook() => Wait(() => Volatile.Read(ref Looks) > 1);
         public void Send(MidiEvent e, int port) { lock (Sent) Sent.Add((e, port)); }
         public List<string> Texts() { lock (Sent) return Sent.Select(s => $"{s.Port}:{Describe(s.Event)}").ToList(); }
         public void Clear() { lock (Sent) Sent.Clear(); }
@@ -84,7 +92,7 @@ public class MidiPortsTests
         var follow = new Follow();
         int transpose = 0;
         using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => transpose);
-        Thread.Sleep(100);   // its first look: stopped at the start
+        follow.WaitFirstLook();   // stopped at the start
 
         // Playing up to tick 60: the program and the note of port 1.
         follow.Running = true;
@@ -131,8 +139,11 @@ public class MidiPortsTests
         Wait(() => follow.Texts().Contains("1:cc1/120=0"));
     }
 
-    static Dictionary<int, InstrumentPassages> PortPassages(MidiFile midi) =>
-        new() { [1] = InstrumentPassages.Read(midi, true, chunk => MidiPorts.TrackPort(chunk) == 1) };
+    static Dictionary<int, PortPassages> Passages(MidiFile midi) => new()
+    {
+        [1] = new PortPassages(InstrumentPassages.Read(midi, true, chunk => MidiPorts.TrackPort(chunk) == 1),
+                               ControllerPassages.Read(midi, true, chunk => MidiPorts.TrackPort(chunk) == 1)),
+    };
 
     [Fact]
     public void Player_plays_instrument_chosen_for_passage_instead_of_file()
@@ -145,8 +156,8 @@ public class MidiPortsTests
             // Chosen for the first passage of channel B1 before the track plays (a playback rebuilt keeps it).
             PortInstruments.Set(1, 0, InstrumentPassages.First, 3, 0, 60);
             var follow = new Follow();
-            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 0, PortPassages(midi));
-            Thread.Sleep(100);
+            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 0, Passages(midi));
+            follow.WaitFirstLook();
             // At the start: the choice sent; playing: the file's Program Change replaced by it, with its bank.
             Assert.Equal(new[] { "1:cc1/0=3", "1:cc1/32=0", "1:pc1/60" }, follow.Texts());
             follow.Running = true;
@@ -166,6 +177,83 @@ public class MidiPortsTests
             Assert.Equal((0, 0, 7), PortInstruments.Of(1, 0, InstrumentPassages.First));
         }
         finally { PortInstruments.Clear(); }
+    }
+
+    // Port 1: a volume at the start, a note, then a change of volume after the note (the end of its first passage).
+    static MidiFile Fade() => new(
+        Track(null, (0, new SetTempoEvent(500000))),
+        Track(0, (0, On(0, 60)), (96, Off(0, 60))),
+        Track(1, (0, Cc(0, 7, 90)), (48, On(0, 72)), (240, Cc(0, 7, 50)), (480, Off(0, 72))))
+    { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+
+    [Fact]
+    public void Player_sends_fixed_value_instead_of_file_until_first_change()
+    {
+        var midi = Fade();
+        var (main, others) = MidiPorts.Split(midi);
+        const int volume = ChannelMixer.Volume;
+        int resets = 0;
+        PortControllers.Clear();
+        try
+        {
+            // Volume of channel B1 fixed at 30 before the track plays: sent at the start, and instead of the file's 90.
+            PortControllers.Set(1, 0, volume, 30, false);
+            var follow = new Follow();
+            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 0, Passages(midi),
+                                                    () => Volatile.Read(ref resets));
+            follow.WaitFirstLook();
+            follow.Running = true;
+            Interlocked.Exchange(ref follow.Tick, 60);
+            Wait(() => follow.Texts().Contains("1:on1/72"));
+            Assert.Equal(new[] { "1:cc1/7=30", "1:cc1/7=30", "1:on1/72" }, follow.Texts());
+            Assert.True(player.IsFixedActive(1, 0, volume));
+            Assert.Equal(30, player.Value(1, 0, volume));
+            Assert.Equal(90, player.FileValue(1, 0, volume));
+
+            // The first change of the volume after the note: the file's values play again.
+            follow.Clear();
+            Interlocked.Exchange(ref follow.Tick, 300);
+            Wait(() => follow.Texts().Contains("1:cc1/7=50"));
+            Wait(() => !player.IsFixedActive(1, 0, volume));
+            Assert.Equal(50, player.Value(1, 0, volume));
+
+            // For the whole track: the fixed value again; back to the file's.
+            follow.Clear();
+            player.SetWholeTrack(1, 0, volume, true);
+            Assert.Equal(30, player.Value(1, 0, volume));
+            player.ClearController(1, 0, volume);
+            Assert.Null(PortControllers.Of(1, 0, volume));
+            // Fixed past the first passage: for the whole track; muted and unmuted: back to the fixed value.
+            player.SetController(1, 0, volume, 20);
+            Assert.Equal((20, true), PortControllers.Of(1, 0, volume));
+            player.SetMuted(1, 0, true);
+            player.SetMuted(1, 0, false);
+            Assert.Equal(new[] { "1:cc1/7=30", "1:cc1/7=50", "1:cc1/7=20", "1:cc1/7=0", "1:cc1/7=20" }, follow.Texts());
+
+            // A mode reset played by the engine: the fixed value sent again.
+            follow.Clear();
+            Interlocked.Increment(ref resets);
+            Wait(() => follow.Texts().Contains("1:cc1/7=20"));
+        }
+        finally { PortControllers.Clear(); }
+    }
+
+    [Fact]
+    public void Save_writes_fixed_values_of_other_port_in_its_tracks()
+    {
+        var midi = Fade();
+        int controllers = ChannelMixer.ControllerNumbers.Length;
+        var applyCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
+        var ccValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
+        var wholeTrack = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
+        (applyCc[ChannelMixer.Volume][0], ccValues[ChannelMixer.Volume][0]) = (true, 30);   // B1, until the first change
+        MidiFileEditor.ApplyChanges(midi, Array.Empty<(int, long, int, int, int)>(), applyCc, ccValues, Enumerable.Repeat(-1, 16).ToArray(),
+                                    true, wholeTrack, chunk => MidiPorts.TrackPort(chunk) == 1, "B", changeSysEx: false);
+        // In the track of port 1: 30 instead of 90 at the start, the change after the note kept.
+        var volumes = midi.GetTrackChunks().ElementAt(2).GetTimedEvents().Where(t => t.Event is ControlChangeEvent cc && cc.ControlNumber == 7)
+                          .Select(t => (t.Time, (int)((ControlChangeEvent)t.Event).ControlValue)).ToList();
+        Assert.Equal(new[] { (0L, 30), (240L, 50) }, volumes);
+        Assert.DoesNotContain(midi.GetTrackChunks().ElementAt(1).Events, e => e is ControlChangeEvent);   // port 0 untouched
     }
 
     [Fact]
