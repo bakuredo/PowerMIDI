@@ -84,33 +84,51 @@ public sealed partial class MainViewModel
     int scaleKey;                                        // 0 = C … 11 = B
     int scaleStep = 5;
 
-    // Channel played by the computer keyboard (-1: off).
+    // Channel played by the computer keyboard (-1: off), and its MIDI port: 0, or 1 for a row of port B in the Mixer
+    // (a file on several ports, with the SoundFont engine: channels 17-32 of the engine).
     int keyboardChannel = -1;
+    int keyboardPort;
     public int KeyboardChannel => keyboardChannel;
+    public int KeyboardPort => keyboardPort;
 
     // Click on a channel number in the Mixer: keyboard mode on this channel, or off if it was already on it.
-    public void ToggleKeyboardChannel(int channel)
+    public void ToggleKeyboardChannel(int port, int channel)
     {
         ReleaseKeyboardNotes();
-        keyboardChannel = keyboardChannel == channel ? -1 : channel;
-        foreach (var ch in Mixer.Channels) ch.IsKeyboard = ch.Channel == keyboardChannel;
+        bool same = keyboardChannel == channel && keyboardPort == port;
+        keyboardChannel = same ? -1 : channel;
+        keyboardPort = same ? 0 : port;
+        foreach (var ch in Mixer.Rows) ch.IsKeyboard = ch.Port == keyboardPort && ch.Channel == keyboardChannel;
         Status = keyboardChannel < 0 ? "Keyboard mode off." : KeyboardHelp();
     }
+
+    // The rows of port B hidden (the file on several ports stopped or replaced): keyboard mode on one of them stops.
+    void CheckKeyboardPort()
+    {
+        if (keyboardChannel < 0 || keyboardPort == 0 || Mixer.ShowsOtherPorts) return;
+        ToggleKeyboardChannel(keyboardPort, keyboardChannel);
+        Status = "Keyboard mode off: port B rows hidden.";
+    }
+
+    // Drum channel played: on port B, its 10th channel (as the SoundFont engine sets it).
+    bool KeyboardOnDrums => keyboardPort > 0 ? keyboardChannel == 9 : Mixer.IsDrumChannel(keyboardChannel);
 
     string KeyboardHelp()
     {
         string Keys(params int[] scans) => string.Join(" ", scans.Select(PhysicalKeys.Label));
         int c = keyboardChannel;
-        var name = Mixer.InstrumentName(c, ChannelMixer.Override[c] ? ChannelMixer.OverrideMsb[c] : ChannelMixer.BankMsb[c],
+        var name = keyboardPort > 0 ? Mixer.OtherInstrumentName(keyboardPort, c)
+                 : Mixer.InstrumentName(c, ChannelMixer.Override[c] ? ChannelMixer.OverrideMsb[c] : ChannelMixer.BankMsb[c],
                                         ChannelMixer.Override[c] ? ChannelMixer.OverrideLsb[c] : ChannelMixer.BankLsb[c],
                                         ChannelMixer.Override[c] ? ChannelMixer.OverrideProgram[c] : ChannelMixer.Program[c]);
+        var row = Mixer.Rows.First(r => r.Port == keyboardPort && r.Channel == c).Name;   // "3", or "A3" / "B3" with port B
         var scaleText = scale < 0 ? $"{Keys(ScaleNext)}: scale (off)"
-                      : Mixer.IsDrumChannel(c) ? $"{Keys(ScaleOff)}: scale off · {Keys(ScaleNext)}: {Scales[scale].Name} (not on drums)"
+                      : KeyboardOnDrums ? $"{Keys(ScaleOff)}: scale off · {Keys(ScaleNext)}: {Scales[scale].Name} (not on drums)"
                       : $"{Keys(ScaleOff)}: scale off · {Keys(ScaleNext)}: {Scales[scale].Name} in {NoteNames[scaleKey]} " +
                         $"({string.Join(" ", Scales[scale].Notes.Select(n => NoteNames[(scaleKey + n) % 12]))}) · " +
                         $"{Keys(StepDown, StepUp)}: step {Step} · {Keys(TonicDown, TonicUp)}: key";
-        return $"Keyboard on channel {c + 1} ({name}): {Keys(OctaveDown, OctaveUp)}: octave {keyboardOctave} · " +
-               $"{Keys(VelocityDown, VelocityUp)}: velocity {keyboardVelocity} · {scaleText} · Esc or click {c + 1} again: off";
+        return $"Keyboard on channel {row} ({name}): {Keys(OctaveDown, OctaveUp)}: octave {keyboardOctave} · " +
+               $"{Keys(VelocityDown, VelocityUp)}: velocity {keyboardVelocity} · {scaleText} · Esc or click {row} again: off";
     }
 
     // Step used: at most the number of notes of the scale (a step of the whole scale is the octave), so that the chords
@@ -123,7 +141,7 @@ public sealed partial class MainViewModel
     int[] KeyNotes(int scanCode)
     {
         int c0 = (keyboardOctave + 2) * 12;
-        if (scale >= 0 && !Mixer.IsDrumChannel(keyboardChannel))
+        if (scale >= 0 && !KeyboardOnDrums)
         {
             if (scanCode is < ScaleKeys or >= ScaleKeys + ScaleKeyCount) return null;
             var notes = Scales[scale].Notes;
@@ -148,10 +166,10 @@ public sealed partial class MainViewModel
                 // Already held by another key: stopped first, so that the module plays it once.
                 if (noteHolds.TryGetValue(note, out int holds) && holds > 0) SendNoteOff(note);
                 noteHolds[note] = holds + 1;
-                output.SendEvent(new NoteOnEvent((SevenBitNumber)note, (SevenBitNumber)keyboardVelocity) { Channel = (FourBitNumber)keyboardChannel });
+                SendKeyboardEvent(new NoteOnEvent((SevenBitNumber)note, (SevenBitNumber)keyboardVelocity) { Channel = (FourBitNumber)keyboardChannel });
             }
             heldNotes[scanCode] = notes;
-            ChannelMixer.Used[keyboardChannel] = true;
+            if (keyboardPort == 0) ChannelMixer.Used[keyboardChannel] = true;
             return true;
         }
         // Key and step only with a scale.
@@ -192,7 +210,14 @@ public sealed partial class MainViewModel
     }
 
     void SendNoteOff(int note) =>
-        output?.SendEvent(new NoteOffEvent((SevenBitNumber)note, (SevenBitNumber)0) { Channel = (FourBitNumber)keyboardChannel });
+        SendKeyboardEvent(new NoteOffEvent((SevenBitNumber)note, (SevenBitNumber)0) { Channel = (FourBitNumber)keyboardChannel });
+
+    // A note of the keyboard mode: to the output, on port B through the SoundFont engine (nothing if it is gone).
+    void SendKeyboardEvent(MidiEvent e)
+    {
+        if (keyboardPort == 0) output?.SendEvent(e);
+        else if (output is SoundFontOutput engine) engine.SendEvent(e, keyboardPort);
+    }
 
     // Releases the notes held on the computer keyboard (focus lost, mode off, channel changed, track stopped).
     public void ReleaseKeyboardNotes()
@@ -203,6 +228,6 @@ public sealed partial class MainViewModel
         noteHolds.Clear();
     }
 
-    // LED of the keyboard channel: lit while a key is held.
+    // LED of the keyboard channel (on keyboardPort): lit while a key is held.
     int KeyboardLedChannel => heldNotes.Count > 0 ? keyboardChannel : -1;
 }

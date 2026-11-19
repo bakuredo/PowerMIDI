@@ -312,11 +312,13 @@
         </Slider>
         <TextBlock Grid.Column="5" Text="{Binding TransposeText}" FontFamily="{DynamicResource MonoFont}" TextAlignment="Center" Margin="3,-0.5,-3,0.5"/>   <!-- the pitch part 3 px right (icon, slider, value): the value under the M buttons -->
       </Grid>
-      <!-- One row per channel: number · LED · map · instrument · slider · value · M -->
-      <ItemsControl ItemsSource="{Binding Channels}">
+      <!-- One row per channel: number · LED · map · instrument · slider · value · M. A file on several MIDI ports with the
+           SoundFont engine: the 16 rows of port B follow those of port A (the list then scrolls). -->
+      <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+      <ItemsControl ItemsSource="{Binding Rows}">
         <ItemsControl.ItemTemplate>
           <DataTemplate DataType="{x:Type vm:ChannelViewModel}">
-            <Grid Height="26">
+            <Grid Height="26" Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="34"/>
                 <ColumnDefinition Width="16"/>
@@ -409,7 +411,8 @@
 
               <!-- Slider of the displayed controller: moving it fixes the value; right click: back to the file value. -->
               <Slider Grid.Column="4" Minimum="0" Maximum="127" SmallChange="1" LargeChange="8" IsMoveToPointEnabled="True"
-                      VerticalAlignment="Center" Value="{Binding Value}" ToolTip="{Binding SliderToolTip}" b:Wheel.SliderStep="True">
+                      VerticalAlignment="Center" Value="{Binding Value}" ToolTip="{Binding SliderToolTip}" b:Wheel.SliderStep="True"
+                      IsHitTestVisible="{Binding IsEditable}" Focusable="{Binding IsEditable}">
                 <Slider.InputBindings>
                   <MouseBinding MouseAction="RightClick" Command="{Binding ClearControllerCommand}"/>
                 </Slider.InputBindings>
@@ -473,6 +476,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </ScrollViewer>
     </DockPanel>
     </TabItem>
     <TabItem Header="Effects" DataContext="{Binding Effects}" d:DataContext="{d:DesignInstance vm:EffectsViewModel}">

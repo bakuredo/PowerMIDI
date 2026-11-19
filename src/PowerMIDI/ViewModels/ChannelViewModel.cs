@@ -11,32 +11,52 @@ public sealed record MapChoice(string Text, int Map);
 
 // One row of the mixer. Properties set by the user (slider, mute, map, instrument) call the mixer;
 // MixerViewModel.Refresh updates them from ChannelMixer without calling it back (see Updating).
+// A row of another MIDI port (Port > 0: a file on several ports, with the SoundFont engine) shows that channel as the
+// file plays it (OtherPortsPlayer); its instrument, mute, solo and keyboard mode act, not its slider nor its map.
 public sealed class ChannelViewModel : ObservableObject
 {
     readonly MixerViewModel mixer;
 
-    public ChannelViewModel(MixerViewModel mixer, int channel)
+    public ChannelViewModel(MixerViewModel mixer, int channel, int port = 0)
     {
         this.mixer = mixer;
         Channel = channel;
-        ClearControllerCommand = new RelayCommand(() => mixer.Run(() => mixer.ClearController(Channel)));
-        WholeTrackCommand = new RelayCommand(() => mixer.Run(() => mixer.ToggleWholeTrack(Channel)));
-        SoloCommand = new RelayCommand(() => mixer.Run(() => mixer.ToggleSolo(Channel)));
-        InstrumentWheelCommand = new RelayCommand(p => mixer.Run(() => mixer.StepInstrumentOrMap(Channel, (WheelStep)p)));
-        MapWheelCommand = new RelayCommand(p => mixer.Run(() => mixer.StepMap(Channel, ((WheelStep)p).Direction)));
-        KeyboardCommand = new RelayCommand(() => mixer.Run(() => mixer.KeyboardToggle?.Invoke(Channel)));
+        Port = port;
+        // The controllers and map of a row of another port do nothing: they are the file's. Its instrument (the
+        // SoundFont's presets), mute, solo and keyboard mode act as on port A.
+        RelayCommand Command(Action action) => new(() => { if (port == 0) mixer.Run(action); });
+        ClearControllerCommand = Command(() => mixer.ClearController(Channel));
+        WholeTrackCommand = Command(() => mixer.ToggleWholeTrack(Channel));
+        SoloCommand = new RelayCommand(() => mixer.Run(() => mixer.ToggleSolo(this)));
+        InstrumentWheelCommand = new RelayCommand(p => mixer.Run(() =>
+        {
+            if (port == 0) mixer.StepInstrumentOrMap(Channel, (WheelStep)p); else mixer.StepOtherInstrument(this, (WheelStep)p);
+        }));
+        MapWheelCommand = new RelayCommand(p => { if (port == 0) mixer.Run(() => mixer.StepMap(Channel, ((WheelStep)p).Direction)); });
+        KeyboardCommand = new RelayCommand(() => mixer.Run(() => mixer.KeyboardToggle?.Invoke(Port, Channel)));
     }
 
     public int Channel { get; }
-    public string Number => $"{Channel + 1,2}";
-    public string NumberToolTip => $"Click to play channel {Channel + 1}{(Channel == 9 ? " (drums)" : "")} with computer keyboard";
+    public int Port { get; }
+    public bool IsEditable => Port == 0;
+
+    // Number: "1".."16"; with several ports shown, "A1".."A16", "B1".."B16".
+    public string Number => mixer.ShowsOtherPorts ? $"{(char)('A' + Port)}{Channel + 1,-2}" : $"{Channel + 1,2}";
+    public string NumberToolTip => Port > 0
+        ? $"Click to play port {(char)('A' + Port)} channel {Channel + 1}{(Channel == 9 ? " (drums)" : "")} with computer keyboard (instrument and controllers: file's)"
+        : $"Click to play channel {Channel + 1}{(Channel == 9 ? " (drums)" : "")} with computer keyboard";
+    internal void NumberChanged() => OnPropertyChanged(nameof(Number));
+
+    // Shown: the rows of the first port always; those of another port while a file on several ports plays.
+    bool isVisible = true;
+    public bool IsVisible { get => isVisible; internal set => Set(ref isVisible, value); }
 
     // Click on the number: keyboard mode on this channel (see MainViewModel.Keyboard.cs).
     public ICommand KeyboardCommand { get; }
 
     bool isKeyboard;
     public bool IsKeyboard { get => isKeyboard; internal set => Set(ref isKeyboard, value); }
-    public string MuteToolTip => $"Mute channel {Channel + 1} (right click: solo)";
+    public string MuteToolTip => Port > 0 ? $"Mute port {(char)('A' + Port)} channel {Channel + 1} (right click: solo)" : $"Mute channel {Channel + 1} (right click: solo)";
 
     public ICommand ClearControllerCommand { get; }
     public ICommand SoloCommand { get; }
@@ -59,7 +79,7 @@ public sealed class ChannelViewModel : ObservableObject
         get => value;
         set
         {
-            if (Set(ref this.value, value) && !Updating)
+            if (Set(ref this.value, value) && !Updating && Port == 0)
                 mixer.Run(() => mixer.SetController(Channel, (int)Math.Round(value)));
         }
     }
@@ -91,9 +111,12 @@ public sealed class ChannelViewModel : ObservableObject
         set
         {
             if (Set(ref isMuted, value) && !Updating)
-                mixer.Run(() => mixer.SetMute(Channel, value));
+                mixer.Run(() => { if (Port == 0) mixer.SetMute(Channel, value); else mixer.SetOtherPortMute(this, value); });
         }
     }
+
+    // Row of the Mixer (solo, keyboard mode): its port letter and channel number, as shown.
+    internal string Name => mixer.ShowsOtherPorts ? $"{(char)('A' + Port)}{Channel + 1}" : $"{Channel + 1}";
 
     bool isSolo;
     public bool IsSolo
@@ -114,7 +137,7 @@ public sealed class ChannelViewModel : ObservableObject
         get => selectedMap;
         set
         {
-            if (Set(ref selectedMap, value) && !Updating && value != null)
+            if (Set(ref selectedMap, value) && !Updating && value != null && Port == 0)
                 mixer.Run(() => mixer.SetChannelMap(Channel, value.Map));
         }
     }
@@ -137,7 +160,7 @@ public sealed class ChannelViewModel : ObservableObject
         set
         {
             if (Set(ref selectedInstrument, value) && !Updating && value != null)
-                mixer.Run(() => mixer.SelectInstrument(Channel, value));
+                mixer.Run(() => { if (Port == 0) mixer.SelectInstrument(Channel, value); else mixer.SelectOtherInstrument(this, value); });
         }
     }
 
@@ -162,8 +185,13 @@ public sealed class ChannelViewModel : ObservableObject
         set
         {
             if (!Set(ref isListOpen, value)) return;
-            // Opening: sounds of the channel's map; closing: back to showing the name.
-            mixer.Run(() => { if (value) mixer.OpenInstrumentList(this); else mixer.RefreshInstrument(this); });
+            // Opening: sounds of the channel's map (port B: the SoundFont's presets); closing: back to showing the name.
+            mixer.Run(() =>
+            {
+                if (Port > 0) { if (value) mixer.OpenOtherInstrumentList(this); else mixer.RefreshOtherPorts(); }
+                else if (value) mixer.OpenInstrumentList(this);
+                else mixer.RefreshInstrument(this);
+            });
         }
     }
 

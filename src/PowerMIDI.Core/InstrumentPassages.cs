@@ -39,7 +39,9 @@ public sealed class InstrumentPassages
     }
 
     // followResets: false in a forced mode (the resets of the file are ignored, see ChannelMixer.ForceMode).
-    public static InstrumentPassages Read(MidiFile file, bool followResets = true)
+    // channelsOf: the tracks whose channel events count (null: all of them), e.g. the tracks of one MIDI port of a file
+    // played on several ports (see MidiPorts); the resets of every track count.
+    public static InstrumentPassages Read(MidiFile file, bool followResets = true, Func<TrackChunk, bool> channelsOf = null)
     {
         var result = new InstrumentPassages();
         // All the events in the order they play (position, then track, then place in the track), as MidiEventList.
@@ -47,11 +49,12 @@ public sealed class InstrumentPassages
         int track = 0;
         foreach (var chunk in file.GetTrackChunks())
         {
+            bool channels = channelsOf == null || channelsOf(chunk);
             long time = 0;
             for (int i = 0; i < chunk.Events.Count; i++)
             {
                 time += chunk.Events[i].DeltaTime;
-                all.Add((time, track, i, chunk.Events[i]));
+                if (channels || chunk.Events[i] is not ChannelEvent) all.Add((time, track, i, chunk.Events[i]));
             }
             track++;
         }

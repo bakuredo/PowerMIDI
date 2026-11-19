@@ -92,6 +92,18 @@ public class MidiPortsTests
         Wait(() => follow.Texts().Contains("1:on1/72"));
         Assert.Equal(new[] { "1:pc1/40", "1:on1/72" }, follow.Texts());
 
+        // The state the Mixer shows: program, used (program or note), last note; an unused channel.
+        Assert.Equal(40, player.Program(1, 0));
+        Assert.True(player.IsUsed(1, 0));
+        Assert.True(player.LastNoteOn(1, 0) > 0);
+        Assert.False(player.IsUsed(1, 1));
+        Assert.Equal(-1, player.Control(1, 0, 7));
+        // Muted: its volume to 0; unmuted: back to 100 (the file has not set it).
+        player.SetMuted(1, 0, true);
+        Assert.True(player.IsMuted(1, 0));
+        player.SetMuted(1, 0, false);
+        Assert.Equal(new[] { "1:cc1/7=0", "1:cc1/7=100" }, follow.Texts().Skip(2));
+
         // Paused: sustain off and all notes off.
         follow.Running = false;
         Wait(() => follow.Texts().Contains("1:cc1/123=0"));
@@ -117,5 +129,62 @@ public class MidiPortsTests
         follow.Clear();
         follow.Gone = true;
         Wait(() => follow.Texts().Contains("1:cc1/120=0"));
+    }
+
+    static Dictionary<int, InstrumentPassages> PortPassages(MidiFile midi) =>
+        new() { [1] = InstrumentPassages.Read(midi, true, chunk => MidiPorts.TrackPort(chunk) == 1) };
+
+    [Fact]
+    public void Player_plays_instrument_chosen_for_passage_instead_of_file()
+    {
+        var midi = TwoPorts();
+        var (main, others) = MidiPorts.Split(midi);
+        PortInstruments.Clear();
+        try
+        {
+            // Chosen for the first passage of channel B1 before the track plays (a playback rebuilt keeps it).
+            PortInstruments.Set(1, 0, InstrumentPassages.First, 3, 0, 60);
+            var follow = new Follow();
+            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 0, PortPassages(midi));
+            Thread.Sleep(100);
+            // At the start: the choice sent; playing: the file's Program Change replaced by it, with its bank.
+            Assert.Equal(new[] { "1:cc1/0=3", "1:cc1/32=0", "1:pc1/60" }, follow.Texts());
+            follow.Running = true;
+            Interlocked.Exchange(ref follow.Tick, 60);
+            Wait(() => follow.Texts().Contains("1:on1/72"));
+            Assert.Equal(new[] { "1:cc1/0=3", "1:cc1/32=0", "1:pc1/60", "1:on1/72" }, follow.Texts().Skip(3));
+            // The file's instrument is still known (the Mixer shows it in the tooltip), in the first passage.
+            Assert.Equal(40, player.Program(1, 0));
+            Assert.Equal(InstrumentPassages.First, player.Passage(1, 0));
+
+            // Back to the file's instrument; another one chosen while playing.
+            follow.Clear();
+            player.ClearInstrument(1, 0, false);
+            Assert.Null(PortInstruments.Of(1, 0, InstrumentPassages.First));
+            player.ChooseInstrument(1, 0, 0, 0, 7);
+            Assert.Equal(new[] { "1:cc1/0=0", "1:cc1/32=0", "1:pc1/40", "1:cc1/0=0", "1:cc1/32=0", "1:pc1/7" }, follow.Texts());
+            Assert.Equal((0, 0, 7), PortInstruments.Of(1, 0, InstrumentPassages.First));
+        }
+        finally { PortInstruments.Clear(); }
+    }
+
+    [Fact]
+    public void Save_writes_settings_of_each_port_in_its_tracks()
+    {
+        var midi = TwoPorts();
+        int controllers = ChannelMixer.ControllerNumbers.Length;
+        var noCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
+        var noValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
+        var noRhythm = Enumerable.Repeat(-1, 16).ToArray();
+        // Channel A1, then channel B1: each in the tracks of its port only (both are channel 1 of the file).
+        MidiFileEditor.ApplyChanges(midi, new[] { (0, InstrumentPassages.First, 0, 0, 10) }, noCc, noValues, noRhythm, true, null,
+                                    chunk => MidiPorts.TrackPort(chunk) == 0, "A");
+        var report = MidiFileEditor.ApplyChanges(midi, new[] { (0, InstrumentPassages.First, 0, 0, 20) }, noCc, noValues, noRhythm, true, null,
+                                                 chunk => MidiPorts.TrackPort(chunk) == 1, "B", changeSysEx: false);
+        Assert.StartsWith("channel B1: instrument", report);
+        var programs = midi.GetTrackChunks().Select(c => c.Events.OfType<ProgramChangeEvent>().Select(p => (int)p.ProgramNumber).ToList()).ToList();
+        Assert.Equal(new[] { 10 }, programs[1]);   // port 0
+        Assert.Equal(new[] { 20 }, programs[2]);   // port 1
+        Assert.Equal(1, MidiPorts.TrackPort(midi.GetTrackChunks().ElementAt(2)));   // its port kept
     }
 }

@@ -235,7 +235,7 @@ public partial class MainWindow : Window, IMainView
         if (e.OriginalSource is System.Windows.Controls.TextBox) return;
         if (vm.KeyboardChannel >= 0 && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Windows)) == 0)
         {
-            if (e.Key == Key.Escape) { Run(() => vm.ToggleKeyboardChannel(vm.KeyboardChannel)); e.Handled = true; return; }
+            if (e.Key == Key.Escape) { Run(() => vm.ToggleKeyboardChannel(vm.KeyboardPort, vm.KeyboardChannel)); e.Handled = true; return; }
             bool used = false;
             Run(() => used = vm.KeyboardKeyDown(PhysicalKeys.ScanCode(e.Key), e.IsRepeat));
             if (used) { e.Handled = true; return; }

@@ -42,7 +42,194 @@ public sealed class MixerViewModel : ObservableObject
         this.setStatus = setStatus;
         this.showError = showError;
         Channels = Enumerable.Range(0, 16).Select(c => new ChannelViewModel(this, c)).ToList();
+        OtherChannels = Enumerable.Range(0, 16).Select(c => new ChannelViewModel(this, c, 1) { IsVisible = false }).ToList();
+        Rows = Channels.Concat(OtherChannels).ToList();
         ResetCommand = new RelayCommand(() => Run(Reset));
+    }
+
+    // ---------- Other MIDI port (a file on several ports, with the SoundFont engine) ----------
+    // The rows of port B (channels 17-32 of the engine) under those of port A, while such a file plays: each channel as
+    // the file plays it (OtherPortsPlayer: instrument, value of the controller shown, activity). Their instrument (chosen
+    // per passage, see PortInstruments), mute, solo and keyboard mode act as on port A; their slider shows only.
+    public IReadOnlyList<ChannelViewModel> OtherChannels { get; }
+    public IReadOnlyList<ChannelViewModel> Rows { get; }   // the rows of the tab: port A, then port B
+    public Func<OtherPortsPlayer> OtherPorts { get; set; }
+
+    bool showsOtherPorts;
+    public bool ShowsOtherPorts
+    {
+        get => showsOtherPorts;
+        private set
+        {
+            if (!Set(ref showsOtherPorts, value)) return;
+            foreach (var row in Rows) row.NumberChanged();   // "A1".."B16", or "1".."16"
+            foreach (var row in OtherChannels) row.IsVisible = value;
+            UpdateSolo();   // the solo counts the rows of port B while shown
+        }
+    }
+
+    // Instruments (every 200 ms, with Refresh) and sliders of the rows of port B. An instrument list open is left as it is
+    // (shown again once closed).
+    internal void RefreshOtherPorts()
+    {
+        var player = OtherPorts?.Invoke();
+        ShowsOtherPorts = player != null;
+        if (player == null) return;
+        foreach (var ch in OtherChannels)
+        {
+            int c = ch.Channel, port = ch.Port;
+            if (player.IsMuted(port, c) != ch.IsMuted) player.SetMuted(port, c, ch.IsMuted);   // the row's mute, on a new track too
+            if (ch.IsListOpen) continue;
+            if (ch.ListShown) { ch.ListShown = false; ch.InstrumentKey = ""; }   // list closed since it was last opened
+            bool used = player.IsUsed(port, c);
+            long passage = player.Passage(port, c);
+            var choice = PortInstruments.Of(port, c, passage);
+            int others = PortInstruments.OtherPassages(port, c, passage);
+            var key = $"{used}/{player.Program(port, c)}/{player.BankMsb(port, c)}/{player.BankLsb(port, c)}/{choice}/{others}";
+            if (key == ch.InstrumentKey) continue;
+            ch.InstrumentKey = key;
+            var fileInfo = FileOtherInstrument(port, c);
+            var info = CurrentOtherInstrument(port, c);
+            var (state, tooltip) = !used ? (InstrumentState.Unused, "Channel unused so far")
+                                 : choice != null ? (InstrumentState.Manual, $"{info.Detail} (file: {ShownName(fileInfo)})\nChosen for this passage (until next Program Change of file)")
+                                 : (InstrumentState.File, info.Detail);
+            if (others > 0) tooltip += $"\nInstrument changed in {others} other passage{(others > 1 ? "s" : "")}";
+            var display = new InstrumentChoice { Text = !used ? "—" : ShownName(info), IsDisplay = true };
+            Update(ch, () =>
+            {
+                ch.IsDrum = c == 9;
+                ch.InstrumentItems = new[] { display };
+                ch.SelectedInstrument = display;
+                ch.InstrumentState = state;
+                ch.IsInstrumentMissing = used && info.Missing;
+                ch.InstrumentToolTip = tooltip;
+                ch.MapEnabled = false;
+                ch.SelectedMap = null;
+                ch.MapToolTip = "Maps: GS and XG only";
+            });
+        }
+        RefreshOtherSliders();
+    }
+
+    // Sound a channel of another port plays: the instrument chosen for its passage, or the file's.
+    (int Msb, int Lsb, int Program) CurrentOtherSound(int port, int c)
+    {
+        var player = OtherPorts?.Invoke();
+        if (player == null) return (0, 0, 0);
+        return PortInstruments.Of(port, c, player.Passage(port, c)) ?? (player.BankMsb(port, c), player.BankLsb(port, c), player.Program(port, c));
+    }
+
+    // Instrument of a sound on a channel of another port (the SoundFont's preset; the 10th channel: drums).
+    InstrumentInfo OtherSound(int c, (int Msb, int Lsb, int Program) sound) =>
+        defs.Resolve(InstrumentDefinitions.Sf2Standard, c, sound.Program, sound.Msb, sound.Lsb, c == 9 ? 1 : 0);
+
+    InstrumentInfo CurrentOtherInstrument(int port, int c) => OtherSound(c, CurrentOtherSound(port, c));
+
+    // The file's instrument of a channel of another port (the choice of the Mixer aside).
+    InstrumentInfo FileOtherInstrument(int port, int c)
+    {
+        var player = OtherPorts?.Invoke();
+        return OtherSound(c, player == null ? (0, 0, 0) : (player.BankMsb(port, c), player.BankLsb(port, c), player.Program(port, c)));
+    }
+
+    // Name of the instrument of a channel of another port (keyboard mode).
+    public string OtherInstrumentName(int port, int c) => ShownName(CurrentOtherInstrument(port, c));
+
+    // Sounds offered for a channel of another port (the SoundFont's presets; kits on the 10th channel) and the place of
+    // the one it plays (-1 if missing), as GetChannelChoices.
+    (IReadOnlyList<InstrumentChoice> Choices, int Index, int Program) GetOtherChoices(int port, int c)
+    {
+        bool drum = c == 9;
+        var (msb, _, program) = CurrentOtherSound(port, c);
+        var choices = defs.GetChoices(InstrumentDefinitions.Sf2Standard, drum, 0);
+        msb = defs.SoundFontBank(msb, program);   // bank 0 when the SoundFont does not have the one asked for
+        int index = -1;
+        for (int i = 0; i < choices.Count; i++)
+            if (choices[i].Program == program && (drum || choices[i].Msb == msb)) { index = i; break; }
+        return (choices, index, program);
+    }
+
+    // Opening the list of a row of port B: back to the file's instrument (in this passage; in all of them, when other
+    // passages have an instrument chosen), then the presets of the SoundFont, the current one selected.
+    internal void OpenOtherInstrumentList(ChannelViewModel ch)
+    {
+        var player = OtherPorts?.Invoke();
+        if (player == null) return;
+        var (choices, index, _) = GetOtherChoices(ch.Port, ch.Channel);
+        var items = new List<InstrumentChoice> { new() { Text = $"↺ File instrument ({ShownName(FileOtherInstrument(ch.Port, ch.Channel))})", IsReset = true } };
+        int others = PortInstruments.OtherPassages(ch.Port, ch.Channel, player.Passage(ch.Port, ch.Channel));
+        if (others > 0)
+            items.Add(new InstrumentChoice { Text = $"↺ File instrument passage ({others} other{(others > 1 ? "s" : "")} changed)", IsReset = true, AllPassages = true });
+        items.AddRange(choices);
+        Update(ch, () =>
+        {
+            ch.AllItems = items;
+            ch.SearchText = "";
+            ch.InstrumentItems = items;
+            ch.SelectedInstrument = index >= 0 ? choices[index] : null;
+        });
+        ch.ListShown = true;
+    }
+
+    // An item of the list of a row of port B chosen: a preset for the passage being played, or the file's instrument.
+    internal void SelectOtherInstrument(ChannelViewModel ch, InstrumentChoice item)
+    {
+        var player = OtherPorts?.Invoke();
+        if (item == null || item.IsDisplay || player == null) return;
+        if (item.IsReset)
+        {
+            player.ClearInstrument(ch.Port, ch.Channel, item.AllPassages);
+            setStatus(item.AllPassages ? $"Channel {ch.Name}: file instruments in all passages" : $"Channel {ch.Name}: file instrument");
+        }
+        else
+        {
+            player.ChooseInstrument(ch.Port, ch.Channel, item.Msb, item.Lsb, item.Program);
+            setStatus($"Channel {ch.Name}: MSB {item.Msb} / LSB {item.Lsb} / PC {item.Program + 1}");
+        }
+        ch.InstrumentKey = "";   // refresh the name (now, or when the list closes)
+        if (!ch.IsListOpen) RefreshOtherPorts();
+    }
+
+    // Wheel on the closed list of a row of port B: next / previous preset (with Ctrl: next / previous program).
+    internal void StepOtherInstrument(ChannelViewModel ch, WheelStep step)
+    {
+        if (OtherPorts?.Invoke() == null) return;
+        var (choices, index, program) = GetOtherChoices(ch.Port, ch.Channel);
+        if (StepTarget(choices, index, program, step.Direction, step.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control)) is { } target)
+            SelectOtherInstrument(ch, target);
+    }
+
+    // Sliders of the rows of port B (every 30 ms while playing, as those of port A): the value of the controller shown.
+    void RefreshOtherSliders()
+    {
+        var player = OtherPorts?.Invoke();
+        if (player == null) return;
+        int k = shownController, number = ChannelMixer.ControllerNumbers[k];
+        foreach (var ch in OtherChannels)
+        {
+            int value = player.Control(ch.Port, ch.Channel, number);
+            if (value < 0) value = ChannelMixer.ControllerDefaults[k];
+            var key = $"{k}/{value}";
+            if (key == ch.ShownKey) continue;
+            ch.ShownKey = key;
+            var text = FormatControllerValue(k, value);
+            Update(ch, () =>
+            {
+                ch.Value = value;
+                ch.ValueText = text;
+                ch.SliderToolTip = $"{ControllerNames[k]} from file: {text} (port {(char)('A' + ch.Port)}: display only)";
+                ch.ValueToolTip = null;
+                ch.IsFixed = ch.IsWholeTrack = false;
+            });
+        }
+    }
+
+    // Mute of a row of port B: the player sets the volume of the channel to 0.
+    internal void SetOtherPortMute(ChannelViewModel ch, bool muted)
+    {
+        Update(ch, () => ch.IsMuted = muted);
+        OtherPorts?.Invoke()?.SetMuted(ch.Port, ch.Channel, muted);
+        UpdateSolo();
     }
 
     // Reset button.
@@ -73,7 +260,7 @@ public sealed class MixerViewModel : ObservableObject
     // Another SoundFont loaded (SF2 mode): the names of its presets, on every channel.
     public void SoundFontChanged()
     {
-        foreach (var ch in Channels) ch.InstrumentKey = "";
+        foreach (var ch in Rows) ch.InstrumentKey = "";
         Refresh();
     }
 
@@ -168,6 +355,7 @@ public sealed class MixerViewModel : ObservableObject
             if (!Set(ref shownController, value)) return;
             OnPropertyChanged(nameof(ShownMenuIndex));
             foreach (var ch in Channels) RefreshController(ch);
+            RefreshOtherSliders();
         }
     }
 
@@ -209,6 +397,7 @@ public sealed class MixerViewModel : ObservableObject
             // Only updates the list if something changed, and never while it is open.
             if (!ch.IsListOpen) RefreshInstrument(ch, false);
         }
+        RefreshOtherPorts();
     }
 
     // Sliders only, with the LEDs (30 ms) while playing, so that they follow the fades of the file smoothly (the rest
@@ -216,20 +405,26 @@ public sealed class MixerViewModel : ObservableObject
     public void RefreshSliders()
     {
         foreach (var ch in Channels) RefreshController(ch);
+        if (ShowsOtherPorts) RefreshOtherSliders();
     }
 
     // Activity LEDs (fast timer, 30 ms): an LED stays lit for 100 ms after each Note On,
     // longer than the update interval, so that even a very short note is visible.
     // heldChannel: channel with a note held on the computer keyboard (lit meanwhile), -1 if none.
-    public void UpdateLeds(bool playing, int heldChannel = -1)
+    public void UpdateLeds(bool playing, int heldChannel = -1, int heldPort = 0)
     {
         long now = DateTime.UtcNow.Ticks;
         foreach (var ch in Channels)
-            ch.IsActive = (playing && now - ChannelMixer.LastNoteOn[ch.Channel] < LedHoldTicks) || ch.Channel == heldChannel;
+            ch.IsActive = (playing && now - ChannelMixer.LastNoteOn[ch.Channel] < LedHoldTicks) || (heldPort == 0 && ch.Channel == heldChannel);
+        if (!ShowsOtherPorts) return;
+        var player = OtherPorts?.Invoke();
+        foreach (var ch in OtherChannels)
+            ch.IsActive = (player != null && playing && now - player.LastNoteOn(ch.Port, ch.Channel) < LedHoldTicks) ||
+                          (heldPort == ch.Port && ch.Channel == heldChannel);
     }
 
-    // Click on a channel number: keyboard mode (set by the main view model).
-    public Action<int> KeyboardToggle { get; set; }
+    // Click on a channel number: keyboard mode on that port and channel (set by the main view model).
+    public Action<int, int> KeyboardToggle { get; set; }
 
     // Text of a value: 0..127; pan: L64..C..R63 (64 = center);
     // envelope, filter and vibrato (index 5 to 12): relative to 64, from -64 to +63 (0 = original sound).
@@ -627,7 +822,16 @@ public sealed class MixerViewModel : ObservableObject
     void StepInstrument(int c, int direction, bool byProgram)
     {
         var (choices, currentIndex, currentProgram, _) = GetChannelChoices(c);
-        if (choices.Count == 0) return;
+        if (StepTarget(choices, currentIndex, currentProgram, direction, byProgram) is not { } target) return;
+        SelectInstrument(c, target);
+        Refresh();
+    }
+
+    // The sound a step of the wheel goes to in a list, from the current one (its place, or -1 and its program when it is
+    // not in the list); null: none (end of the list).
+    static InstrumentChoice StepTarget(IReadOnlyList<InstrumentChoice> choices, int currentIndex, int currentProgram, int direction, bool byProgram)
+    {
+        if (choices.Count == 0) return null;
         int index = currentIndex;
         if (index < 0)
         {
@@ -643,15 +847,13 @@ public sealed class MixerViewModel : ObservableObject
             int program = choices[Math.Max(index, 0)].Program;
             target = index;
             do { target += direction; } while (target >= 0 && target < choices.Count && choices[target].Program == program);
-            if (target < 0 || target >= choices.Count) return;
+            if (target < 0 || target >= choices.Count) return null;
             // Previous program: go to its first sound (the base sound), not its last variation.
             program = choices[target].Program;
             while (direction < 0 && target > 0 && choices[target - 1].Program == program) target--;
         }
         else target = Math.Max(0, Math.Min(choices.Count - 1, index + direction));
-        if (target == currentIndex) return;
-        SelectInstrument(c, choices[target]);
-        Refresh();
+        return target == currentIndex ? null : choices[target];
     }
 
     // ---------- Maps: Sound Canvas maps in GS, MU2000 maps in XG ----------
@@ -811,30 +1013,43 @@ public sealed class MixerViewModel : ObservableObject
         UpdateSolo();
     }
 
-    // Soloed channel: the only unmuted channel when the other 15 are muted; -1 otherwise.
-    static int GetSoloChannel()
+    // The rows solo and mute act on: those of port A, and those of port B while shown.
+    IEnumerable<ChannelViewModel> SoloRows => ShowsOtherPorts ? Rows : Channels;
+
+    static bool IsRowMuted(ChannelViewModel row) => row.Port == 0 ? ChannelMixer.Muted[row.Channel] : row.IsMuted;
+
+    void SetRowMute(ChannelViewModel row, bool muted)
     {
-        var open = Enumerable.Range(0, 16).Where(i => !ChannelMixer.Muted[i]).ToList();
-        return open.Count == 1 ? open[0] : -1;
+        if (row.Port == 0) SetMute(row.Channel, muted);
+        else SetOtherPortMute(row, muted);
     }
 
-    // Solo on a channel: mutes all the others. If it is already soloed, unmutes all channels.
-    internal void ToggleSolo(int c)
+    // Soloed row: the only unmuted one when all the others are muted; null otherwise.
+    ChannelViewModel GetSoloRow()
     {
-        bool alreadySolo = GetSoloChannel() == c;
-        for (int i = 0; i < 16; i++)
+        var open = SoloRows.Where(r => !IsRowMuted(r)).ToList();
+        return open.Count == 1 ? open[0] : null;
+    }
+
+    // Solo on a row: mutes all the others (port B included while shown). If it is already soloed, unmutes them all.
+    internal void ToggleSolo(int c) => ToggleSolo(Channels[c]);
+
+    internal void ToggleSolo(ChannelViewModel row)
+    {
+        bool alreadySolo = GetSoloRow() == row;
+        foreach (var r in SoloRows.ToList())
         {
-            bool muted = !alreadySolo && i != c;
-            if (ChannelMixer.Muted[i] != muted) SetMute(i, muted);
+            bool muted = !alreadySolo && r != row;
+            if (IsRowMuted(r) != muted) SetRowMute(r, muted);
         }
-        setStatus(alreadySolo ? "Solo cancelled: all channels unmuted" : $"Solo on channel {c + 1}");
+        setStatus(alreadySolo ? "Solo cancelled: all channels unmuted" : $"Solo on channel {row.Name}");
     }
 
-    // The soloed channel shows "S" in green; the others "M".
+    // The soloed row shows "S" in green; the others "M".
     void UpdateSolo()
     {
-        int solo = GetSoloChannel();
-        foreach (var ch in Channels) ch.IsSolo = ch.Channel == solo;
+        var solo = GetSoloRow();
+        foreach (var ch in Rows) ch.IsSolo = ch == solo;
     }
 
     // ---------- Reset ----------
@@ -850,6 +1065,12 @@ public sealed class MixerViewModel : ObservableObject
         }
         foreach (var ch in Channels)
             if (ChannelMixer.Muted[ch.Channel]) SetMute(ch.Channel, false);
+        foreach (var ch in OtherChannels)   // port B: its mutes and instruments too
+            if (ch.IsMuted) SetOtherPortMute(ch, false);
+        var player = OtherPorts?.Invoke();
+        foreach (var (port, c) in PortInstruments.All().Select(x => (x.Port, x.Channel)).Distinct().ToList())
+            if (player != null) player.ClearInstrument(port, c, true);
+            else PortInstruments.Remove(port, c, InstrumentPassages.First, true);
         foreach (var ch in Channels)
         {
             if (ChannelMixer.HasInstruments(ch.Channel)) ChannelMixer.ClearOverride(device, ch.Channel, true);
@@ -872,6 +1093,7 @@ public sealed class MixerViewModel : ObservableObject
                 if (ChannelMixer.IsFixed(k, c)) { ChannelMixer.ClearController(null, k, c); had = true; }
             if (ChannelMixer.Muted[c]) { SetMute(c, false, false); had = true; }
         }
+        had |= PortInstruments.Clear();   // the instruments of the rows of port B
         return had;
     }
 }

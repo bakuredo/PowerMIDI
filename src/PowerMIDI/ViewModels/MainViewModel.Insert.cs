@@ -156,9 +156,11 @@ public sealed partial class MainViewModel
     }
 
     // Values "from the file" as they are at a position: the file's events before it go through the mixer, without
-    // sending anything (the module is already in that state).
-    static void RebuildFileState(MidiFile midi, long tick, string std)
+    // sending anything (the module is already in that state). A file whose other MIDI ports the SoundFont engine plays
+    // apart (see CreatePlayback): the first port only.
+    void RebuildFileState(MidiFile midi, long tick, string std)
     {
+        if (output is SoundFontOutput && MidiPorts.HasOtherPorts(midi)) midi = MidiPorts.Split(midi).Main;
         var device = ChannelMixer.Device;
         ChannelMixer.Device = null;   // nothing resent after the resets of the file
         try
