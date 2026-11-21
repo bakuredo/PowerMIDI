@@ -4,18 +4,20 @@ using PowerMIDI.Core;
 
 namespace PowerMIDI.ViewModels;
 
-// SoundFonts tab: the .sf2 files of the soundfonts folder next to the program, the one played by the SoundFont engine
-// (MIDI OUT "SoundFont engine (FluidSynth)"; remembered in PowerMIDI.ini) and what it says about itself.
+// SoundFonts tab: the .sf2 files of the soundfonts folder (next to the program, or the one of PowerMIDI.ini, see
+// SoundFontFinder.FolderOf), the one played by the SoundFont engine (MIDI OUT "SoundFont engine (FluidSynth)";
+// remembered in PowerMIDI.ini) and what it says about itself.
 public sealed class SoundFontsViewModel : ObservableObject
 {
     readonly Action chosen;   // a file chosen by hand: the engine loads it if it runs
     readonly Action<bool> engineChanged;   // a setting of the engine changed: restart (true) or taken at once (false)
     string savedFile;         // the file remembered in PowerMIDI.ini
+    string folderSetting = "";   // the folder as PowerMIDI.ini gives it ("": the default one), written back as it is
     bool updating;            // list refreshed or settings read: not a choice by hand
 
-    public SoundFontsViewModel(string folder, Action chosen, Action<bool> engineChanged)
+    public SoundFontsViewModel(Action chosen, Action<bool> engineChanged)
     {
-        Folder = folder;
+        Folder = SoundFontFinder.FolderOf("", AppContext.BaseDirectory);
         this.chosen = chosen;
         this.engineChanged = engineChanged;
         RefreshCommand = new RelayCommand(() => Refresh(notify: true));
@@ -23,7 +25,9 @@ public sealed class SoundFontsViewModel : ObservableObject
         Refresh(notify: false);
     }
 
-    public string Folder { get; }
+    string folder;
+    public string Folder { get => folder; private set { if (Set(ref folder, value)) OnPropertyChanged(nameof(FolderToolTip)); } }
+    public string FolderToolTip => $"Open soundfonts folder (place for .sf2 files): {folder}";
     public ICommand RefreshCommand { get; }
     public ICommand OpenFolderCommand { get; }
 
@@ -47,6 +51,12 @@ public sealed class SoundFontsViewModel : ObservableObject
 
     // Full path of the chosen file (null: none).
     public string SelectedPath => selectedFile == null ? null : Path.Combine(Folder, selectedFile);
+
+    // The SF_BANK tag of the MIDI files (see SoundFontFinder): read when a file is played (its SoundFont), written by
+    // Save MIDI file in SF2 mode (the SoundFont played). Both on by default.
+    bool readTag = true, writeTag = true;
+    public bool ReadTag { get => readTag; set => Set(ref readTag, value); }
+    public bool WriteTag { get => writeTag; set => Set(ref writeTag, value); }
 
     // State of the engine, set by the main view model: stopped, loading, running; and its delay while it runs.
     string engineState = "Stopped";
@@ -200,9 +210,15 @@ public sealed class SoundFontsViewModel : ObservableObject
     }
 
     // ---------- Settings (PowerMIDI.ini) ----------
-    // The file chosen, the settings of the engine, and its reverb and chorus (SoundFontEffects, set in the Effects tab).
+    // The folder of the SoundFonts (Folder, first in the section: the file chosen is one of it; empty: the soundfonts
+    // folder next to the program), the file chosen, the SF_BANK tag (ReadTag, WriteTag: 1 / 0), the settings of the
+    // engine, and its reverb and chorus (SoundFontEffects, set in the Effects tab).
     public void LoadSettings(IniFile ini)
     {
+        folderSetting = ini.Get("SoundFont", "Folder") ?? "";
+        Folder = SoundFontFinder.FolderOf(folderSetting, AppContext.BaseDirectory);
+        ReadTag = ini.GetInt("SoundFont", "ReadTag") != 0;
+        WriteTag = ini.GetInt("SoundFont", "WriteTag") != 0;
         SoundFontEffects.Read(ini);
         updating = true;
         try { Change(SoundFontEngineOptions.Read(ini)); }
@@ -215,7 +231,10 @@ public sealed class SoundFontsViewModel : ObservableObject
 
     public void WriteSettings(IniFile ini)
     {
+        ini.Set("SoundFont", "Folder", folderSetting);   // first: the INI is written anew, its keys in this order
         ini.Set("SoundFont", "File", selectedFile ?? savedFile ?? "");
+        ini.Set("SoundFont", "ReadTag", readTag ? 1 : 0);
+        ini.Set("SoundFont", "WriteTag", writeTag ? 1 : 0);
         options.Write(ini);
         SoundFontEffects.Write(ini);
     }

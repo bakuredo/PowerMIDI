@@ -56,6 +56,13 @@ public sealed partial class MainViewModel
         // Unchanged: the copy has the SysEx of the .syx file of the track, if it was added (see MidiTools.ReadFile).
         if (unchanged) report.Add(MidiTools.AddedSyxFile(source) is { } syx ? $"copy of track with {Path.GetFileName(syx)} file" : "copy of track, no change");
         else report.AddRange(WriteSettings(midi, channels, modules, forceMode));
+        // SF2 mode: the SoundFont the track is played with, named in the file (SF_BANK tag, unless not written: SoundFonts
+        // tab); its name alone when the saved file finds it so (see SoundFontFinder.TagFor).
+        if (IsSoundFontEngine && SoundFonts.WriteTag && current != null && SamePath(source, current.Path) && engineSoundFont?.Path is { } soundFont)
+        {
+            var value = SoundFontFinder.TagFor(soundFont, target, SoundFonts.Folder);
+            if (SoundFontFinder.WriteTag(midi, value)) report.Add($"{SoundFontFinder.Tag}={value} tag written");
+        }
         MidiTools.WriteFile(midi, target);
 
         savedSignature = GetSettingsSignature();

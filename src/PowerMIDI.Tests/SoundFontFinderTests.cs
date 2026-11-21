@@ -45,6 +45,32 @@ public sealed class SoundFontFinderTests : IDisposable
     }
 
     [Fact]
+    public void Tag_written_with_name_found_by_search()
+    {
+        // The name alone next to the saved file, or in the soundfonts folder; otherwise (or when another file of that name
+        // is next to it) the full path.
+        var album = File(@"Album\Bank.sf2");
+        var shared = File(@"soundfonts\Shared.sf2");
+        var elsewhere = File(@"Elsewhere\Far.sf2");
+        File(@"Album\Shared.sf2");
+        string Tag(string soundFont, string midi) => SoundFontFinder.TagFor(soundFont, Path.Combine(root, midi), soundFonts);
+        Assert.Equal("Bank.sf2", Tag(album, @"Album\saved.mid"));
+        Assert.Equal("Shared.sf2", Tag(shared, @"Other\saved.mid"));
+        Assert.Equal(shared, Tag(shared, @"Album\saved.mid"));   // Album\Shared.sf2 would be found first
+        Assert.Equal(elsewhere, Tag(elsewhere, @"Album\saved.mid"));
+
+        // Written at the start of the first track, the times kept; the tag of the file replaced; the same: no change.
+        var midi = new MidiFile(new TrackChunk(new NoteOnEvent { DeltaTime = 96 }), new TrackChunk(new NoteOnEvent()));
+        Assert.True(SoundFontFinder.WriteTag(midi, "Bank.sf2"));
+        var first = midi.GetTrackChunks().First().Events;
+        Assert.Equal(("SF_BANK=Bank.sf2", 0L, 96L), (((TextEvent)first[0]).Text, first[0].DeltaTime, first[1].DeltaTime));
+        Assert.False(SoundFontFinder.WriteTag(midi, "Bank.sf2"));
+        var tagged = Tagged("SF_BANK = \"Old.sf2\"");
+        Assert.True(SoundFontFinder.WriteTag(tagged, "New.sf2"));
+        Assert.Equal(new[] { "SF_BANK=New.sf2" }, tagged.GetTrackChunks().SelectMany(c => c.Events).OfType<TextEvent>().Select(e => e.Text));
+    }
+
+    [Fact]
     public void Missing_tag_file_goes_on_and_is_said()
     {
         var same = File(@"Album\song.sf2");
@@ -66,5 +92,20 @@ public sealed class SoundFontFinderTests : IDisposable
         File(@"Mixed\two.sf2");
         var none = Find(@"Mixed\x.mid");
         Assert.Equal((Default, SoundFontFinder.Source.Default), (none.Path, none.From));
+    }
+
+    // The Folder setting of PowerMIDI.ini: none, the soundfonts folder next to the program; a full path as it is; a
+    // relative one from the program's folder; environment variables replaced; quotes taken off.
+    [Fact]
+    public void Folder_of_setting()
+    {
+        const string program = @"C:\Apps\PowerMIDI";
+        Assert.Equal(@"C:\Apps\PowerMIDI\soundfonts", SoundFontFinder.FolderOf("", program));
+        Assert.Equal(@"C:\Apps\PowerMIDI\soundfonts", SoundFontFinder.FolderOf(null, program));
+        Assert.Equal(@"D:\Music\SF2", SoundFontFinder.FolderOf(@"D:\Music\SF2", program));
+        Assert.Equal(@"C:\Apps\SoundFonts", SoundFontFinder.FolderOf(@"..\SoundFonts", program));
+        Assert.Equal(@"D:\Music\SF2", SoundFontFinder.FolderOf("  \"D:\\Music\\SF2\"  ", program));
+        var profile = Environment.GetEnvironmentVariable("USERPROFILE");
+        Assert.Equal(Path.Combine(profile, "SoundFonts"), SoundFontFinder.FolderOf(@"%USERPROFILE%\SoundFonts", program));
     }
 }

@@ -45,7 +45,7 @@ public sealed partial class MainViewModel : ObservableObject
         Effects = new EffectsViewModel(defs, () => output, view.ShowError);
         Library = new LibraryViewModel(view, Path.Combine(AppContext.BaseDirectory, "library"), s => Status = s,
                                        path => Run(() => PlayFromLibrary(path)), paths => Run(() => AddFiles(paths)));
-        SoundFonts = new SoundFontsViewModel(Path.Combine(AppContext.BaseDirectory, "soundfonts"), () => Run(OnSoundFontChosen),
+        SoundFonts = new SoundFontsViewModel(() => Run(OnSoundFontChosen),
                                              restart => Run(() => OnEngineSettingChanged(restart)));
 
         AddFilesCommand = Command(AddFilesFromDialog);
@@ -314,12 +314,13 @@ public sealed partial class MainViewModel : ObservableObject
     SoundFontFinder.Result engineSoundFont;   // SoundFont the engine has (or loads), and how it was found
     bool engineLoading;                       // the engine is being created (its SoundFont loading)
 
-    // SoundFont of a track (see SoundFontFinder): its SF_BANK tag, a .sf2 next to it, or the SoundFonts tab's choice.
-    // No track: the tab's. midi: the track already read (null: read here, for its tag).
+    // SoundFont of a track (see SoundFontFinder): its SF_BANK tag (unless not read: SoundFonts tab), a .sf2 next to it,
+    // or the SoundFonts tab's choice. No track: the tab's. midi: the track already read (null: read here, for its tag).
     SoundFontFinder.Result SoundFontFor(PlaylistItem item, MidiFile midi = null)
     {
         if (item == null) return new SoundFontFinder.Result(SoundFonts.SelectedPath, SoundFontFinder.Source.Default);
-        if (midi == null)
+        if (!SoundFonts.ReadTag) midi = null;
+        else if (midi == null)
             try { midi = ReadTrackFile(item.Path); }
             catch (Exception) { }   // unreadable: no tag (its error is shown when it is played)
         return SoundFontFinder.Find(item.Path, midi, SoundFonts.Folder, SoundFonts.SelectedPath);

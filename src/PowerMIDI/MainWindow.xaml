@@ -893,7 +893,7 @@
       </ListView>
     </DockPanel>
     </TabItem>
-    <!-- SoundFonts: the .sf2 files of the soundfonts folder next to the program, the one played by the SoundFont engine
+    <!-- SoundFonts: the .sf2 files of the soundfonts folder (Folder in PowerMIDI.ini), the one played by the SoundFont engine
          (MIDI OUT "SoundFont engine (FluidSynth)", remembered in PowerMIDI.ini), what it says about itself, and the state
          of the engine. -->
     <TabItem Header="SoundFonts" MinWidth="102" DataContext="{Binding SoundFonts}" d:DataContext="{d:DesignInstance vm:SoundFontsViewModel}">
@@ -901,7 +901,7 @@
       <!-- File, Refresh and Open folder; as the collection row of the Library tab. -->
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
         <Button DockPanel.Dock="Right" Content="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
-                Command="{Binding OpenFolderCommand}" ToolTip="Open soundfonts folder (place for .sf2 files)"/>
+                Command="{Binding OpenFolderCommand}" ToolTip="{Binding FolderToolTip}"/>
         <Button DockPanel.Dock="Right" Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
                 Command="{Binding RefreshCommand}" ToolTip="Refresh list"/>
         <TextBlock Text="&#xE8D6;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
@@ -916,6 +916,16 @@
         <TextBlock Foreground="{DynamicResource TextSoftBrush}" TextTrimming="CharacterEllipsis"
                    Text="{Binding EngineState, StringFormat=Engine: {0}}" ToolTip="{Binding EngineState}"/>
       </DockPanel>
+      <!-- The SF_BANK tag of the MIDI files (SoundFontFinder): read to choose their SoundFont, written by Save MIDI file. -->
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,8,0,0">
+        <DockPanel>
+          <TextBlock Text="SF_BANK tag" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
+          <ToggleButton Content="Read on play" Padding="10,3" Margin="0,0,6,0" IsChecked="{Binding ReadTag}" HorizontalAlignment="Left"
+                        ToolTip="SoundFont named by SF_BANK tag of file played first (next to file, or in soundfonts folder)"/>
+          <ToggleButton Content="Write on save" Padding="10,3" IsChecked="{Binding WriteTag}" HorizontalAlignment="Left"
+                        ToolTip="Save MIDI file in SF2 mode: SoundFont played written in file (SF_BANK tag)"/>
+        </DockPanel>
+      </Border>
       <!-- Settings of the engine (SoundFontEngineOptions): those FluidSynth takes when created restart it (tooltips). -->
       <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,8,0,0">
         <Border.Resources>
