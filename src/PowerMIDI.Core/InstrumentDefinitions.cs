@@ -378,6 +378,11 @@ public sealed class InstrumentDefinitions
     // GM2: is a channel (0-based) playing a drum kit with this bank MSB?
     public static bool IsGm2Drum(int channel, int msb) => msb == Gm2DrumMsb || (msb != Gm2MelodicMsb && channel == 9);
 
+    // XG: bank MSB 127 (drum kits) or 126 (SFX kits) makes a channel a drum channel, another bank a normal one (the 10th
+    // channel starts on 127). In SF2 mode an XG track is played so too (see SoundFontOutput.PlayXgBank), its kits being
+    // those of the SoundFont (bank 128).
+    public static bool IsXgDrumBank(int msb) => msb is 126 or 127;
+
     // Instrument name of a channel (0-based) according to the file's standard, the program (0-based),
     // the bank and the GS drum mode (rhythm > 0).
     public InstrumentInfo Resolve(string standard, int channel, int program, int msb, int lsb, int rhythm)

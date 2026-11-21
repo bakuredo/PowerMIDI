@@ -249,7 +249,10 @@ public sealed class SoundFontOutput : IOutputDevice
                 {
                     case Kind.NoteOn: fluid_synth_noteon(s, e.Channel, e.Data1, e.Data2); break;
                     case Kind.NoteOff: fluid_synth_noteoff(s, e.Channel, e.Data1); break;
-                    case Kind.Control: fluid_synth_cc(s, e.Channel, e.Data1, e.Data2); break;
+                    case Kind.Control:
+                        if (e.Data1 == 0 && ChannelMixer.XgMode) PlayXgBank(s, e.Channel, e.Data2);
+                        fluid_synth_cc(s, e.Channel, e.Data1, e.Data2);
+                        break;
                     case Kind.Program: fluid_synth_program_change(s, e.Channel, e.Data1); break;
                     case Kind.PitchBend: fluid_synth_pitch_bend(s, e.Channel, e.Data2); break;
                     case Kind.ChannelPressure: fluid_synth_channel_pressure(s, e.Channel, e.Data2); break;
@@ -301,6 +304,18 @@ public sealed class SoundFontOutput : IOutputDevice
         if (length < 1) return;
         var message = length == data.Length ? data : data[..length];
         fluid_synth_sysex(s, message, message.Length, IntPtr.Zero, IntPtr.Zero, out _, 0);
+    }
+
+    // XG track (ChannelMixer.XgMode): a bank select MSB of 127 (drum kits) or 126 (SFX kits) makes the channel a drum
+    // channel, another MSB a normal one (InstrumentDefinitions.IsXgDrumBank), before the bank select itself is played.
+    // FluidSynth does so in its XG bank style only, which is not used (see PlaySysEx); in the GS style a drum channel
+    // ignores the bank select and plays the kits of bank 128, the next Program Change choosing the kit. No SFX kit in a
+    // SoundFont: MSB 126 plays its drum kits too.
+    static void PlayXgBank(IntPtr s, int channel, int msb)
+    {
+        bool drums = InstrumentDefinitions.IsXgDrumBank(msb);
+        fluid_synth_set_channel_type(s, channel, drums ? 1 : 0);
+        if (drums) fluid_synth_bank_select(s, channel, InstrumentDefinitions.Sf2DrumBank);
     }
 
     // GS Use for Rhythm Part (41 dd 42 12 40 1x 15 vv sum) of a channel of another port, as FluidSynth plays it on the

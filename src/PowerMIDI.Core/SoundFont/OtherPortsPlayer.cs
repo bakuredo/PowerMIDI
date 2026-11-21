@@ -103,6 +103,15 @@ public sealed class OtherPortsPlayer : IDisposable
     public bool IsUsed(int port, int channel) => Valid(port, channel) && Volatile.Read(ref used[port, channel]);
     // Drum part of a channel (GS Use for Rhythm Part: 0 normal part, 1 / 2 drum part; the 10th channel: 1 by default).
     public int Rhythm(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref rhythm[port, channel]) : 0;
+
+    // Does a channel play drums? In an XG track, by its bank MSB (InstrumentDefinitions.IsXgDrumBank; before any bank
+    // select, the 10th channel), as the engine plays it; otherwise by its GS drum part.
+    public bool IsDrum(int port, int channel)
+    {
+        if (!ChannelMixer.XgMode) return Rhythm(port, channel) > 0;
+        int msb = Control(port, channel, 0);
+        return msb >= 0 ? InstrumentDefinitions.IsXgDrumBank(msb) : channel == 9;
+    }
     public int Program(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref program[port, channel]) : 0;
     public int BankMsb(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref bankMsb[port, channel]) : 0;
     public int BankLsb(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref bankLsb[port, channel]) : 0;
@@ -398,7 +407,7 @@ public sealed class OtherPortsPlayer : IDisposable
     int TransposedKey(int port, FourBitNumber channel, SevenBitNumber note)
     {
         int semitones = transpose();
-        if (semitones == 0 || Rhythm(port, channel) > 0) return note;   // the drums are not transposed
+        if (semitones == 0 || IsDrum(port, channel)) return note;   // the drums are not transposed
         int key = note + semitones;
         while (key > 127) key -= 12;
         while (key < 0) key += 12;

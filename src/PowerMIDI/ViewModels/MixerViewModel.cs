@@ -86,7 +86,7 @@ public sealed class MixerViewModel : ObservableObject
             long passage = player.Passage(port, c);
             var choice = PortInstruments.Of(port, c, passage);
             int others = PortInstruments.OtherPassages(port, c, passage);
-            bool drum = player.Rhythm(port, c) > 0;
+            bool drum = IsOtherDrumChannel(port, c);
             var key = $"{used}/{player.Program(port, c)}/{player.BankMsb(port, c)}/{player.BankLsb(port, c)}/{choice}/{others}/{drum}";
             if (key == ch.InstrumentKey) continue;
             ch.InstrumentKey = key;
@@ -121,9 +121,15 @@ public sealed class MixerViewModel : ObservableObject
         return PortInstruments.Of(port, c, player.Passage(port, c)) ?? (player.BankMsb(port, c), player.BankLsb(port, c), player.Program(port, c));
     }
 
-    // Does a channel of another port play drums? Its 10th channel, and those a GS Use for Rhythm Part has made drum parts
-    // (see OtherPortsPlayer.Rhythm).
-    public bool IsOtherDrumChannel(int port, int c) => OtherPorts?.Invoke() is { } player ? player.Rhythm(port, c) > 0 : c == 9;
+    // Does a channel of another port play drums? Its 10th channel, and those a GS Use for Rhythm Part has made drum parts;
+    // in an XG track, those on bank MSB 126 / 127: the file's, or that of the instrument chosen for the passage (see
+    // OtherPortsPlayer.IsDrum).
+    public bool IsOtherDrumChannel(int port, int c)
+    {
+        if (OtherPorts?.Invoke() is not { } player) return c == 9;
+        if (ChannelMixer.XgMode && PortInstruments.Of(port, c, player.Passage(port, c)) is { } choice) return InstrumentDefinitions.IsXgDrumBank(choice.Msb);
+        return player.IsDrum(port, c);
+    }
 
     // Instrument of a sound on a channel of another port (the SoundFont's preset; a kit on a drum channel).
     InstrumentInfo OtherSound(int port, int c, (int Msb, int Lsb, int Program) sound) =>
@@ -189,8 +195,12 @@ public sealed class MixerViewModel : ObservableObject
         }
         else
         {
-            player.ChooseInstrument(ch.Port, ch.Channel, item.Msb, item.Lsb, item.Program);
-            setStatus($"Channel {ch.Name}: MSB {item.Msb} / LSB {item.Lsb} / PC {item.Program + 1}");
+            // A kit of an XG track: on its drum bank (126 / 127, see InstrumentDefinitions.IsXgDrumBank), not the bank 0
+            // of the list (which would make the channel a normal one).
+            int msb = item.Msb;
+            if (ChannelMixer.XgMode && IsOtherDrumChannel(ch.Port, ch.Channel)) msb = player.BankMsb(ch.Port, ch.Channel) == 126 ? 126 : 127;
+            player.ChooseInstrument(ch.Port, ch.Channel, msb, item.Lsb, item.Program);
+            setStatus($"Channel {ch.Name}: MSB {msb} / LSB {item.Lsb} / PC {item.Program + 1}");
         }
         ch.InstrumentKey = "";   // refresh the name (now, or when the list closes)
         if (!ch.IsListOpen) RefreshOtherPorts();
@@ -535,7 +545,7 @@ public sealed class MixerViewModel : ObservableObject
     {
         int c = ch.Channel;
         if (ch.ListShown) { ch.ListShown = false; force = true; }   // list closed since it was last opened
-        var key = $"{Standard}/{ChannelMixer.VoiceMap}/{ChannelMixer.GsDefaultMap}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
+        var key = $"{Standard}/{ChannelMixer.XgMode}/{ChannelMixer.VoiceMap}/{ChannelMixer.GsDefaultMap}/{ChannelMixer.Used[c]}/{ChannelMixer.Program[c]}/{ChannelMixer.BankMsb[c]}/{ChannelMixer.BankLsb[c]}/" +
                   $"{ChannelMixer.Passage[c]}/{OtherPassages(c)}/" +
                   $"{ChannelMixer.RhythmPart[c]}/{ChannelMixer.RhythmOverride[c]}/{ChannelMixer.Override[c]}/" +
                   $"{ChannelMixer.OverrideMsb[c]}/{ChannelMixer.OverrideLsb[c]}/{ChannelMixer.OverrideProgram[c]}/{GetSharedKit(c)}/{ChannelMixer.SysExPatch[c]}/{Mt32Patches.Version}";
@@ -559,7 +569,7 @@ public sealed class MixerViewModel : ObservableObject
         else if (ChannelMixer.Override[c] || ChannelMixer.RhythmOverride[c] >= 0)
         {
             int part = ChannelMixer.RhythmOverride[c];
-            var partText = part > 0 ? $" · drum part {part}" : part == 0 ? " · normal part" : "";
+            var partText = part > 0 ? (IsSoundFont ? " · drum kit" : $" · drum part {part}") : part == 0 ? " · normal part" : "";
             (name, state, tooltip) = (currentInfo.Name, InstrumentState.Manual, $"{currentInfo.Detail}{partText}{sharedText} (file: {ShownName(fileInfo)})");
         }
         else (name, state, tooltip) = (currentInfo.Name, InstrumentState.File, $"{currentInfo.Detail}{sharedText}");
@@ -603,9 +613,15 @@ public sealed class MixerViewModel : ObservableObject
     {
         "XG" => GetCurrentSound(c).Msb is 126 or 127,
         "GM2" => InstrumentDefinitions.IsGm2Drum(c, GetCurrentSound(c).Msb),
-        "GS" or "MT-32" or InstrumentDefinitions.Sf2Standard => ChannelMixer.Rhythm(c) > 0,
+        InstrumentDefinitions.Sf2Standard => SoundFontRhythm(GetCurrentSound(c).Msb, ChannelMixer.Rhythm(c)) > 0,
+        "GS" or "MT-32" => ChannelMixer.Rhythm(c) > 0,
         _ => c == 9,
     };
+
+    // SF2: the drum part a channel plays with a bank MSB, as the engine plays it: in an XG track, by the bank
+    // (InstrumentDefinitions.IsXgDrumBank); otherwise the GS drum part given (Use for Rhythm Part).
+    internal static int SoundFontRhythm(int msb, int rhythm) =>
+        ChannelMixer.XgMode ? (InstrumentDefinitions.IsXgDrumBank(msb) ? 1 : 0) : rhythm;
 
     // Name of a sound on a channel, in the current standard (insertion descriptions).
     public string InstrumentName(int c, int msb, int lsb, int program) => ResolveSound(c, program, msb, lsb, ChannelMixer.Rhythm(c)).Name;
@@ -614,6 +630,7 @@ public sealed class MixerViewModel : ObservableObject
     // of a variation the module does not have.
     InstrumentInfo ResolveSound(int c, int program, int msb, int lsb, int rhythm)
     {
+        if (IsSoundFont) rhythm = SoundFontRhythm(msb, rhythm);
         var info = defs.Resolve(Standard, c, program, msb, EffectiveXgLsb(msb, lsb), rhythm);
         if (info.Missing && !info.Drum && HasXgBanks && msb == 0 && ChannelMixer.VoiceMap == ChannelMixer.VoiceMapBasic)
             info = info with { Name = defs.Resolve(Standard, c, program, 0, InstrumentDefinitions.XgBasicLsb, rhythm).Name };
@@ -712,6 +729,14 @@ public sealed class MixerViewModel : ObservableObject
             foreach (var (bank, text) in kinds)
                 items.Add(new InstrumentChoice { Text = text + (kind == bank ? "  ✓" : ""), AssignXgBank = bank });
         }
+        else if (IsSoundFont)
+        {
+            // SF2, a track of another mode than XG: the GS drum part (Use for Rhythm Part), which the engine plays; a kit
+            // of its own on each channel (no drum part shared as on a GS module).
+            int rhythm = ChannelMixer.Rhythm(ch.Channel) > 0 ? 1 : 0;
+            foreach (var (part, text) in Sf2Parts)
+                items.Add(new InstrumentChoice { Text = text + (rhythm == part ? "  ✓" : ""), AssignPart = part });
+        }
         items.AddRange(choices);
         Update(ch, () =>
         {
@@ -777,6 +802,7 @@ public sealed class MixerViewModel : ObservableObject
             if (ChannelMixer.RhythmOverride[c] >= 0) ChannelMixer.ClearRhythmOverride(output(), c);
             setStatus(item.AllPassages ? $"Channel {c + 1}: file instruments in all passages" : $"Channel {c + 1}: file instrument");
         }
+        else if (item.AssignPart is int sf2Part && IsSoundFont) SelectSoundFontPart(c, sf2Part);
         else if (item.AssignPart is int part)
         {
             // Joining a drum part whose kit was chosen by hand on another channel: same kit (the module
@@ -799,9 +825,12 @@ public sealed class MixerViewModel : ObservableObject
             int drumPart = HasGsMaps ? ChannelMixer.Rhythm(c) : 0;
             var targets = drumPart > 0 ? DrumPartChannels(drumPart) : new List<int> { c };
             int sentLsb = item.Lsb;
-            foreach (int t in targets) ChannelMixer.SetOverride(output(), t, item.Msb, sentLsb, item.Program);
+            // SF2, XG track: a kit on its drum bank (126 / 127), not the bank 0 of the list (which would make the channel
+            // a normal one, see InstrumentDefinitions.IsXgDrumBank).
+            int sentMsb = IsSoundFont && ChannelMixer.XgMode && IsDrumChannel(c) ? (GetCurrentSound(c).Msb == 126 ? 126 : 127) : item.Msb;
+            foreach (int t in targets) ChannelMixer.SetOverride(output(), t, sentMsb, sentLsb, item.Program);
             var others = targets.Where(t => t != c).Select(t => (t + 1).ToString()).ToList();
-            setStatus($"Channel {c + 1}: MSB {item.Msb} / LSB {sentLsb} / PC {item.Program + 1}" +
+            setStatus($"Channel {c + 1}: MSB {sentMsb} / LSB {sentLsb} / PC {item.Program + 1}" +
                       (others.Count > 0 ? $" — also on channel {string.Join(", ", others)} (drum part {drumPart})" : ""));
             foreach (int t in targets.Where(t => t != c)) RefreshInstrument(Channels[t]);
         }
@@ -816,13 +845,18 @@ public sealed class MixerViewModel : ObservableObject
 
     bool HasXgBanks => Standard == "XG" && defs.XgVoices.Count > 0;
     bool HasGm2Banks => Standard == "GM2" && defs.Gm2Voices.Count > 0;
+    // SF2 mode, XG track: drum kits by the bank, as in XG (see SoundFontRhythm); no SFX kit (none in a SoundFont).
+    bool HasSoundFontXgBanks => IsSoundFont && ChannelMixer.XgMode;
 
     static readonly (int Bank, string Text)[] XgKinds = { (0, "Assign to Normal part"), (127, "Assign to Drum kit"), (126, "Assign to SFX kit") };
     static readonly (int Bank, string Text)[] Gm2Kinds =
         { (InstrumentDefinitions.Gm2MelodicMsb, "Assign to Normal part"), (InstrumentDefinitions.Gm2DrumMsb, "Assign to Drum kit") };
+    static readonly (int Bank, string Text)[] Sf2XgKinds = { (0, "Assign to Normal part"), (127, "Assign to Drum kit") };
+    // SF2 mode, another track: the GS drum part (0 normal, 1 drums).
+    static readonly (int Part, string Text)[] Sf2Parts = { (0, "Assign to Normal part"), (1, "Assign to Drum kit") };
 
-    // "Assign to …" entries of the current standard (null: none, or GS parts).
-    (int Bank, string Text)[] BankKinds => HasXgBanks ? XgKinds : HasGm2Banks ? Gm2Kinds : null;
+    // "Assign to …" entries of the current standard (null: none, GS parts or SF2 parts).
+    (int Bank, string Text)[] BankKinds => HasXgBanks ? XgKinds : HasGm2Banks ? Gm2Kinds : HasSoundFontXgBanks ? Sf2XgKinds : null;
 
     // Bank kind (the MSB of its "Assign to …" entry) of a sound played on a channel.
     int BankKind(int c, int msb) => HasGm2Banks
@@ -850,6 +884,29 @@ public sealed class MixerViewModel : ObservableObject
         }
         ChannelMixer.SetOverride(output(), c, bank, 0, 0);
         setStatus($"Channel {c + 1}: {KindName(bank)} — choose it in list");
+    }
+
+    // SF2 mode, a track of another mode than XG: moves a channel to a normal part (0) or a drum kit (1) by the GS drum
+    // part, which the engine plays (Use for Rhythm Part), as SelectBankKind: nothing if already there; the file's own part:
+    // back to it and to the file's instrument; otherwise the first sound or kit (program 1), to be changed in the list.
+    void SelectSoundFontPart(int c, int part)
+    {
+        int kind = part > 0 ? 127 : 0;   // for KindName
+        if ((ChannelMixer.Rhythm(c) > 0 ? 1 : 0) == part)
+        {
+            setStatus($"Channel {c + 1}: already on {KindName(kind)}");
+            return;
+        }
+        if ((ChannelMixer.RhythmPart[c] > 0 ? 1 : 0) == part)
+        {
+            ChannelMixer.ClearRhythmOverride(output(), c);
+            ChannelMixer.ClearOverride(output(), c);
+            setStatus($"Channel {c + 1}: {KindName(kind)} — file instrument");
+            return;
+        }
+        ChannelMixer.SetRhythmOverride(output(), c, part);
+        ChannelMixer.SetOverride(output(), c, 0, 0, 0);
+        setStatus($"Channel {c + 1}: {KindName(kind)} — choose it in list");
     }
 
     // Channels currently assigned to a GS drum part (1 or 2).

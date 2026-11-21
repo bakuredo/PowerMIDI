@@ -30,16 +30,22 @@ public static class MidiEventList
         public readonly int[] Msb = new int[16], Lsb = new int[16], Program = new int[16], Rhythm = new int[16];
         public readonly NrpnState Nrpn = new();   // as the player reads them (ChannelMixer)
         public readonly string[] Names = new string[16];
-        public PortState() => Rhythm[9] = 1;
+        // xgBanks: an XG track, whose 10th channel starts on bank MSB 127 (drum kits).
+        public PortState(bool xgBanks)
+        {
+            Rhythm[9] = 1;
+            if (xgBanks) Msb[9] = 127;
+        }
     }
 
     // instrumentName(channel, program, bank MSB, bank LSB, GS rhythm part): name of the instrument the channel plays.
     // describeSysEx(data): description of a SysEx (null: the generic one). byPort: a file whose MIDI ports are played
     // apart (see MidiPorts, OtherPortsPlayer): each row has the port of its track, and the channels of each port are
     // followed on their own (instruments, RPN / NRPN, passages); a GS Use for Rhythm Part sets the drum part of a channel
-    // of the port it is played for (see MidiPorts.GsPart), the other SysEx act on the first port.
+    // of the port it is played for (see MidiPorts.GsPart), the other SysEx act on the first port. xgBanks: an XG track (its
+    // 10th channel starts on the drum kits, bank MSB 127).
     public static List<MidiEventRow> Build(MidiFile file, Func<int, int, int, int, int, string> instrumentName,
-                                           Func<byte[], string> describeSysEx = null, bool byPort = false)
+                                           Func<byte[], string> describeSysEx = null, bool byPort = false, bool xgBanks = false)
     {
         // All the events of all tracks in the order they play (position, then track, then place in the track). A note:
         // its Note On with the place and position of its Note Off (the first Note Off of the same channel and key after it).
@@ -77,7 +83,7 @@ public static class MidiEventList
         // Per port: the state of its channels, the passages of its instruments (those of its tracks; the first port's for
         // the SysEx).
         var states = new Dictionary<int, PortState>();
-        PortState StateOf(int p) => states.TryGetValue(p, out var state) ? state : states[p] = new PortState();
+        PortState StateOf(int p) => states.TryGetValue(p, out var state) ? state : states[p] = new PortState(xgBanks);
         bool followResets = !ChannelMixer.ForceMode;
         var passages = portOf.Append(0).Distinct().ToDictionary(p => p, p =>
             InstrumentPassages.Read(file, followResets, byPort ? chunk => portsOf(chunk) == p : null));
@@ -230,7 +236,7 @@ public static class MidiEventList
             case ControlChangeEvent bank when (int)bank.ControlNumber is 0 or 32:
             {
                 if (row.Passage is not long passage || PortInstruments.Of(port, c, passage) is not { } chosen) return null;
-                var name = instrumentName?.Invoke(c, chosen.Program, chosen.Msb, chosen.Lsb, ports.Rhythm(port, c));   // drums: a kit
+                var name = instrumentName?.Invoke(c, chosen.Program, chosen.Msb, chosen.Lsb, ports.IsDrum(port, c) ? 1 : 0);   // drums: a kit
                 return string.IsNullOrEmpty(name) ? $"Mixer: bank {chosen.Msb} / {chosen.Lsb}, PC {chosen.Program + 1}"
                                                   : $"Mixer: {name} (bank {chosen.Msb} / {chosen.Lsb}, PC {chosen.Program + 1})";
             }

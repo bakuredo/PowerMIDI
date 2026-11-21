@@ -148,9 +148,12 @@ public sealed class EventEditorViewModel : ObservableObject
     public void Load(MidiFile midi, string standard, string fileName)
     {
         tempoMap = midi.GetTempoMap();
-        Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) => defs.Resolve(standard, c, program, msb, lsb, rhythm).Name;
+        // SF2: the drums as the engine plays them (an XG track: by the bank, see MixerViewModel.SoundFontRhythm).
+        bool soundFont = standard == InstrumentDefinitions.Sf2Standard;
+        Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) =>
+            defs.Resolve(standard, c, program, msb, lsb, soundFont ? MixerViewModel.SoundFontRhythm(msb, rhythm) : rhythm).Name;
         byPort = editing.OtherPorts != null && MidiPorts.HasOtherPorts(midi);
-        var list = MidiEventList.Build(midi, name, DescribeSysEx, byPort);
+        var list = MidiEventList.Build(midi, name, DescribeSysEx, byPort, ChannelMixer.XgMode);
         instrumentName = name;
         rows = list.Select(r => new EventRowViewModel { Row = r, TempoMap = tempoMap, FixedOf = FixedOf, ByPort = byPort }).ToList();
         settingCount = 0;
@@ -320,10 +323,10 @@ public sealed class EventEditorViewModel : ObservableObject
         }
         if (byPort)
         {
-            // The rows of the other ports (see OtherPortsPlayer): no drum part to choose, the file's (the 10th channel, and
-            // those of its GS Use for Rhythm Part).
+            // The rows of the other ports (see OtherPortsPlayer): no drum part to choose, the file's (the 10th channel, those
+            // of its GS Use for Rhythm Part; in an XG track, those on the drum banks).
             foreach (var (port, c, passage, msb, lsb, program) in PortInstruments.All())
-                yield return (port, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, editing.OtherPorts?.Rhythm(port, c) ?? (c == 9 ? 1 : 0)));
+                yield return (port, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, (editing.OtherPorts?.IsDrum(port, c) ?? c == 9) ? 1 : 0));
             foreach (var (port, c, k, value, wholeTrack) in PortControllers.All())
                 yield return (port, c, "Mixer", ControllerSetting(k, value, wholeTrack));
         }

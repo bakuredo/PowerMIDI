@@ -7,6 +7,7 @@ namespace PowerMIDI.Tests;
 
 // Files on several MIDI ports (MidiPorts) and the player of the other ports (OtherPortsPlayer), which follows the
 // playback of the first one.
+[Collection("ChannelMixer")]   // the mode of the track (ChannelMixer.XgMode) and the settings of the Mixer: shared static state
 public class MidiPortsTests
 {
     static ChannelEvent On(int channel, int key, int velocity = 100) => new NoteOnEvent((SevenBitNumber)key, (SevenBitNumber)velocity) { Channel = (FourBitNumber)channel };
@@ -530,6 +531,54 @@ public class MidiPortsTests
             Track(1, (48, On(1, 36)), (96, Off(1, 36))))
         { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
         Assert.Equal(new[] { "drums", "sound" }, Notes(true));
+    }
+
+    [Fact]
+    public void Player_follows_XG_drum_banks_in_XG_track()
+    {
+        // Port B: drum kit bank on channel 2 (not transposed), a normal bank on channel 10, a note on each.
+        var midi = new MidiFile(
+            Track(null, (0, new SetTempoEvent(500000))),
+            Track(0, (0, On(0, 60)), (96, Off(0, 60))),
+            Track(1, (0, Cc(1, 0, 127)), (0, Pc(1, 0)), (0, Cc(9, 0, 0)), (0, Pc(9, 0)), (20, On(1, 36)), (30, Off(1, 36)), (20, On(9, 60)), (30, Off(9, 60))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        var (main, others) = MidiPorts.Split(midi);
+        try
+        {
+            ChannelMixer.XgMode = true;
+            var follow = new Follow();
+            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 2);
+            follow.WaitFirstLook();
+            Assert.True(player.IsDrum(1, 9));    // before any bank select: the 10th channel
+            Assert.False(player.IsDrum(1, 1));
+            follow.Running = true;
+            Interlocked.Exchange(ref follow.Tick, 40);
+            Wait(() => follow.Texts().Contains("1:off10/62"));
+            Assert.True(player.IsDrum(1, 1));
+            Assert.False(player.IsDrum(1, 9));
+            Assert.Contains("1:on2/36", follow.Texts());    // drums: as they are
+            Assert.Contains("1:on10/62", follow.Texts());   // a normal channel: transposed
+            Assert.Equal(0, player.Rhythm(1, 1));            // (no GS drum part)
+
+            // Another mode: the GS drum part decides (the 10th channel).
+            ChannelMixer.XgMode = false;
+            Assert.False(player.IsDrum(1, 1));
+            Assert.True(player.IsDrum(1, 9));
+        }
+        finally { ChannelMixer.XgMode = false; }
+    }
+
+    [Fact]
+    public void Event_list_of_XG_track_starts_10th_channel_on_drum_bank()
+    {
+        // Names by the bank, as in SF2 mode with an XG track: a note of channel 10 before any bank select, one of
+        // channel 3 after MSB 127.
+        Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) => InstrumentDefinitions.IsXgDrumBank(msb) ? "drums" : "sound";
+        var midi = new MidiFile(Track(null, (0, On(9, 36)), (48, Off(9, 36)), (60, Cc(2, 0, 127)), (60, On(2, 38)), (96, Off(2, 38))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        string[] Notes(bool xg) => MidiEventList.Build(midi, name, xgBanks: xg).Where(r => r.Type == "Note").Select(r => r.Description).ToArray();
+        Assert.Equal(new[] { "drums", "drums" }, Notes(true));
+        Assert.Equal(new[] { "sound", "drums" }, Notes(false));
     }
 
     [Fact]
