@@ -40,11 +40,15 @@ public sealed partial class EffectsViewModel
         gm2Blocks.Add(gm2Part.Block);
         mt32Blocks.Insert(1, mt32Drums.Block);   // Reverb, Drums, Part
         mt32Blocks.Add(mt32Part.Block);
-        sf2Reverb = Sf2Page(6000, 0, SoundFontEffects.ChorusFirst, "Reverb");
-        sf2Chorus = Sf2Page(6100, SoundFontEffects.ChorusFirst, SoundFontEffects.Count, "Chorus");
+        sf2Reverb = Sf2Page(12000, 0, SoundFontEffects.ChorusFirst, SoundFontEffects.ReverbSend, "Reverb");
+        sf2Chorus = Sf2Page(12100, SoundFontEffects.ChorusFirst, SoundFontEffects.ChorusEnd, SoundFontEffects.ChorusSend, "Chorus");
         sf2Blocks.Add(sf2Reverb.Block);
         sf2Blocks.Add(sf2Chorus.Block);
         pages.AddRange(new[] { xgDrums, xgPart, gsDrums, gsPart, gm2Drums, gm2Part, mt32Drums, mt32Part, sf2Reverb, sf2Chorus });
+        // Each page has a range of indexes of its own (SettingsPage.Handles): on the range of another page, its values
+        // would go to that one (the SF2 Reverb page on the range of the GS Drums page set the drum map instead).
+        if (pages.Where((a, i) => pages.Skip(i + 1).Any(b => Math.Abs(a.BaseIndex - b.BaseIndex) < SettingsPage.Span)).FirstOrDefault() is { } shared)
+            throw new InvalidOperationException($"Effects tab: two pages on indexes {shared.BaseIndex}-{shared.BaseIndex + SettingsPage.Span - 1}.");
 
         // Texts of the settings (Event Editor, Append / Replace), with the names and units of the pages.
         ModuleSettings.GsXgFx.Describe = (k, v) => DescribeEffect(k.C, v);
@@ -63,32 +67,59 @@ public sealed partial class EffectsViewModel
 
     // ---------- SF2 (SoundFont engine) ----------
 
-    // Reverb or Chorus page of the SoundFont engine: the parameters first .. last - 1 of SoundFontEffects, given to the
-    // engine at once. Its values are settings of the engine (defaults in place of file values; right click: back to
-    // the default).
-    SettingsPage Sf2Page(int baseIndex, int first, int last, string title)
+    // Reverb or Chorus page of the SoundFont engine: a list of presets (SoundFontEffects.PresetsOf), then the parameters
+    // first .. last - 1 of SoundFontEffects, then its global send (row r: parameters[r - 1]), given to the engine at once.
+    // Its values are settings of the engine (defaults in place of file values; right click: back to the default). The
+    // list shows the preset the values are (the send aside); values set by hand: none chosen, "Custom" beside it.
+    SettingsPage Sf2Page(int baseIndex, int first, int last, int send, string title)
     {
         void Apply(IOutputDevice device) => SoundFontEffects.Apply(device as SoundFontOutput);
-        return new SettingsPage(this, baseIndex, last - first)
+        var parameters = Enumerable.Range(first, last - first).Append(send).ToArray();
+        int Of(int row) => parameters[row - 1];
+        var presets = SoundFontEffects.PresetsOf(first);
+        int Shown() => SoundFontEffects.PresetIndex(first) is int index and >= 0 ? index : presets.Length;
+        var presetRow = new PageParam
         {
-            Params = Enumerable.Range(first, last - first).Select(p =>
+            Label = "Preset", Choices = IndexedChoices(presets.Select(x => x.Name).ToArray()),
+            Format = v => v < presets.Length ? presets[v].Name : "Custom",
+            OwnValue = _ => Shown(), OwnFileValue = _ => 0, OwnIsFixed = _ => Shown() != 0,
+            OwnSet = (_, v) =>
+            {
+                if (v >= presets.Length) return;
+                SoundFontEffects.SetPreset(first, v);
+                Apply(output());
+            },
+            OwnClear = _ =>
+            {
+                for (int q = first; q < last; q++) SoundFontEffects.Clear(q);
+                Apply(output());
+            },
+            OwnToolTip = v => v == 0 ? "Default values (recommended for GeneralUser GS)"
+                            : v < presets.Length ? $"Approximation of GS {title.ToLowerInvariant()} macro: sets values below. Right click: default values"
+                            : "Values set by hand. Right click: default values",
+        };
+        return new SettingsPage(this, baseIndex, parameters.Length + 1)
+        {
+            Params = parameters.Select(p =>
             {
                 var param = SoundFontEffects.Params[p];
                 return new PageParam
                 {
                     Label = param.Label, Min = param.Min, Max = param.Max, Format = v => SoundFontEffects.Format(p, v),
                     Choices = param.Choices != null ? IndexedChoices(param.Choices) : null,
+                    ToolTipSuffix = p == send ? () => $". Added to {title.ToLowerInvariant()} send of every note (all channels), whatever CC{(p == SoundFontEffects.ReverbSend ? 91 : 93)} of file; notes started after change"
+                                              : null,
                 };
-            }).ToList(),
+            }).Prepend(presetRow).ToList(),
             GroupLabels = Array.Empty<string>(),
-            Value = (_, _, p) => SoundFontEffects.Value(first + p),
-            FileValue = (_, _, p) => SoundFontEffects.Params[first + p].Default,
-            IsFixed = (_, _, p) => SoundFontEffects.IsChanged(first + p),
+            Value = (_, _, p) => SoundFontEffects.Value(Of(p)),
+            FileValue = (_, _, p) => SoundFontEffects.Params[Of(p)].Default,
+            IsFixed = (_, _, p) => SoundFontEffects.IsChanged(Of(p)),
             IsNoteFixed = (_, _) => false, IsGroupFixed = _ => false,
-            Set = (device, _, _, p, v) => { SoundFontEffects.Set(first + p, v); Apply(device); },
+            Set = (device, _, _, p, v) => { SoundFontEffects.Set(Of(p), v); Apply(device); },
             Clear = (device, _, _, p) =>
             {
-                for (int q = first; q < last; q++) if (p < 0 || q == first + p) SoundFontEffects.Clear(q);
+                foreach (int q in parameters) if (p < 0 || q == Of(p)) SoundFontEffects.Clear(q);
                 Apply(device);
             },
             IsActive = () => output() is SoundFontOutput,

@@ -423,6 +423,37 @@ public sealed class SoundFontOutput : IOutputDevice
         }
     }
 
+    // Global sends (percent, 0-100): a send to the reverb / chorus added to every note of all the channels, whatever their
+    // CC91 / CC93. A default modulator without source (SF2 2.01, 8.2.1: its value is 1) on the generator of the send
+    // (tenths of a percent): FluidSynth adds its amount to the send of each note when it starts (the notes playing keep
+    // theirs); a mode reset and CC121 leave it (unlike the generator offsets of a channel: fluid_synth_set_gen).
+    // Measured offline (FluidSynth 2.6.2, GeneralUser GS piano, CC91 = CC93 = 0): what it adds grows with its amount (50 %:
+    // 2.5 times 20 %), the same after a CC121 or a reset.
+    public void SetGlobalSends(double reverb, double chorus)
+    {
+        lock (gate)
+        {
+            if (synth == IntPtr.Zero) return;
+            AddConstantSend(synth, GenReverbSend, reverb * 10);
+            AddConstantSend(synth, GenChorusSend, chorus * 10);
+        }
+    }
+
+    static void AddConstantSend(IntPtr synth, int generator, double amount)
+    {
+        var mod = new_fluid_mod();
+        if (mod == IntPtr.Zero) return;
+        try
+        {
+            fluid_mod_set_source1(mod, 0, 0);   // no source: 1
+            fluid_mod_set_source2(mod, 0, 0);
+            fluid_mod_set_dest(mod, generator);
+            fluid_mod_set_amount(mod, Math.Clamp(amount, 0, 1000));
+            fluid_synth_add_default_mod(synth, mod, SynthAddModOverwrite);   // replaces the previous one (same sources and generator)
+        }
+        finally { delete_fluid_mod(mod); }
+    }
+
     void ApplyEffects(IntPtr s)
     {
         if (reverb is { } r)

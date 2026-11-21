@@ -131,8 +131,8 @@ static class FluidSynthNative
     // Flags of a source: 2 bipolar (centered: -1..1), 12 switch (0 below the middle, 1 from it), 16 a MIDI CC (the
     // source is its number). Generators: SF2 numbers (fluid_gen_type).
     public const int ModBipolar = 2, ModSwitch = 12, ModCc = 16;
-    public const int GenVibLfoToPitch = 6, GenFilterFc = 8, GenFilterQ = 9, GenVibLfoDelay = 23, GenVibLfoFreq = 24,
-                     GenVolEnvAttack = 34, GenVolEnvDecay = 36, GenVolEnvRelease = 38;
+    public const int GenVibLfoToPitch = 6, GenFilterFc = 8, GenFilterQ = 9, GenChorusSend = 15, GenReverbSend = 16,
+                     GenVibLfoDelay = 23, GenVibLfoFreq = 24, GenVolEnvAttack = 34, GenVolEnvDecay = 36, GenVolEnvRelease = 38;
     public const int SynthAddModOverwrite = 0;   // FLUID_SYNTH_OVERWRITE
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]

@@ -25,6 +25,7 @@ public sealed class PageParam
     public Func<int, bool> OwnIsFixed { get; init; }
     public Action<int, int> OwnSet { get; init; }
     public Action<int> OwnClear { get; init; }
+    public Func<int, string> OwnToolTip { get; init; }            // tooltip by value (null: the page's, with the source)
 
     internal string Text(int v) => v < 0 ? "auto" : Format?.Invoke(v) ?? v.ToString();
 }
@@ -132,6 +133,7 @@ public sealed class SettingsPage
         return this;
     }
 
+    public int BaseIndex => baseIndex;
     public bool Handles(int fx) => fx >= baseIndex && fx < baseIndex + Span;
 
     IOutputDevice Device() => IsActive() ? effects.Output() : null;
@@ -226,7 +228,8 @@ public sealed class SettingsPage
             bool isFixed = param.OwnIsFixed?.Invoke(Group) ?? IsFixed(Group, n, p);
             bool visible = param.Visible?.Invoke(Group) ?? true;
             var suffix = param.ToolTipSuffix?.Invoke() ?? "";
-            var toolTip = (isFixed ? $"Fixed ({SourceText}: {(fileValue < 0 ? AutoText.ToLowerInvariant() : param.Text(fileValue))})"
+            var toolTip = param.OwnToolTip?.Invoke(v) ??
+                          (isFixed ? $"Fixed ({SourceText}: {(fileValue < 0 ? AutoText.ToLowerInvariant() : param.Text(fileValue))})"
                            : v < 0 ? AutoText : $"{char.ToUpperInvariant(SourceText[0])}{SourceText[1..]} value") + suffix;
             row.Show($"{Group}/{n}/{v}/{isFixed}/{fileValue}/{visible}/{suffix}", v, isFixed, toolTip, param.Text(v), param.AutoPosition, visible);
         }
