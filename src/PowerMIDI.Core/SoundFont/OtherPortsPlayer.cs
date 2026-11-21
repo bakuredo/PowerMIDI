@@ -21,8 +21,8 @@ public sealed record PortPassages(InstrumentPassages Instruments, ControllerPass
 //   (drum part, bank, program, controllers, RPN, pitch bend, channel pressure) is sent again, as a module would have
 //   it there.
 // The settings of the Mixer replace the file's, as on the first port: the instruments chosen (PortInstruments, by
-// passage) and the controller values fixed (PortControllers, in the first passage of their controller or in the whole
-// track). A mode reset sent to the engine (by the playback of the first port: the file's, or one of the interface) sets
+// passage), the controller values fixed (PortControllers, in the first passage of their controller or in the whole
+// track) and the drum parts chosen (PortRhythm). A mode reset sent to the engine (by the playback of the first port: the file's, or one of the interface) sets
 // all its channels back: the state of the other ports from the events sent so far is sent again after it, with the
 // settings of the Mixer and the mutes. Sent by another thread, a reset at the time of their first events could
 // otherwise come after them, and leave them with the default instruments.
@@ -74,7 +74,9 @@ public sealed class OtherPortsPlayer : IDisposable
     readonly int[,,] controls = NewControls();
     readonly long[,] lastNoteOn = new long[Ports, 16];
     readonly bool[,] used = new bool[Ports, 16], muted = new bool[Ports, 16];
-    readonly int[,] rhythm = new int[Ports, 16];   // GS drum part (0: normal part), see ResetRhythm
+    // GS drum part (0: normal part), see ResetRhythm: the one the engine has (the Mixer's choice, see PortRhythm, or the
+    // file's), and the file's.
+    readonly int[,] rhythm = new int[Ports, 16], fileRhythm = new int[Ports, 16];
 
     static int[,,] NewControls()
     {
@@ -90,7 +92,12 @@ public sealed class OtherPortsPlayer : IDisposable
 
     void ResetRhythm()
     {
-        for (int p = 0; p < Ports; p++) for (int c = 0; c < 16; c++) Volatile.Write(ref rhythm[p, c], DefaultRhythm(c));
+        for (int p = 0; p < Ports; p++)
+            for (int c = 0; c < 16; c++)
+            {
+                Volatile.Write(ref rhythm[p, c], DefaultRhythm(c));
+                Volatile.Write(ref fileRhythm[p, c], DefaultRhythm(c));
+            }
     }
 
     // A GS Use for Rhythm Part (at address 40: for a part of the port it is sent to, see MidiPorts.Split): its channel
@@ -101,16 +108,63 @@ public sealed class OtherPortsPlayer : IDisposable
     static (int Port, int Channel, int Value)? RhythmOf(PortEvent e) => RhythmPartOf(e.Event) is { } r ? (e.Port, r.Channel, r.Value) : null;
 
     public bool IsUsed(int port, int channel) => Valid(port, channel) && Volatile.Read(ref used[port, channel]);
-    // Drum part of a channel (GS Use for Rhythm Part: 0 normal part, 1 / 2 drum part; the 10th channel: 1 by default).
+    // Drum part of a channel (GS Use for Rhythm Part: 0 normal part, 1 / 2 drum part; the 10th channel: 1 by default): the
+    // one played (the Mixer's choice, or the file's), and the file's.
     public int Rhythm(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref rhythm[port, channel]) : 0;
+    public int FileRhythm(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref fileRhythm[port, channel]) : 0;
 
-    // Does a channel play drums? In an XG track, by its bank MSB (InstrumentDefinitions.IsXgDrumBank; before any bank
-    // select, the 10th channel), as the engine plays it; otherwise by its GS drum part.
+    // Does a channel play drums by the file? In an XG or GM2 track, by its bank MSB (InstrumentDefinitions.SoundFontBankDrum;
+    // before any bank select: XG 127 on the 10th channel, 0 on the others), as the engine plays it; otherwise by its GS
+    // drum part.
     public bool IsDrum(int port, int channel)
     {
-        if (!ChannelMixer.XgMode) return Rhythm(port, channel) > 0;
         int msb = Control(port, channel, 0);
-        return msb >= 0 ? InstrumentDefinitions.IsXgDrumBank(msb) : channel == 9;
+        if (msb < 0) msb = ChannelMixer.XgMode && channel == 9 ? 127 : 0;
+        return InstrumentDefinitions.SoundFontBankDrum(channel, msb) ?? Rhythm(port, channel) > 0;
+    }
+
+    // Is a program of a drum channel a drum kit (InstrumentDefinitions.IsSoundFontKit: not an instrument of bank 128)?
+    // Null: all are.
+    public Func<int, bool> IsKitProgram { get; init; }
+
+    // Does a channel play a drum kit now (its notes not transposed)? A drum channel (IsDrum) whose program, the one chosen
+    // for the passage or the file's, is a kit.
+    bool PlaysKit(int port, int channel) =>
+        IsDrum(port, channel) && (IsKitProgram?.Invoke(PortInstruments.Of(port, channel, Passage(port, channel))?.Program ?? Program(port, channel)) ?? true);
+
+    // ---------- Drum parts chosen in the Mixer (tracks whose drums are a GS drum part, see PortRhythm) ----------
+    // A drum part chosen for a channel (0 normal part, 1 drums): sent at once, and instead of the file's Use for Rhythm
+    // Part of that channel, after a jump and after a reset.
+    public void SetRhythm(int port, int channel, int value)
+    {
+        if (!Valid(port, channel)) return;
+        PortRhythm.Set(port, channel, value);
+        SendRhythm(port, channel, value);
+    }
+
+    // Back to the file's drum part.
+    public void ClearRhythm(int port, int channel)
+    {
+        if (!Valid(port, channel)) return;
+        PortRhythm.Remove(port, channel);
+        SendRhythm(port, channel, FileRhythm(port, channel));
+    }
+
+    void SendRhythm(int port, int c, int value)
+    {
+        RhythmSent(port, c, value);
+        send(ChannelMixer.RhythmPartEvent(c, value), port);
+    }
+
+    // A Use for Rhythm Part sent: the engine sets the bank and program of the channel back too (see
+    // SoundFontOutput.PlayRhythmPart).
+    void RhythmSent(int port, int c, int value)
+    {
+        Volatile.Write(ref rhythm[port, c], value);
+        Volatile.Write(ref program[port, c], 0);
+        Volatile.Write(ref bankMsb[port, c], 0);
+        Volatile.Write(ref bankLsb[port, c], 0);
+        Volatile.Write(ref choiceSent[port, c], false);
     }
     public int Program(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref program[port, channel]) : 0;
     public int BankMsb(int port, int channel) => Valid(port, channel) ? Volatile.Read(ref bankMsb[port, channel]) : 0;
@@ -250,16 +304,12 @@ public sealed class OtherPortsPlayer : IDisposable
     // first program change or note, as on the first port (ChannelMixer.Used).
     void Out(MidiEvent e, int port)
     {
-        // A drum part set or taken away: the engine sets the bank and program of the channel back too (see
-        // SoundFontOutput.PlayRhythmPart).
+        // A drum part of the file set or taken away: the one chosen in the Mixer instead, if any (see SendRhythm).
         if (RhythmPartOf(e) is { } part && Valid(port, part.Channel))
         {
-            int c = part.Channel;
-            Volatile.Write(ref rhythm[port, c], part.Value);
-            Volatile.Write(ref program[port, c], 0);
-            Volatile.Write(ref bankMsb[port, c], 0);
-            Volatile.Write(ref bankLsb[port, c], 0);
-            Volatile.Write(ref choiceSent[port, c], false);
+            Volatile.Write(ref fileRhythm[port, part.Channel], part.Value);
+            if (PortRhythm.Of(port, part.Channel) is int chosen) { SendRhythm(port, part.Channel, chosen); return; }
+            RhythmSent(port, part.Channel, part.Value);   // the file's message, sent below
         }
         if (e is ChannelEvent ce && Valid(port, ce.Channel))
         {
@@ -407,7 +457,7 @@ public sealed class OtherPortsPlayer : IDisposable
     int TransposedKey(int port, FourBitNumber channel, SevenBitNumber note)
     {
         int semitones = transpose();
-        if (semitones == 0 || IsDrum(port, channel)) return note;   // the drums are not transposed
+        if (semitones == 0 || PlaysKit(port, channel)) return note;   // the drums are not transposed
         int key = note + semitones;
         while (key > 127) key -= 12;
         while (key < 0) key += 12;
@@ -456,11 +506,15 @@ public sealed class OtherPortsPlayer : IDisposable
     void SendState(int index, long tick)
     {
         eventTick = tick - 1;   // the state: the passages in effect just before the position
+        // The file's drum parts there, then those chosen in the Mixer instead.
         var parts = rhythmChannels.ToDictionary(r => r, r => DefaultRhythm(r.Channel));
         foreach (var e in events.Take(index))
             if (RhythmOf(e) is { } r) parts[(r.Port, r.Channel)] = r.Value;
         foreach (var ((port, channel), value) in parts)
-            if (Valid(port, channel) && Rhythm(port, channel) != value) Out(ChannelMixer.RhythmPartEvent(channel, value), port);
+            if (Valid(port, channel)) Volatile.Write(ref fileRhythm[port, channel], value);
+        foreach (var (port, channel, value) in PortRhythm.All()) parts[(port, channel)] = value;
+        foreach (var ((port, channel), value) in parts)
+            if (Valid(port, channel) && Rhythm(port, channel) != value) SendRhythm(port, channel, value);
         var programmed = new HashSet<(int, int)>();
         foreach (var e in State(events.Take(index)))
         {

@@ -97,22 +97,24 @@ public sealed partial class MainViewModel
         if (playedOnPorts)
         {
             // A file played on several MIDI ports: the settings of rows A1-A16 in the tracks of the first port, those of
-            // rows B1-B16 (instruments, fixed values) in the tracks of their port (their SysEx are left as they are: the
-            // drum parts are not chosen there).
+            // rows B1-B16 (instruments, fixed values, drum parts) in the tracks of their port (their other SysEx are left
+            // as they are).
             report.Add(MidiFileEditor.ApplyChanges(midi, instruments, applyCc, ccValues, rhythm, !ChannelMixer.ForceMode, wholeTrack,
                                                    MidiPorts.TracksOf(midi, 0), "A"));
             var portInstruments = PortInstruments.All();
             var portControllers = PortControllers.All();
-            var noRhythm = Enumerable.Repeat(-1, 16).ToArray();
-            foreach (int port in portInstruments.Select(x => x.Port).Concat(portControllers.Select(x => x.Port)).Distinct().Order())
+            var portRhythm = PortRhythm.All();
+            foreach (int port in portInstruments.Select(x => x.Port).Concat(portControllers.Select(x => x.Port)).Concat(portRhythm.Select(x => x.Port)).Distinct().Order())
             {
                 var portCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
                 var portValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
                 var portWhole = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
                 foreach (var f in portControllers.Where(x => x.Port == port))
                     (portCc[f.K][f.Channel], portValues[f.K][f.Channel], portWhole[f.K][f.Channel]) = (true, f.Value, f.WholeTrack);
+                var parts = Enumerable.Repeat(-1, 16).ToArray();   // drum parts chosen (-1: the file's)
+                foreach (var r in portRhythm.Where(x => x.Port == port)) parts[r.Channel] = r.Value;
                 report.Add(MidiFileEditor.ApplyChanges(midi, portInstruments.Where(x => x.Port == port).Select(x => (x.Channel, x.Passage, x.Msb, x.Lsb, x.Program)),
-                                                       portCc, portValues, noRhythm, !ChannelMixer.ForceMode, portWhole,
+                                                       portCc, portValues, parts, !ChannelMixer.ForceMode, portWhole,
                                                        MidiPorts.TracksOf(midi, port), ((char)('A' + port)).ToString(), changeSysEx: false));
             }
         }
@@ -144,7 +146,7 @@ public sealed partial class MainViewModel
 
     // Instruments chosen and values fixed on the rows of the other MIDI ports (B1-B16), saved with the track played on its
     // ports.
-    bool HasPortSettings => playedOnPorts && (PortInstruments.All().Count > 0 || PortControllers.All().Count > 0);
+    bool HasPortSettings => playedOnPorts && (PortInstruments.All().Count > 0 || PortControllers.All().Count > 0 || PortRhythm.All().Count > 0);
 
     // Settings applied to the whole track (fixed values in blue, forced mode), as opposed to the changes of the events.
     bool HasGlobalSettings() => GetSettingsSignature(false) != "";
@@ -159,6 +161,7 @@ public sealed partial class MainViewModel
         {
             foreach (var (port, c, passage, msb, lsb, program) in PortInstruments.All()) parts.Add($"i{port}:{c}@{passage}={msb}/{lsb}/{program}");
             foreach (var (port, c, k, value, whole) in PortControllers.All()) parts.Add($"c{port}:{k}/{c}={value}{(whole ? "w" : "")}");
+            foreach (var (port, c, value) in PortRhythm.All()) parts.Add($"r{port}:{c}={value}");
         }
         for (int c = 0; c < 16; c++)
         {

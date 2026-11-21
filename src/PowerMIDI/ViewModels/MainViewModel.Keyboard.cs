@@ -111,7 +111,7 @@ public sealed partial class MainViewModel
     }
 
     // Drum channel played: on port B, its 10th channel (as the SoundFont engine sets it) or a drum part of the file.
-    bool KeyboardOnDrums => keyboardPort > 0 ? Mixer.IsOtherDrumChannel(keyboardPort, keyboardChannel) : Mixer.IsDrumChannel(keyboardChannel);
+    bool KeyboardOnDrums => keyboardPort > 0 ? Mixer.IsOtherKit(keyboardPort, keyboardChannel) : Mixer.IsDrumChannel(keyboardChannel);
 
     string KeyboardHelp()
     {

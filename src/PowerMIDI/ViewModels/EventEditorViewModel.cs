@@ -151,7 +151,7 @@ public sealed class EventEditorViewModel : ObservableObject
         // SF2: the drums as the engine plays them (an XG track: by the bank, see MixerViewModel.SoundFontRhythm).
         bool soundFont = standard == InstrumentDefinitions.Sf2Standard;
         Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) =>
-            defs.Resolve(standard, c, program, msb, lsb, soundFont ? MixerViewModel.SoundFontRhythm(msb, rhythm) : rhythm).Name;
+            defs.Resolve(standard, c, program, msb, lsb, soundFont ? MixerViewModel.SoundFontRhythm(c, msb, rhythm) : rhythm).Name;
         byPort = editing.OtherPorts != null && MidiPorts.HasOtherPorts(midi);
         var list = MidiEventList.Build(midi, name, DescribeSysEx, byPort, ChannelMixer.XgMode);
         instrumentName = name;
@@ -323,10 +323,12 @@ public sealed class EventEditorViewModel : ObservableObject
         }
         if (byPort)
         {
-            // The rows of the other ports (see OtherPortsPlayer): no drum part to choose, the file's (the 10th channel, those
-            // of its GS Use for Rhythm Part; in an XG track, those on the drum banks).
+            // The rows of the other ports (see OtherPortsPlayer): their drum parts chosen (tracks of the modes of the GS drum
+            // part, see PortRhythm), instruments and fixed values.
+            foreach (var (port, c, value) in PortRhythm.All())
+                yield return (port, c, "Mixer", value > 0 ? "Part: drum kit" : "Part: normal");
             foreach (var (port, c, passage, msb, lsb, program) in PortInstruments.All())
-                yield return (port, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, (editing.OtherPorts?.IsDrum(port, c) ?? c == 9) ? 1 : 0));
+                yield return (port, c, "Mixer", InstrumentSetting(c, passage, msb, lsb, program, (editing.OtherPorts?.Rhythm(port, c) ?? (c == 9 ? 1 : 0))));
             foreach (var (port, c, k, value, wholeTrack) in PortControllers.All())
                 yield return (port, c, "Mixer", ControllerSetting(k, value, wholeTrack));
         }

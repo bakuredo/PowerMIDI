@@ -103,6 +103,12 @@ public sealed partial class MainViewModel
             for (int c = 0; c < 16; c++)
             {
                 var parts = new List<string>();
+                // The drum part first (it sets the instrument of the channel back), as for the first port.
+                if (PortRhythm.Of(port, c) is int rhythm)
+                {
+                    events.Add((port, c, ChannelMixer.RhythmPartEvent(c, rhythm)));
+                    parts.Add(rhythm > 0 ? "drum kit" : "normal part");
+                }
                 if (PortInstruments.Of(port, c, player.Passage(port, c)) is var (msb, lsb, program))
                 {
                     events.Add((port, c, Cc(c, 0, msb)));
@@ -123,11 +129,14 @@ public sealed partial class MainViewModel
     }
 
     // The settings of the rows of port B back to the file's values, sent by the player of the other ports (stores cleared
-    // without it): the instruments chosen (all passages, as ClearWrittenSettings), the fixed values heard at the position
-    // (those written by BuildPortInsertion; all: every fixed value, an Append / Replace cancelled).
+    // without it): the drum parts and instruments chosen (all passages, as ClearWrittenSettings), the fixed values heard
+    // at the position (those written by BuildPortInsertion; all: every fixed value, an Append / Replace cancelled).
     void ClearPortSettings(bool all)
     {
         var player = otherPorts;
+        foreach (var (port, c, _) in PortRhythm.All())
+            if (player != null) player.ClearRhythm(port, c);
+            else PortRhythm.Remove(port, c);
         foreach (var (port, c) in PortInstruments.All().Select(x => (x.Port, x.Channel)).Distinct().ToList())
             if (player != null) player.ClearInstrument(port, c, true);
             else PortInstruments.Remove(port, c, InstrumentPassages.First, true);

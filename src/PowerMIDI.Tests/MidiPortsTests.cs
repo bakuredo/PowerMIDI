@@ -569,6 +569,120 @@ public class MidiPortsTests
     }
 
     [Fact]
+    public void Player_follows_GM2_drum_banks_in_GM2_track()
+    {
+        // Port B: the GM2 drum kit bank on channel 2 (not transposed), the normal bank on channel 10.
+        var midi = new MidiFile(
+            Track(null, (0, new SetTempoEvent(500000))),
+            Track(0, (0, On(0, 60)), (96, Off(0, 60))),
+            Track(1, (0, Cc(1, 0, 120)), (0, Pc(1, 0)), (0, Cc(9, 0, 121)), (0, Pc(9, 0)), (20, On(1, 36)), (30, Off(1, 36))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        var (main, others) = MidiPorts.Split(midi);
+        try
+        {
+            ChannelMixer.Gm2Mode = true;
+            // The rule (any port: channel 26 is the 10th of port B); another mode: none (the GS drum part decides).
+            Assert.Equal(new bool?[] { false, true, false, true, true }, new[] { (2, 0), (9, 0), (9, 121), (2, 120), (25, 0) }.Select(x => InstrumentDefinitions.SoundFontBankDrum(x.Item1, x.Item2)));
+            var follow = new Follow();
+            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 2);
+            follow.WaitFirstLook();
+            Assert.True(player.IsDrum(1, 9));
+            Assert.False(player.IsDrum(1, 1));
+            follow.Running = true;
+            Interlocked.Exchange(ref follow.Tick, 40);
+            Wait(() => follow.Texts().Contains("1:off2/36"));
+            Assert.True(player.IsDrum(1, 1));
+            Assert.False(player.IsDrum(1, 9));
+            Assert.Contains("1:on2/36", follow.Texts());   // drums: as they are
+            ChannelMixer.Gm2Mode = false;
+            Assert.Null(InstrumentDefinitions.SoundFontBankDrum(9, 0));
+        }
+        finally { ChannelMixer.Gm2Mode = false; }
+    }
+
+    [Fact]
+    public void Player_plays_drum_part_chosen_instead_of_file()
+    {
+        // Port B: channel 2 a drum part at 10 (GS), a note on it.
+        var midi = new MidiFile(
+            Track(null, (0, new SetTempoEvent(500000))),
+            Track(0, (0, On(0, 60)), (96, Off(0, 60))),
+            Track(1, (10, RhythmPart(0x40, 1, 1)), (20, On(1, 36)), (30, Off(1, 36))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        var (main, others) = MidiPorts.Split(midi);
+        PortRhythm.Clear();
+        try
+        {
+            var follow = new Follow();
+            using var player = new OtherPortsPlayer(others, main.GetTempoMap(), follow.Position, follow.Send, () => 0);
+            follow.WaitFirstLook();
+            follow.Running = true;
+            Interlocked.Exchange(ref follow.Tick, 40);
+            Wait(() => follow.Texts().Contains("1:off2/36"));
+            Assert.Equal(1, player.Rhythm(1, 1));
+
+            // The normal part chosen: sent at once; the file's drum part still known.
+            follow.Clear();
+            player.SetRhythm(1, 1, 0);
+            Assert.Equal(new[] { "1:rhythm2=0" }, follow.Texts());
+            Assert.Equal((0, 1, (int?)0), (player.Rhythm(1, 1), player.FileRhythm(1, 1), PortRhythm.Of(1, 1)));
+
+            // Back before the file's drum part, then played again: the choice instead of it.
+            follow.Clear();
+            Interlocked.Exchange(ref follow.Tick, 5);
+            Wait(() => follow.Texts().Contains("1:cc2/120=0"));
+            Interlocked.Exchange(ref follow.Tick, 40);
+            Wait(() => follow.Texts().Contains("1:off2/36"));
+            Assert.Contains("1:rhythm2=0", follow.Texts());
+            Assert.DoesNotContain("1:rhythm2=1", follow.Texts());
+
+            // Back to the file's.
+            follow.Clear();
+            player.ClearRhythm(1, 1);
+            Assert.Equal(new[] { "1:rhythm2=1" }, follow.Texts());
+            Assert.Null(PortRhythm.Of(1, 1));
+        }
+        finally { PortRhythm.Clear(); }
+    }
+
+    [Fact]
+    public void Save_writes_drum_part_of_port_B_in_its_tracks()
+    {
+        // Channel 2 a drum part on port A; on port B, the drum part chosen for its channel 2.
+        var midi = new MidiFile(
+            Track(0, (0, RhythmPart(0x40, 1, 1)), (48, On(1, 60)), (96, Off(1, 60))),
+            Track(1, (48, On(1, 36)), (96, Off(1, 36))))
+        { TimeDivision = new TicksPerQuarterNoteTimeDivision(96) };
+        int controllers = ChannelMixer.ControllerNumbers.Length;
+        var noCc = Enumerable.Range(0, controllers).Select(_ => new bool[16]).ToArray();
+        var noValues = Enumerable.Range(0, controllers).Select(_ => new int[16]).ToArray();
+        var parts = Enumerable.Repeat(-1, 16).ToArray();
+        parts[1] = 1;
+        MidiFileEditor.ApplyChanges(midi, Array.Empty<(int, long, int, int, int)>(), noCc, noValues, parts, true, null,
+                                    MidiPorts.TracksOf(midi, 1), "B", changeSysEx: false);
+        int[] Parts(int track) => midi.GetTrackChunks().ElementAt(track).Events.OfType<SysExEvent>()
+                                      .Where(e => ChannelMixer.RhythmPartChannel(e.Data) == 1).Select(e => (int)e.Data[7]).ToArray();
+        Assert.Equal(new[] { 1 }, Parts(0));   // port A: its own, as it was
+        Assert.Equal(new[] { 1 }, Parts(1));   // port B: in its track, played on port B
+        Assert.Contains(MidiPorts.Split(midi).Others, e => e.Port == 1 && e.Event is SysExEvent sx && ChannelMixer.RhythmPartChannel(sx.Data) == 1);
+
+        // In the Event Editor (listed by port): blue while a drum part is chosen on that channel of port B (not port A's).
+        PortRhythm.Clear();
+        try
+        {
+            Func<int, int, int, int, int, string> name = (c, program, msb, lsb, rhythm) => "";
+            var rows = MidiEventList.Build(midi, name, byPort: true).Where(r => r.Type == "SysEx").ToList();
+            var (_, others) = MidiPorts.Split(midi);
+            using var player = new OtherPortsPlayer(others, midi.GetTempoMap(), () => null, (e, p) => { }, () => 0);
+            Assert.All(rows, r => Assert.Null(MidiEventList.FixedText(r, name, player)));
+            PortRhythm.Set(1, 1, 0);
+            Assert.Null(MidiEventList.FixedText(rows.Single(r => r.Port == 0), name, player));
+            Assert.Equal("Drum part chosen in Mixer tab", MidiEventList.FixedText(rows.Single(r => r.Port == 1), name, player));
+        }
+        finally { PortRhythm.Clear(); }
+    }
+
+    [Fact]
     public void Event_list_of_XG_track_starts_10th_channel_on_drum_bank()
     {
         // Names by the bank, as in SF2 mode with an XG track: a note of channel 10 before any bank select, one of

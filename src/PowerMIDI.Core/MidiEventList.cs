@@ -165,10 +165,14 @@ public static class MidiEventList
     // tab (blue there), or the mode forced in the interface; null if the event plays as it is. Same cases as
     // ChannelMixer.Callback (the data entries: the RPN / NRPN selected before them, see Build). instrumentName: as for
     // Build, to name the instrument chosen in the Mixer tab. ports: the player of the other MIDI ports, for the channel
-    // events of their tracks (rows of a file listed by port, see Build).
+    // events of their tracks and the drum parts of their channels (rows of a file listed by port, see Build).
     public static string FixedText(MidiEventRow row, Func<int, int, int, int, int, string> instrumentName = null, OtherPortsPlayer ports = null)
     {
         if (row.Port > 0 && row.Event is ChannelEvent) return OtherPortFixedText(row, instrumentName, ports);
+        // A Use for Rhythm Part of a channel of another port (see MidiPorts.RhythmPart): replaced by the drum part chosen
+        // there in the Mixer tab.
+        if (ports != null && row.Event is SysExEvent rhythmSysEx && MidiPorts.RhythmPart(rhythmSysEx.Data, row.Port) is { Port: > 0 } other)
+            return PortRhythm.Of(other.Port, other.Channel) != null ? "Drum part chosen in Mixer tab" : null;
         int c = row.Channel;
         // The instrument chosen in the Mixer tab for a channel, in the passage of the row.
         (int, int, int)? Chosen(int ch) => row.Passage is long passage ? ChannelMixer.InstrumentOf(ch, passage) : null;

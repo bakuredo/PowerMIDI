@@ -63,7 +63,8 @@ public static class MidiFileEditor
     // ports (see MidiPorts) gets the settings of each port in the tracks of that port only (its SysEx stay in any track;
     // the drum parts chosen replace the Use for Rhythm Part of those tracks only).
     // port: the letter of that port in the report ("B" → "channel B3"), empty otherwise. changeSysEx: false for the
-    // settings of another port than the first one, which the SysEx of the file do not act on (left as they are).
+    // settings of another port than the first one, which the SysEx of the file do not act on (left as they are), except
+    // the Use for Rhythm Part of its tracks, which act on that port (rhythm).
     public static string ApplyChanges(MidiFile file, IEnumerable<(int Channel, long Passage, int Msb, int Lsb, int Program)> instruments,
                                       bool[][] applyCc, int[][] ccValues, int[] rhythm, bool followResets = true, bool[][] wholeTrack = null,
                                       Func<TrackChunk, bool> channelsOf = null, string port = "", bool changeSysEx = true)
@@ -186,8 +187,9 @@ public static class MidiFileEditor
                     continue;
                 }
                 var sysEx = changeSysEx ? t.Event as SysExEvent : null;
-                // (a Use for Rhythm Part of a track of another port sets a part of that port: see MidiPorts.GsPart)
-                int rhythmChannel = sysEx != null && accepted[k] ? ChannelMixer.RhythmPartChannel(sysEx.Data) : -1;
+                // The Use for Rhythm Part of the tracks of the port, whatever changeSysEx: it sets a part of the port of
+                // its track (see MidiPorts.GsPart).
+                int rhythmChannel = t.Event is SysExEvent rhythmSysEx && accepted[k] ? ChannelMixer.RhythmPartChannel(rhythmSysEx.Data) : -1;
                 if (rhythmChannel >= 0 && rhythm[rhythmChannel] >= 0)
                 {
                     removedRhythm[rhythmChannel]++;

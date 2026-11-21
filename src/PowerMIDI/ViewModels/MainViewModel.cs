@@ -1146,7 +1146,8 @@ public sealed partial class MainViewModel : ObservableObject
         if (others is { Count: > 0 } && output is SoundFontOutput engine)
             otherPorts = new OtherPortsPlayer(others, midi.GetTempoMap(),
                 () => playback != pb ? null : (pb.IsRunning, (long)pb.GetCurrentTime<MidiTimeSpan>().TimeSpan, pb.Speed),
-                (e, port) => engine.SendEvent(e, port), () => transposeSemitones, portPassages, () => engine.Resets);
+                (e, port) => engine.SendEvent(e, port), () => transposeSemitones, portPassages, () => engine.Resets)
+                { IsKitProgram = defs.IsSoundFontKit };
         tempoMap = midi.GetTempoMap();
         eventsPending = true;   // the Event Editor lists it at the next timer tick (after the start)
         TimeSpan length = pb.GetDuration<MetricTimeSpan>();

@@ -87,19 +87,22 @@ public sealed class MixerViewModel : ObservableObject
             var choice = PortInstruments.Of(port, c, passage);
             int others = PortInstruments.OtherPassages(port, c, passage);
             bool drum = IsOtherDrumChannel(port, c);
-            var key = $"{used}/{player.Program(port, c)}/{player.BankMsb(port, c)}/{player.BankLsb(port, c)}/{choice}/{others}/{drum}";
+            var part = PortRhythm.Of(port, c);   // drum part chosen (GS drum part)
+            var key = $"{used}/{player.Program(port, c)}/{player.BankMsb(port, c)}/{player.BankLsb(port, c)}/{choice}/{others}/{drum}/{part}";
             if (key == ch.InstrumentKey) continue;
             ch.InstrumentKey = key;
             var fileInfo = FileOtherInstrument(port, c);
             var info = CurrentOtherInstrument(port, c);
+            var partText = part is int p ? (p > 0 ? " · drum kit" : " · normal part") : "";
             var (state, tooltip) = !used ? (InstrumentState.Unused, "Channel unused so far")
-                                 : choice != null ? (InstrumentState.Manual, $"{info.Detail} (file: {ShownName(fileInfo)})\nChosen for this passage (until next Program Change of file)")
+                                 : choice != null ? (InstrumentState.Manual, $"{info.Detail}{partText} (file: {ShownName(fileInfo)})\nChosen for this passage (until next Program Change of file)")
+                                 : part != null ? (InstrumentState.Manual, $"{info.Detail}{partText} (file: {ShownName(fileInfo)})")
                                  : (InstrumentState.File, info.Detail);
             if (others > 0) tooltip += $"\nInstrument changed in {others} other passage{(others > 1 ? "s" : "")}";
             var display = new InstrumentChoice { Text = !used ? "—" : ShownName(info), IsDisplay = true };
             Update(ch, () =>
             {
-                ch.IsDrum = drum;
+                ch.IsDrum = info.Drum;   // a kit (not an instrument of bank 128 on a drum channel)
                 ch.InstrumentItems = new[] { display };
                 ch.SelectedInstrument = display;
                 ch.InstrumentState = state;
@@ -121,15 +124,19 @@ public sealed class MixerViewModel : ObservableObject
         return PortInstruments.Of(port, c, player.Passage(port, c)) ?? (player.BankMsb(port, c), player.BankLsb(port, c), player.Program(port, c));
     }
 
-    // Does a channel of another port play drums? Its 10th channel, and those a GS Use for Rhythm Part has made drum parts;
-    // in an XG track, those on bank MSB 126 / 127: the file's, or that of the instrument chosen for the passage (see
-    // OtherPortsPlayer.IsDrum).
+    // Does a channel of another port play drums? Its 10th channel, and those a GS Use for Rhythm Part (the file's, or one
+    // chosen, see PortRhythm) has made drum parts; in an XG or GM2 track, by the bank: the file's, or that of the
+    // instrument chosen for the passage (see OtherPortsPlayer.IsDrum, InstrumentDefinitions.SoundFontBankDrum).
     public bool IsOtherDrumChannel(int port, int c)
     {
         if (OtherPorts?.Invoke() is not { } player) return c == 9;
-        if (ChannelMixer.XgMode && PortInstruments.Of(port, c, player.Passage(port, c)) is { } choice) return InstrumentDefinitions.IsXgDrumBank(choice.Msb);
+        if (PortInstruments.Of(port, c, player.Passage(port, c)) is { } choice && InstrumentDefinitions.SoundFontBankDrum(c, choice.Msb) is bool drum) return drum;
         return player.IsDrum(port, c);
     }
+
+    // Does a channel of another port play a drum kit (a drum channel, not playing an instrument of bank 128: see
+    // InstrumentDefinitions.IsSoundFontKit)? For the keyboard mode.
+    public bool IsOtherKit(int port, int c) => IsOtherDrumChannel(port, c) && defs.IsSoundFontKit(CurrentOtherSound(port, c).Program);
 
     // Instrument of a sound on a channel of another port (the SoundFont's preset; a kit on a drum channel).
     InstrumentInfo OtherSound(int port, int c, (int Msb, int Lsb, int Program) sound) =>
@@ -162,7 +169,8 @@ public sealed class MixerViewModel : ObservableObject
     }
 
     // Opening the list of a row of port B: back to the file's instrument (in this passage; in all of them, when other
-    // passages have an instrument chosen), then the presets of the SoundFont, the current one selected.
+    // passages have an instrument chosen), the normal part or the drum kits (as the rows of port A, see
+    // OpenInstrumentList), then the presets of the SoundFont, the current one selected.
     internal void OpenOtherInstrumentList(ChannelViewModel ch)
     {
         var player = OtherPorts?.Invoke();
@@ -172,6 +180,13 @@ public sealed class MixerViewModel : ObservableObject
         int others = PortInstruments.OtherPassages(ch.Port, ch.Channel, player.Passage(ch.Port, ch.Channel));
         if (others > 0)
             items.Add(new InstrumentChoice { Text = $"↺ File instrument passage ({others} other{(others > 1 ? "s" : "")} changed)", IsReset = true, AllPassages = true });
+        bool drum = IsOtherDrumChannel(ch.Port, ch.Channel);
+        if (BankKinds is { } kinds)   // XG, GM2: by the bank
+            foreach (var (bank, text) in kinds)
+                items.Add(new InstrumentChoice { Text = text + (drum == IsKitBank(bank) ? "  ✓" : ""), AssignXgBank = bank });
+        else   // the GS drum part
+            foreach (var (part, text) in Sf2Parts)
+                items.Add(new InstrumentChoice { Text = text + (drum == part > 0 ? "  ✓" : ""), AssignPart = part });
         items.AddRange(choices);
         Update(ch, () =>
         {
@@ -190,15 +205,17 @@ public sealed class MixerViewModel : ObservableObject
         if (item == null || item.IsDisplay || player == null) return;
         if (item.IsReset)
         {
+            // Back to the file: its instrument (in this passage, or in all of them) and its drum part.
             player.ClearInstrument(ch.Port, ch.Channel, item.AllPassages);
+            if (PortRhythm.Of(ch.Port, ch.Channel) != null) player.ClearRhythm(ch.Port, ch.Channel);
             setStatus(item.AllPassages ? $"Channel {ch.Name}: file instruments in all passages" : $"Channel {ch.Name}: file instrument");
         }
+        else if (item.AssignXgBank is int bank) SelectOtherBankKind(ch, player, bank);
+        else if (item.AssignPart is int part) SelectOtherPart(ch, player, part);
         else
         {
-            // A kit of an XG track: on its drum bank (126 / 127, see InstrumentDefinitions.IsXgDrumBank), not the bank 0
-            // of the list (which would make the channel a normal one).
-            int msb = item.Msb;
-            if (ChannelMixer.XgMode && IsOtherDrumChannel(ch.Port, ch.Channel)) msb = player.BankMsb(ch.Port, ch.Channel) == 126 ? 126 : 127;
+            // XG or GM2 track: the bank that keeps the kind of the channel (see SoundFontChoiceMsb).
+            int msb = SoundFontChoiceMsb(ch.Channel, item.Msb, IsOtherDrumChannel(ch.Port, ch.Channel), player.BankMsb(ch.Port, ch.Channel));
             player.ChooseInstrument(ch.Port, ch.Channel, msb, item.Lsb, item.Program);
             setStatus($"Channel {ch.Name}: MSB {msb} / LSB {item.Lsb} / PC {item.Program + 1}");
         }
@@ -613,15 +630,32 @@ public sealed class MixerViewModel : ObservableObject
     {
         "XG" => GetCurrentSound(c).Msb is 126 or 127,
         "GM2" => InstrumentDefinitions.IsGm2Drum(c, GetCurrentSound(c).Msb),
-        InstrumentDefinitions.Sf2Standard => SoundFontRhythm(GetCurrentSound(c).Msb, ChannelMixer.Rhythm(c)) > 0,
+        // SF2: a drum channel of the engine playing a kit (not an instrument of bank 128, see IsSoundFontKit).
+        InstrumentDefinitions.Sf2Standard => IsSoundFontDrumType(c) && defs.IsSoundFontKit(GetCurrentSound(c).Program),
         "GS" or "MT-32" => ChannelMixer.Rhythm(c) > 0,
         _ => c == 9,
     };
 
-    // SF2: the drum part a channel plays with a bank MSB, as the engine plays it: in an XG track, by the bank
-    // (InstrumentDefinitions.IsXgDrumBank); otherwise the GS drum part given (Use for Rhythm Part).
-    internal static int SoundFontRhythm(int msb, int rhythm) =>
-        ChannelMixer.XgMode ? (InstrumentDefinitions.IsXgDrumBank(msb) ? 1 : 0) : rhythm;
+    // SF2: is a channel a drum channel of the engine (it plays the presets of bank 128)?
+    bool IsSoundFontDrumType(int c) => SoundFontRhythm(c, GetCurrentSound(c).Msb, ChannelMixer.Rhythm(c)) > 0;
+
+    // SF2: the drum part a channel plays with a bank MSB, as the engine plays it: in an XG or GM2 track, by the bank
+    // (InstrumentDefinitions.SoundFontBankDrum); otherwise the GS drum part given (Use for Rhythm Part).
+    internal static int SoundFontRhythm(int c, int msb, int rhythm) =>
+        InstrumentDefinitions.SoundFontBankDrum(c, msb) is bool drum ? (drum ? 1 : 0) : rhythm;
+
+    // SF2, XG or GM2 track: the bank sent with a sound or kit of the list (whose banks are the SoundFont's, kits on 0), so
+    // that the channel stays a drum or a normal channel by the rule of the mode (see SoundFontBankDrum): a kit on the
+    // drum bank (XG 127, or 126 if the channel is on it; GM2 120); a sound on a bank that would make drums of it, on the
+    // normal one instead (XG 0, GM2 121: the engine plays bank 0, the SoundFont having no bank 121). Other modes: the
+    // list's bank.
+    static int SoundFontChoiceMsb(int c, int listMsb, bool kit, int currentMsb)
+    {
+        if (ChannelMixer.XgMode) return kit ? (currentMsb == 126 ? 126 : 127) : InstrumentDefinitions.IsXgDrumBank(listMsb) ? 0 : listMsb;
+        if (ChannelMixer.Gm2Mode)
+            return kit ? InstrumentDefinitions.Gm2DrumMsb : InstrumentDefinitions.IsGm2Drum(c, listMsb) ? InstrumentDefinitions.Gm2MelodicMsb : listMsb;
+        return listMsb;
+    }
 
     // Name of a sound on a channel, in the current standard (insertion descriptions).
     public string InstrumentName(int c, int msb, int lsb, int program) => ResolveSound(c, program, msb, lsb, ChannelMixer.Rhythm(c)).Name;
@@ -630,7 +664,7 @@ public sealed class MixerViewModel : ObservableObject
     // of a variation the module does not have.
     InstrumentInfo ResolveSound(int c, int program, int msb, int lsb, int rhythm)
     {
-        if (IsSoundFont) rhythm = SoundFontRhythm(msb, rhythm);
+        if (IsSoundFont) rhythm = SoundFontRhythm(c, msb, rhythm);
         var info = defs.Resolve(Standard, c, program, msb, EffectiveXgLsb(msb, lsb), rhythm);
         if (info.Missing && !info.Drum && HasXgBanks && msb == 0 && ChannelMixer.VoiceMap == ChannelMixer.VoiceMapBasic)
             info = info with { Name = defs.Resolve(Standard, c, program, 0, InstrumentDefinitions.XgBasicLsb, rhythm).Name };
@@ -671,7 +705,8 @@ public sealed class MixerViewModel : ObservableObject
     {
         var fileInfo = GetFileInstrument(c);
         var (msb, lsb, program) = GetCurrentSound(c);
-        bool drum = GetCurrentInstrument(c).Drum;
+        // SF2: the presets of bank 128 on a drum channel, kits or not (the engine plays them there).
+        bool drum = IsSoundFont ? IsSoundFontDrumType(c) : GetCurrentInstrument(c).Drum;
         // XG: the list of the map of the sound. The MU50 map lists a capital voice once (bank LSB 0), whatever
         // bank asked for it; the 2000 map has its three banks (0, 126 = MU100 Native, 127 = MU Basic).
         int xgMap = HasXgBanks ? XgMapOfSound(msb, lsb, program) : 0;
@@ -825,9 +860,8 @@ public sealed class MixerViewModel : ObservableObject
             int drumPart = HasGsMaps ? ChannelMixer.Rhythm(c) : 0;
             var targets = drumPart > 0 ? DrumPartChannels(drumPart) : new List<int> { c };
             int sentLsb = item.Lsb;
-            // SF2, XG track: a kit on its drum bank (126 / 127), not the bank 0 of the list (which would make the channel
-            // a normal one, see InstrumentDefinitions.IsXgDrumBank).
-            int sentMsb = IsSoundFont && ChannelMixer.XgMode && IsDrumChannel(c) ? (GetCurrentSound(c).Msb == 126 ? 126 : 127) : item.Msb;
+            // SF2, XG or GM2 track: the bank that keeps the kind of the channel (see SoundFontChoiceMsb).
+            int sentMsb = IsSoundFont ? SoundFontChoiceMsb(c, item.Msb, IsSoundFontDrumType(c), GetCurrentSound(c).Msb) : item.Msb;
             foreach (int t in targets) ChannelMixer.SetOverride(output(), t, sentMsb, sentLsb, item.Program);
             var others = targets.Where(t => t != c).Select(t => (t + 1).ToString()).ToList();
             setStatus($"Channel {c + 1}: MSB {sentMsb} / LSB {sentLsb} / PC {item.Program + 1}" +
@@ -845,8 +879,10 @@ public sealed class MixerViewModel : ObservableObject
 
     bool HasXgBanks => Standard == "XG" && defs.XgVoices.Count > 0;
     bool HasGm2Banks => Standard == "GM2" && defs.Gm2Voices.Count > 0;
-    // SF2 mode, XG track: drum kits by the bank, as in XG (see SoundFontRhythm); no SFX kit (none in a SoundFont).
+    // SF2 mode, XG or GM2 track: drum kits by the bank, as in XG and GM2 (see SoundFontRhythm); no SFX kit (none in a
+    // SoundFont).
     bool HasSoundFontXgBanks => IsSoundFont && ChannelMixer.XgMode;
+    bool HasSoundFontGm2Banks => IsSoundFont && ChannelMixer.Gm2Mode;
 
     static readonly (int Bank, string Text)[] XgKinds = { (0, "Assign to Normal part"), (127, "Assign to Drum kit"), (126, "Assign to SFX kit") };
     static readonly (int Bank, string Text)[] Gm2Kinds =
@@ -856,10 +892,10 @@ public sealed class MixerViewModel : ObservableObject
     static readonly (int Part, string Text)[] Sf2Parts = { (0, "Assign to Normal part"), (1, "Assign to Drum kit") };
 
     // "Assign to …" entries of the current standard (null: none, GS parts or SF2 parts).
-    (int Bank, string Text)[] BankKinds => HasXgBanks ? XgKinds : HasGm2Banks ? Gm2Kinds : HasSoundFontXgBanks ? Sf2XgKinds : null;
+    (int Bank, string Text)[] BankKinds => HasXgBanks ? XgKinds : HasGm2Banks || HasSoundFontGm2Banks ? Gm2Kinds : HasSoundFontXgBanks ? Sf2XgKinds : null;
 
-    // Bank kind (the MSB of its "Assign to …" entry) of a sound played on a channel.
-    int BankKind(int c, int msb) => HasGm2Banks
+    // Bank kind (the MSB of its "Assign to …" entry) of a sound played on a channel (any port).
+    int BankKind(int c, int msb) => HasGm2Banks || HasSoundFontGm2Banks
         ? (InstrumentDefinitions.IsGm2Drum(c, msb) ? InstrumentDefinitions.Gm2DrumMsb : InstrumentDefinitions.Gm2MelodicMsb)
         : msb is 126 or 127 ? msb : 0;
     int CurrentBankKind(int c) => BankKind(c, GetCurrentSound(c).Msb);
@@ -907,6 +943,54 @@ public sealed class MixerViewModel : ObservableObject
         ChannelMixer.SetRhythmOverride(output(), c, part);
         ChannelMixer.SetOverride(output(), c, 0, 0, 0);
         setStatus($"Channel {c + 1}: {KindName(kind)} — choose it in list");
+    }
+
+    // An "Assign to …" bank of drum kits (XG drum or SFX kits, GM2 drum kits).
+    static bool IsKitBank(int bank) => bank is 126 or 127 or InstrumentDefinitions.Gm2DrumMsb;
+
+    // A row of port B moved to normal sounds or drum kits by the bank (XG, GM2 track), as SelectBankKind: nothing if
+    // already there; if the file's instrument there is of that kind, back to it (in this passage); otherwise the first one
+    // of the kind (program 1), chosen for the passage, to be changed in the list.
+    void SelectOtherBankKind(ChannelViewModel ch, OtherPortsPlayer player, int bank)
+    {
+        int port = ch.Port, c = ch.Channel;
+        bool kit = IsKitBank(bank);
+        if (IsOtherDrumChannel(port, c) == kit)
+        {
+            setStatus($"Channel {ch.Name}: already on {KindName(bank)}");
+            return;
+        }
+        if (player.IsDrum(port, c) == kit)
+        {
+            player.ClearInstrument(port, c, false);
+            setStatus($"Channel {ch.Name}: {KindName(bank)} — file instrument");
+            return;
+        }
+        player.ChooseInstrument(port, c, bank, 0, 0);
+        setStatus($"Channel {ch.Name}: {KindName(bank)} — choose it in list");
+    }
+
+    // A row of port B moved to a normal part (0) or a drum kit (1) by the GS drum part (a track of another mode), as
+    // SelectSoundFontPart: nothing if already there; the file's own part: back to it and to the file's instrument;
+    // otherwise the drum part chosen (see PortRhythm) and the first sound or kit (program 1).
+    void SelectOtherPart(ChannelViewModel ch, OtherPortsPlayer player, int part)
+    {
+        int port = ch.Port, c = ch.Channel, kind = part > 0 ? 127 : 0;   // kind: for KindName
+        if ((player.Rhythm(port, c) > 0 ? 1 : 0) == part)
+        {
+            setStatus($"Channel {ch.Name}: already on {KindName(kind)}");
+            return;
+        }
+        if ((player.FileRhythm(port, c) > 0 ? 1 : 0) == part)
+        {
+            player.ClearRhythm(port, c);
+            player.ClearInstrument(port, c, false);
+            setStatus($"Channel {ch.Name}: {KindName(kind)} — file instrument");
+            return;
+        }
+        player.SetRhythm(port, c, part);
+        player.ChooseInstrument(port, c, 0, 0, 0);
+        setStatus($"Channel {ch.Name}: {KindName(kind)} — choose it in list");
     }
 
     // Channels currently assigned to a GS drum part (1 or 2).
@@ -1169,6 +1253,9 @@ public sealed class MixerViewModel : ObservableObject
         foreach (var ch in OtherChannels)   // port B: its mutes and instruments too
             if (ch.IsMuted) SetOtherPortMute(ch, false);
         var player = OtherPorts?.Invoke();
+        foreach (var (port, c, _) in PortRhythm.All())
+            if (player != null) player.ClearRhythm(port, c);
+            else PortRhythm.Remove(port, c);
         foreach (var (port, c) in PortInstruments.All().Select(x => (x.Port, x.Channel)).Distinct().ToList())
             if (player != null) player.ClearInstrument(port, c, true);
             else PortInstruments.Remove(port, c, InstrumentPassages.First, true);
@@ -1197,8 +1284,9 @@ public sealed class MixerViewModel : ObservableObject
                 if (ChannelMixer.IsFixed(k, c)) { ChannelMixer.ClearController(null, k, c); had = true; }
             if (ChannelMixer.Muted[c]) { SetMute(c, false, false); had = true; }
         }
-        had |= PortInstruments.Clear();   // the instruments and fixed values of the rows of port B
+        had |= PortInstruments.Clear();   // the instruments, fixed values and drum parts of the rows of port B
         had |= PortControllers.Clear();
+        had |= PortRhythm.Clear();
         return had;
     }
 }

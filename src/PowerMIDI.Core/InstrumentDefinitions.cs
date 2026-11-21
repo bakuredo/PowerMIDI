@@ -379,9 +379,14 @@ public sealed class InstrumentDefinitions
     public static bool IsGm2Drum(int channel, int msb) => msb == Gm2DrumMsb || (msb != Gm2MelodicMsb && channel == 9);
 
     // XG: bank MSB 127 (drum kits) or 126 (SFX kits) makes a channel a drum channel, another bank a normal one (the 10th
-    // channel starts on 127). In SF2 mode an XG track is played so too (see SoundFontOutput.PlayXgBank), its kits being
-    // those of the SoundFont (bank 128).
+    // channel starts on 127).
     public static bool IsXgDrumBank(int msb) => msb is 126 or 127;
+
+    // SF2 mode: does a bank select make a channel (0-based, of any port) a drum channel, by the rule of the mode of the
+    // track: XG (IsXgDrumBank), GM2 (IsGm2Drum)? null: in the other modes the bank does not decide (the GS drum part
+    // does). The engine plays the tracks so (see SoundFontOutput.PlayBank), its kits being those of the SoundFont (bank 128).
+    public static bool? SoundFontBankDrum(int channel, int msb) =>
+        ChannelMixer.XgMode ? IsXgDrumBank(msb) : ChannelMixer.Gm2Mode ? IsGm2Drum(channel % 16, msb) : null;
 
     // Instrument name of a channel (0-based) according to the file's standard, the program (0-based),
     // the bank and the GS drum mode (rhythm > 0).
@@ -526,6 +531,7 @@ public sealed class InstrumentDefinitions
     public const int Sf2DrumBank = 128;
     Dictionary<(int Bank, int Program), string> sf2Presets = new();
     HashSet<int> sf2Banks = new();
+    HashSet<int> sf2Instruments = new();   // programs of bank 128 that are instruments, not kits (see SoundFontPreset.IsKit)
     IReadOnlyList<InstrumentChoice> sf2Sounds = Array.Empty<InstrumentChoice>(), sf2Drums = Array.Empty<InstrumentChoice>();
 
     public bool HasSoundFont => sf2Presets.Count > 0;
@@ -533,7 +539,10 @@ public sealed class InstrumentDefinitions
     public void SetSoundFont(IEnumerable<SoundFontPreset> presets)
     {
         var table = new Dictionary<(int, int), string>();
-        foreach (var p in presets) table.TryAdd((p.Bank, p.Program), p.Name);   // the first one, as FluidSynth
+        var instruments = new HashSet<int>();
+        foreach (var p in presets)   // the first one, as FluidSynth
+            if (table.TryAdd((p.Bank, p.Program), p.Name) && p.Bank == Sf2DrumBank && !p.IsKit) instruments.Add(p.Program);
+        sf2Instruments = instruments;
         // Sounds: by program, then bank; the first preset of a program shows its number, the others (other banks)
         // are indented under it, with their bank. Kits: by program. The kits are sent with bank MSB 0 (a drum channel
         // ignores it).
@@ -552,16 +561,26 @@ public sealed class InstrumentDefinitions
     // Bank of the preset the engine plays for a melodic channel (see ResolveSoundFont): the one asked for, otherwise 0.
     public int SoundFontBank(int msb, int program) => sf2Presets.ContainsKey((msb, program)) ? msb : 0;
 
+    // Does a drum channel play a drum kit with this program? The preset of bank 128 the engine plays (that of the
+    // program, otherwise the first one) is a kit; false: an instrument of bank 128 (see SoundFontPreset.IsKit), whose
+    // notes are notes (transposed, with the scales of the keyboard), shown as an instrument.
+    public bool IsSoundFontKit(int program) =>
+        !sf2Instruments.Contains(sf2Presets.ContainsKey((Sf2DrumBank, program)) ? program : 0);
+
     InstrumentInfo ResolveSoundFont(int program, int msb, int rhythm)
     {
         if (rhythm > 0)
         {
             var note = "";
+            int played = program;
             if (!sf2Presets.TryGetValue((Sf2DrumBank, program), out var kit))
             {
                 note = " · kit missing, first kit";
                 kit = sf2Presets.GetValueOrDefault((Sf2DrumBank, 0), "Drums");
+                played = 0;
             }
+            if (sf2Instruments.Contains(played))
+                return new InstrumentInfo(kit, $"SF2 · bank {Sf2DrumBank} · PC {program + 1} · instrument, not a kit{note}", false, note != "");
             return new InstrumentInfo($"Drums · {kit}", $"SF2 · bank {Sf2DrumBank} · PC {program + 1}{note}", true, note != "");
         }
         // A bank the SoundFont does not have at all (a converter's bank select, e.g. bank 1 everywhere): bank 0 is the

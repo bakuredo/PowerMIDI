@@ -84,6 +84,47 @@ public class SoundFontInfoTests
         finally { File.Delete(path); }
     }
 
+    static byte[] U16(params int[] values) => values.SelectMany(v => BitConverter.GetBytes((ushort)v)).ToArray();
+    static byte[] Name20(string name) { var b = new byte[20]; Encoding.ASCII.GetBytes(name).CopyTo(b, 0); return b; }
+    static byte[] KeyRange(int low, int high) => U16(43).Concat(new[] { (byte)low, (byte)high }).ToArray();
+
+    // Bank 128: a kit (4 keys, a zone of one key each) and an instrument (one zone over all the keys, as the copies of a
+    // converter). Presets → instruments → zones, each list closed by a last record.
+    [Fact]
+    public void TellsKitsFromInstrumentsOfDrumBank()
+    {
+        byte[] Preset(string name, int program, int bag) => Name20(name).Concat(U16(program, 128, bag)).Concat(new byte[12]).ToArray();
+        var phdr = Preset("Kit", 0, 0).Concat(Preset("Copy", 1, 1)).Concat(Preset("EOP", 0, 2)).ToArray();
+        var pbag = U16(0, 0, 1, 0, 2, 0);
+        var pgen = U16(41, 0, 41, 1, 0, 0);
+        var inst = Name20("Kit").Concat(U16(0)).Concat(Name20("Copy")).Concat(U16(4)).Concat(Name20("EOI")).Concat(U16(5)).ToArray();
+        var ibag = U16(0, 0, 2, 0, 4, 0, 6, 0, 8, 0, 10, 0);
+        var sample = U16(53, 0);
+        var igen = new[] { 36, 38, 42, 46 }.SelectMany(k => KeyRange(k, k).Concat(sample)).Concat(KeyRange(0, 127)).Concat(sample).Concat(U16(0, 0)).ToArray();
+        var pdta = List("pdta", Chunk("phdr", phdr), Chunk("pbag", pbag), Chunk("pmod", new byte[10]), Chunk("pgen", pgen),
+                        Chunk("inst", inst), Chunk("ibag", ibag), Chunk("imod", new byte[10]), Chunk("igen", igen));
+        var body = Encoding.ASCII.GetBytes("sfbk").Concat(List("INFO", Chunk("ifil", new byte[] { 2, 0, 1, 0 })))
+                                                  .Concat(List("sdta", Chunk("smpl", new byte[100]))).Concat(pdta).ToArray();
+        var path = Path.Combine(Path.GetTempPath(), $"powermidi-test-{Guid.NewGuid():N}.sf2");
+        File.WriteAllBytes(path, Chunk("RIFF", body));
+        try
+        {
+            var presets = SoundFontInfo.Read(path).PresetList;
+            Assert.Equal(new SoundFontPreset(128, 0, "Kit", true), presets[0]);
+            Assert.Equal(new SoundFontPreset(128, 1, "Copy", false), presets[1]);
+
+            // Named and played as such on a drum channel: the instrument as an instrument; a missing program: the first
+            // kit, a kit.
+            var defs = new InstrumentDefinitions();
+            defs.SetSoundFont(presets);
+            var copy = defs.Resolve(InstrumentDefinitions.Sf2Standard, 9, 1, 0, 0, 1);
+            Assert.Equal(("Copy", false), (copy.Name, copy.Drum));
+            Assert.True(defs.Resolve(InstrumentDefinitions.Sf2Standard, 9, 0, 0, 0, 1).Drum);
+            Assert.Equal(new[] { true, false, true }, new[] { 0, 1, 5 }.Select(defs.IsSoundFontKit));
+        }
+        finally { File.Delete(path); }
+    }
+
     [Fact]
     public void RejectsOtherFile()
     {
