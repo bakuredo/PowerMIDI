@@ -122,6 +122,16 @@ static class FluidSynthNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_system_reset(IntPtr synth);
 
+    // Basic channels (MIDI modes): chan -1 resets them all; a basic channel's group of val channels in a mode below.
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_reset_basic_channel(IntPtr synth, int chan);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_set_basic_channel(IntPtr synth, int chan, int mode, int val);
+
+    // fluid_basic_channel_modes: Omni Off Poly (MIDI mode 2: a group of one channel).
+    public const int ChannelModeOmniOffPoly = 2;
+
     // type: 0 melodic, 1 drum (enum fluid_midi_channel_type).
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_set_channel_type(IntPtr synth, int chan, int type);

@@ -78,6 +78,7 @@ public sealed class SoundFontOutput : IOutputDevice
             AddSoundControllers(synth);
             if (fluid_synth_sfload(synth, soundFontPath, 1) < 0) throw Failure($"cannot load {Path.GetFileName(soundFontPath)}");
             SetDrumChannels(synth);
+            SetBasicChannels(synth);
             fluid_synth_set_interp_method(synth, -1, options.Interpolation);
             fullGain = (float)options.Gain;
             fluid_synth_set_gain(synth, fullGain);
@@ -147,6 +148,19 @@ public sealed class SoundFontOutput : IOutputDevice
             fluid_synth_bank_select(synth, channel, InstrumentDefinitions.Sf2DrumBank);
             fluid_synth_program_change(synth, channel, 0);
         }
+    }
+
+    // Mono / Poly (CC126 / CC127) of each channel, as on a module. FluidSynth takes them only on a "basic channel", and
+    // after its creation and each reset it has one: the first channel, Omni On Poly, for all the channels; a Mono On
+    // on another channel is refused (measured: a warning, the channel stays poly). Each channel is made a basic channel
+    // of its own (Omni Off Poly, a group of one channel), after the creation and after each reset (which brings the
+    // single group back). Measured offline (FluidSynth 2.6.2): CC126 then makes that channel mono (one voice for two
+    // notes held), the others staying poly, port B included; CC127 back to poly; the drums still play.
+    static void SetBasicChannels(IntPtr synth)
+    {
+        fluid_synth_reset_basic_channel(synth, -1);
+        for (int channel = 0; channel < Channels; channel++)
+            fluid_synth_set_basic_channel(synth, channel, ChannelModeOmniOffPoly, 1);
     }
 
     public void SendEvent(MidiEvent midiEvent) => SendEvent(midiEvent, 0);
@@ -251,7 +265,9 @@ public sealed class SoundFontOutput : IOutputDevice
                     case Kind.NoteOff: fluid_synth_noteoff(s, e.Channel, e.Data1); break;
                     case Kind.Control:
                         if (e.Data1 == 0) PlayBank(s, e.Channel, e.Data2);
-                        fluid_synth_cc(s, e.Channel, e.Data1, e.Data2);
+                        // Mono On: its value (the number of channels of the group, 0 = up to the next basic channel)
+                        // as 1, this channel only (measured: 4 is refused, the next channels being basic channels).
+                        fluid_synth_cc(s, e.Channel, e.Data1, e.Data1 == 126 ? 1 : e.Data2);
                         break;
                     case Kind.Program: fluid_synth_program_change(s, e.Channel, e.Data1); break;
                     case Kind.PitchBend: fluid_synth_pitch_bend(s, e.Channel, e.Data2); break;
@@ -293,6 +309,7 @@ public sealed class SoundFontOutput : IOutputDevice
         {
             fluid_synth_system_reset(s);
             SetDrumChannels(s);
+            SetBasicChannels(s);
             ApplyEffects(s);   // the reverb and chorus chosen stay
             return;
         }
