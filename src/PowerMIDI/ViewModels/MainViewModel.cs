@@ -468,12 +468,14 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // A SoundFont chosen in the list: remembered (the one of the files without their own), and with the engine played at
-    // once, the track loaded included (whatever SoundFont it finds: until another track starts, see StartTrack).
+    // once, the track loaded included (whatever SoundFont it finds: until another track starts, see StartTrack). As for
+    // another mode, the track loaded is played again from its start (once the engine has loaded the SoundFont).
     void OnSoundFontChosen(string path)
     {
         view.SaveSettings();
         soundFontChoice = current != null ? (current.Path, path) : null;
         if (!IsSoundFontEngine) return;
+        if (current != null) { StartTrack(current); return; }
         Stop();
         ClosePort();
         outputName = SoundFontOutput.PortName;

@@ -909,7 +909,8 @@
       </TextBlock.Style>
     </TextBlock>
     <DockPanel Visibility="{Binding IsEngine, Converter={StaticResource BoolToVisibility}}">
-      <!-- The soundfonts folder, Random, Refresh and Open folder (the list of the SoundFonts: in place of the mode, top left). -->
+      <!-- The soundfonts folder, Favorite, Random, Refresh and Open folder (the list of the SoundFonts: in place of the mode,
+           top left). -->
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
         <Button DockPanel.Dock="Right" Content="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
                 Command="{Binding OpenFolderCommand}" ToolTip="{Binding FolderToolTip}"/>
@@ -917,6 +918,19 @@
                 Command="{Binding RefreshCommand}" ToolTip="Refresh list"/>
         <Button DockPanel.Dock="Right" Content="&#xE8B1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
                 Command="{Binding RandomCommand}" ToolTip="Random SoundFont of folder (played at once)" AutomationProperties.Name="Random SoundFont"/>
+        <!-- The SoundFont shown added to the favorites (star filled) or removed (star outline): at the top of the list. -->
+        <Button DockPanel.Dock="Right" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
+                Command="{Binding FavoriteCommand}" IsEnabled="{Binding CanFavorite}" ToolTipService.ShowOnDisabled="True"
+                ToolTip="{Binding FavoriteToolTip}" AutomationProperties.Name="Favorite SoundFont">
+          <Button.Style>
+            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+              <Setter Property="Content" Value="&#xE734;"/>
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFavorite}" Value="True"><Setter Property="Content" Value="&#xE735;"/></DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Button.Style>
+        </Button>
         <TextBlock Text="{Binding Folder, StringFormat=Folder: {0}}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                    Foreground="{DynamicResource TextSoftBrush}" ToolTip="{Binding Folder}"/>
       </DockPanel>
@@ -1135,7 +1149,8 @@
       </Button>
       <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" AutomationProperties.Name="MIDI OUT"/>
       <!-- Mode, right after the port (no label: its tooltip says what it is). The SoundFont engine imposes SF2: the list of
-           the SoundFonts in its place (the one played shown, see SoundFontsViewModel), to the end of the row. -->
+           the SoundFonts in its place (the one played shown, see SoundFontsViewModel), to the left edge of the last column
+           of the playlist (Duration; its right margin set by AlignSoundFontBox). -->
       <Grid Margin="6,0,0,0">
         <ComboBox Width="120" HorizontalAlignment="Left" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
                   ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
@@ -1154,9 +1169,27 @@
           <ComboBoxItem Content="MT-32"
                         ToolTip="Roland MT-32 / CM-32L"/>
         </ComboBox>
-        <ComboBox ItemsSource="{Binding SoundFonts.Items}" SelectedItem="{Binding SoundFonts.SelectedItem}" DisplayMemberPath="Text"
+        <ComboBox x:Name="SoundFontBox" ItemsSource="{Binding SoundFonts.Items}" SelectedItem="{Binding SoundFonts.SelectedItem}" TextSearch.TextPath="Text"
                   IsEnabled="{Binding SoundFonts.HasFiles}" ToolTipService.ShowOnDisabled="True" ToolTip="{Binding SoundFonts.SelectedToolTip}"
-                  Visibility="{Binding IsSoundFontEngine, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="SoundFont file"/>
+                  Visibility="{Binding IsSoundFontEngine, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="SoundFont file"
+                  DropDownOpened="OnSoundFontListOpened">
+          <!-- Fixed width when open: as wide as the longest name (measured when it opens, see OnSoundFontListOpened), not
+               following the names on screen while scrolling (virtualized: a few hundred files open at once). -->
+          <ComboBox.ItemsPanel>
+            <ItemsPanelTemplate><VirtualizingStackPanel MinWidth="{DynamicResource SoundFontListWidth}"/></ItemsPanelTemplate>
+          </ComboBox.ItemsPanel>
+          <!-- The favorites (first in the list) with a star before their name, as in the Library tab; 16 wide, so that
+               their names line up (see OnSoundFontListOpened). -->
+          <ComboBox.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="★" Width="16" Foreground="{DynamicResource AccentBrush}"
+                           Visibility="{Binding IsFavorite, Converter={StaticResource BoolToVisibility}}"/>
+                <TextBlock Text="{Binding Text}"/>
+              </StackPanel>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
       </Grid>
     </DockPanel>
 

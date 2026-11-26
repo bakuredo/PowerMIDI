@@ -42,6 +42,15 @@ public partial class MainWindow : Window, IMainView
         vm = new MainViewModel(this, defs);
         DataContext = vm;
         vm.Library.PropertyChanged += OnLibraryChanged;
+        // The list of the SoundFonts placed again when the columns of the playlist or the window change (AlignSoundFontBox).
+        if (PlaylistView.View is System.Windows.Controls.GridView playlistGrid)
+        {
+            foreach (var column in playlistGrid.Columns)
+                ((System.ComponentModel.INotifyPropertyChanged)column).PropertyChanged += (_, _) => AlignSoundFontBox();
+            playlistGrid.Columns.CollectionChanged += (_, _) => AlignSoundFontBox();
+        }
+        Loaded += (_, _) => AlignSoundFontBox();
+        SizeChanged += (_, _) => AlignSoundFontBox();
 
         Run(ImportSettings);
         Run(vm.UpdatePortList);
@@ -265,6 +274,43 @@ public partial class MainWindow : Window, IMainView
             PlaylistView.View is not System.Windows.Controls.GridView grid) return;
         double others = grid.Columns.Where(c => c != PlaylistFileColumn).Sum(c => c.Width);
         PlaylistFileColumn.Width = Math.Max(120, Math.Floor(viewer.ViewportWidth - others));
+    }
+
+    // The list of the SoundFonts (top row, SF2 mode) ends over the left edge of the last column of the playlist (Duration),
+    // whatever the width of the window, the vertical scroll bar or the columns (resized, moved). Placed once the layout
+    // is done (several changes at once: placed once).
+    bool soundFontBoxQueued;
+
+    void AlignSoundFontBox()
+    {
+        if (soundFontBoxQueued) return;
+        soundFontBoxQueued = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            soundFontBoxQueued = false;
+            if (PlaylistView.View is not System.Windows.Controls.GridView { Columns.Count: > 1 } grid ||
+                SoundFontBox.Parent is not FrameworkElement row || !row.IsLoaded || !PlaylistView.IsLoaded) return;
+            double left = PlaylistView.BorderThickness.Left + PlaylistView.Padding.Left +
+                          grid.Columns.Take(grid.Columns.Count - 1).Sum(c => c.ActualWidth);
+            double x = PlaylistView.TranslatePoint(new Point(left, 0), row).X;
+            SoundFontBox.Margin = new Thickness(0, 0, Math.Max(0, Math.Round(row.ActualWidth - x)), 0);
+        }, System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    // The list of the SoundFonts opened: as wide as its longest name, in the font of the theme (SoundFontListWidth, the
+    // least width of its items panel). Virtualized, it would otherwise take the width of the names on screen, changing
+    // while scrolling. 16: the star of a favorite (ItemTemplate of the list); 12: the padding (5 + 5) and the frame
+    // (1 + 1) of an item (ComboBoxItem style, Styles.xaml).
+    void OnSoundFontListOpened(object sender, EventArgs e)
+    {
+        var typeface = new System.Windows.Media.Typeface(SoundFontBox.FontFamily, SoundFontBox.FontStyle, SoundFontBox.FontWeight, SoundFontBox.FontStretch);
+        double pixelsPerDip = System.Windows.Media.VisualTreeHelper.GetDpi(SoundFontBox).PixelsPerDip;
+        double widest = vm.SoundFonts.Items
+            .Select(i => new System.Windows.Media.FormattedText(i.Text, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+                                                                typeface, SoundFontBox.FontSize, System.Windows.Media.Brushes.Black, pixelsPerDip)
+                         .WidthIncludingTrailingWhitespace + (i.IsFavorite ? 16 : 0))
+            .DefaultIfEmpty(0).Max();
+        SoundFontBox.Resources["SoundFontListWidth"] = Math.Ceiling(widest) + 12;
     }
 
     bool themeReady;   // false while the theme list is filled at startup

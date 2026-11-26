@@ -22,6 +22,7 @@ public sealed class SoundFontsViewModel : ObservableObject
         this.engineChanged = engineChanged;
         RefreshCommand = new RelayCommand(Refresh);
         RandomCommand = new RelayCommand(ChooseRandom);
+        FavoriteCommand = new RelayCommand(ToggleFavorite);
         OpenFolderCommand = new RelayCommand(OpenFolder);
         Refresh();
     }
@@ -35,6 +36,36 @@ public sealed class SoundFontsViewModel : ObservableObject
         if (others.Count > 0) SelectedItem = others[Random.Shared.Next(others.Count)];
     }
 
+    // ---------- Favorites ----------
+    // Files of the folder (by name) shown first in the list, with a star; the one shown added or removed by the Favorite
+    // button. Kept in PowerMIDI.ini (Favorites, the names separated by |), also those gone from the folder (they may come
+    // back: another drive plugged in…).
+    readonly HashSet<string> favorites = new(StringComparer.OrdinalIgnoreCase);
+    public ICommand FavoriteCommand { get; }
+
+    // The one shown is a favorite; only a file of the folder can be one (not the one found next to the MIDI file).
+    public bool IsFavorite => selectedItem?.IsFavorite == true;
+    public bool CanFavorite => selectedItem?.InFolder == true;
+    public string FavoriteToolTip => !CanFavorite ? "Favorites: SoundFonts of folder only"
+        : IsFavorite ? "Remove from favorites" : "Add to favorites (shown at top of list)";
+
+    void ToggleFavorite()
+    {
+        if (selectedItem is not { InFolder: true } item) return;
+        var name = Path.GetFileName(item.Path);
+        if (!favorites.Remove(name)) favorites.Add(name);
+        Rebuild();
+    }
+
+    // The selection changed (by hand or by Rebuild): what depends on it.
+    void SelectionShown()
+    {
+        OnPropertyChanged(nameof(SelectedToolTip));
+        OnPropertyChanged(nameof(IsFavorite));
+        OnPropertyChanged(nameof(CanFavorite));
+        OnPropertyChanged(nameof(FavoriteToolTip));
+    }
+
     string folder;
     public string Folder { get => folder; private set { if (Set(ref folder, value)) OnPropertyChanged(nameof(FolderToolTip)); } }
     public string FolderToolTip => $"Open soundfonts folder (place for .sf2 files): {folder}";
@@ -42,9 +73,9 @@ public sealed class SoundFontsViewModel : ObservableObject
     public ICommand OpenFolderCommand { get; }
 
     // ---------- The list ----------
-    // A SoundFont of the list: its path, its text, and whether it is a file of the soundfonts folder (otherwise the one
-    // played, found elsewhere: next to the MIDI file, by its tag…).
-    public sealed record Item(string Path, string Text, bool InFolder);
+    // A SoundFont of the list: its path, its text, whether it is a file of the soundfonts folder (otherwise the one
+    // played, found elsewhere: next to the MIDI file, by its tag…), and whether it is a favorite (a star before it).
+    public sealed record Item(string Path, string Text, bool InFolder, bool IsFavorite = false);
 
     List<string> folderFiles = new();   // the .sf2 files of the folder, by name
     string defaultFile;                 // the one chosen for the files without their own (a file of the folder)
@@ -64,7 +95,7 @@ public sealed class SoundFontsViewModel : ObservableObject
         {
             if (value == null || !Set(ref selectedItem, value)) return;
             ReadInfo();
-            OnPropertyChanged(nameof(SelectedToolTip));
+            SelectionShown();
             if (updating || !value.InFolder) return;
             defaultFile = Path.GetFileName(value.Path);
             chosen(value.Path);
@@ -86,13 +117,15 @@ public sealed class SoundFontsViewModel : ObservableObject
 
     static bool SamePath(string a, string b) => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
 
-    // The files of the folder, and the one played if it is not one of them; the one played shown (otherwise the one
-    // chosen), not taken for a choice.
+    // The files of the folder (the favorites first, each part by name), and the one played if it is not one of them
+    // (found by the MIDI file: "auto", how in its tooltip); the one played shown (otherwise the one chosen), not taken
+    // for a choice.
     void Rebuild()
     {
-        var list = folderFiles.Select(n => new Item(Path.Combine(Folder, n), n, true)).ToList();
+        var list = folderFiles.Select(n => new Item(Path.Combine(Folder, n), n, true, favorites.Contains(n)))
+                              .OrderBy(i => i.IsFavorite ? 0 : 1).ToList();   // (stable: by name within each part)
         if (usedPath != null && !list.Any(i => SamePath(i.Path, usedPath)))
-            list.Add(new Item(usedPath, $"{Path.GetFileName(usedPath)} ({usedFrom})", false));
+            list.Add(new Item(usedPath, $"{Path.GetFileName(usedPath)} (auto)", false));
         var shown = (usedPath != null ? list.FirstOrDefault(i => SamePath(i.Path, usedPath)) : null)
                     ?? list.FirstOrDefault(i => i.InFolder && string.Equals(Path.GetFileName(i.Path), defaultFile, StringComparison.OrdinalIgnoreCase));
         updating = true;
@@ -101,7 +134,7 @@ public sealed class SoundFontsViewModel : ObservableObject
             Items = list;
             selectedItem = shown;
             OnPropertyChanged(nameof(SelectedItem));
-            OnPropertyChanged(nameof(SelectedToolTip));
+            SelectionShown();
             ReadInfo();   // also the same file again (it may have been replaced)
         }
         finally { updating = false; }
@@ -266,12 +299,15 @@ public sealed class SoundFontsViewModel : ObservableObject
 
     // ---------- Settings (PowerMIDI.ini) ----------
     // The folder of the SoundFonts (Folder, first in the section: the file chosen is one of it; empty: the soundfonts
-    // folder next to the program), the file chosen, the SF_BANK tag (ReadTag, WriteTag: 1 / 0), the settings of the
-    // engine, and its reverb and chorus (SoundFontEffects, set in the Effects tab).
+    // folder next to the program), the file chosen, the favorites (Favorites: names separated by |, a character no file
+    // name has), the SF_BANK tag (ReadTag, WriteTag: 1 / 0), the settings of the engine, and its reverb and chorus
+    // (SoundFontEffects, set in the Effects tab).
     public void LoadSettings(IniFile ini)
     {
         folderSetting = ini.Get("SoundFont", "Folder") ?? "";
         Folder = SoundFontFinder.FolderOf(folderSetting, AppContext.BaseDirectory);
+        favorites.Clear();
+        favorites.UnionWith((ini.Get("SoundFont", "Favorites") ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         ReadTag = ini.GetInt("SoundFont", "ReadTag") != 0;
         WriteTag = ini.GetInt("SoundFont", "WriteTag") != 0;
         SoundFontEffects.Read(ini);
@@ -286,6 +322,7 @@ public sealed class SoundFontsViewModel : ObservableObject
     {
         ini.Set("SoundFont", "Folder", folderSetting);   // first: the INI is written anew, its keys in this order
         ini.Set("SoundFont", "File", defaultFile ?? "");
+        ini.Set("SoundFont", "Favorites", string.Join("|", favorites.Order(StringComparer.OrdinalIgnoreCase)));
         ini.Set("SoundFont", "ReadTag", readTag ? 1 : 0);
         ini.Set("SoundFont", "WriteTag", writeTag ? 1 : 0);
         options.Write(ini);
