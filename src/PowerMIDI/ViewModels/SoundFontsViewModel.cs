@@ -4,25 +4,35 @@ using PowerMIDI.Core;
 
 namespace PowerMIDI.ViewModels;
 
-// SoundFonts tab: the .sf2 files of the soundfonts folder (next to the program, or the one of PowerMIDI.ini, see
-// SoundFontFinder.FolderOf), the one played by the SoundFont engine (MIDI OUT "SoundFont engine (FluidSynth)";
-// remembered in PowerMIDI.ini) and what it says about itself.
+// The SoundFonts: those of the soundfonts folder (next to the program, or the one of PowerMIDI.ini, see
+// SoundFontFinder.FolderOf), the one played by the SoundFont engine (MIDI OUT "SoundFont engine (FluidSynth)") and what
+// it says about itself, the one chosen for the files without their own (remembered in PowerMIDI.ini); the settings of the
+// engine and of the SF_BANK tag (SoundFonts tab). Their list is shown in place of the mode while the engine is the port.
 public sealed class SoundFontsViewModel : ObservableObject
 {
-    readonly Action chosen;   // a file chosen by hand: the engine loads it if it runs
+    readonly Action<string> chosen;   // a file chosen in the list (its path): the engine plays it if it is the port
     readonly Action<bool> engineChanged;   // a setting of the engine changed: restart (true) or taken at once (false)
-    string savedFile;         // the file remembered in PowerMIDI.ini
     string folderSetting = "";   // the folder as PowerMIDI.ini gives it ("": the default one), written back as it is
     bool updating;            // list refreshed or settings read: not a choice by hand
 
-    public SoundFontsViewModel(Action chosen, Action<bool> engineChanged)
+    public SoundFontsViewModel(Action<string> chosen, Action<bool> engineChanged)
     {
         Folder = SoundFontFinder.FolderOf("", AppContext.BaseDirectory);
         this.chosen = chosen;
         this.engineChanged = engineChanged;
-        RefreshCommand = new RelayCommand(() => Refresh(notify: true));
+        RefreshCommand = new RelayCommand(Refresh);
+        RandomCommand = new RelayCommand(ChooseRandom);
         OpenFolderCommand = new RelayCommand(OpenFolder);
-        Refresh(notify: false);
+        Refresh();
+    }
+
+    public ICommand RandomCommand { get; }
+
+    // A SoundFont of the folder at random (another one than the one shown), chosen as in the list: played at once.
+    void ChooseRandom()
+    {
+        var others = items.Where(i => i.InFolder && i != selectedItem).ToList();
+        if (others.Count > 0) SelectedItem = others[Random.Shared.Next(others.Count)];
     }
 
     string folder;
@@ -31,26 +41,71 @@ public sealed class SoundFontsViewModel : ObservableObject
     public ICommand RefreshCommand { get; }
     public ICommand OpenFolderCommand { get; }
 
-    IReadOnlyList<string> files = Array.Empty<string>();
-    public IReadOnlyList<string> Files { get => files; private set { if (Set(ref files, value)) OnPropertyChanged(nameof(HasFiles)); } }
-    public bool HasFiles => files.Count > 0;
+    // ---------- The list ----------
+    // A SoundFont of the list: its path, its text, and whether it is a file of the soundfonts folder (otherwise the one
+    // played, found elsewhere: next to the MIDI file, by its tag…).
+    public sealed record Item(string Path, string Text, bool InFolder);
 
-    string selectedFile;
-    public string SelectedFile
+    List<string> folderFiles = new();   // the .sf2 files of the folder, by name
+    string defaultFile;                 // the one chosen for the files without their own (a file of the folder)
+    string usedPath, usedFrom;          // the one the engine plays (or loads), and how it was found (null: none)
+
+    IReadOnlyList<Item> items = Array.Empty<Item>();
+    public IReadOnlyList<Item> Items { get => items; private set { if (Set(ref items, value)) OnPropertyChanged(nameof(HasFiles)); } }
+    public bool HasFiles => items.Count > 0;
+
+    // Shown: the SoundFont played; without one, the one chosen. A file of the folder chosen by hand: the one chosen from
+    // now on, played at once. A list given new items may give back null for a moment: ignored.
+    Item selectedItem;
+    public Item SelectedItem
     {
-        get => selectedFile;
+        get => selectedItem;
         set
         {
-            if (!Set(ref selectedFile, value)) return;
+            if (value == null || !Set(ref selectedItem, value)) return;
             ReadInfo();
-            if (updating || value == null) return;
-            savedFile = value;
-            chosen();
+            OnPropertyChanged(nameof(SelectedToolTip));
+            if (updating || !value.InFolder) return;
+            defaultFile = Path.GetFileName(value.Path);
+            chosen(value.Path);
         }
     }
 
-    // Full path of the chosen file (null: none).
-    public string SelectedPath => selectedFile == null ? null : Path.Combine(Folder, selectedFile);
+    public string SelectedToolTip => selectedItem == null ? "SoundFont"
+        : $"SoundFont: {selectedItem.Path}" + (usedPath != null && SamePath(selectedItem.Path, usedPath) ? $"\nPlayed ({usedFrom})" : "\nChosen in list");
+
+    // Full path of the SoundFont chosen for the files without their own (null: none).
+    public string DefaultPath => defaultFile == null ? null : Path.Combine(Folder, defaultFile);
+
+    // The SoundFont the engine plays (or loads), and how it was found (null: none, the engine stopped).
+    public void SetUsed(string path, string from)
+    {
+        (usedPath, usedFrom) = (path, from);
+        Rebuild();
+    }
+
+    static bool SamePath(string a, string b) => string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase);
+
+    // The files of the folder, and the one played if it is not one of them; the one played shown (otherwise the one
+    // chosen), not taken for a choice.
+    void Rebuild()
+    {
+        var list = folderFiles.Select(n => new Item(Path.Combine(Folder, n), n, true)).ToList();
+        if (usedPath != null && !list.Any(i => SamePath(i.Path, usedPath)))
+            list.Add(new Item(usedPath, $"{Path.GetFileName(usedPath)} ({usedFrom})", false));
+        var shown = (usedPath != null ? list.FirstOrDefault(i => SamePath(i.Path, usedPath)) : null)
+                    ?? list.FirstOrDefault(i => i.InFolder && string.Equals(Path.GetFileName(i.Path), defaultFile, StringComparison.OrdinalIgnoreCase));
+        updating = true;
+        try
+        {
+            Items = list;
+            selectedItem = shown;
+            OnPropertyChanged(nameof(SelectedItem));
+            OnPropertyChanged(nameof(SelectedToolTip));
+            ReadInfo();   // also the same file again (it may have been replaced)
+        }
+        finally { updating = false; }
+    }
 
     // The SF_BANK tag of the MIDI files (see SoundFontFinder): read when a file is played (its SoundFont), written by
     // Save MIDI file in SF2 mode (the SoundFont played). Both on by default.
@@ -58,11 +113,21 @@ public sealed class SoundFontsViewModel : ObservableObject
     public bool ReadTag { get => readTag; set => Set(ref readTag, value); }
     public bool WriteTag { get => writeTag; set => Set(ref writeTag, value); }
 
-    // State of the engine, set by the main view model: stopped, loading, running; and its delay while it runs.
-    string engineState = "Stopped";
+    // The SoundFont engine is the MIDI OUT (otherwise the tab shows only a message).
+    bool isEngine;
+    public bool IsEngine { get => isEngine; set => Set(ref isEngine, value); }
+
+    // State of the engine, set by the main view model: while it runs, the number of voices playing ("—" otherwise); its
+    // tooltip (stopped, loading; running: SoundFont, how it was found, FluidSynth, audio output); and its delay while
+    // it runs, in the tooltip of Buffer.
+    string engineState = "—";
     public string EngineState { get => engineState; set => Set(ref engineState, value); }
-    string delayText;
-    public string DelayText { get => delayText; set => Set(ref delayText, value); }
+    string engineToolTip = "Engine stopped";
+    public string EngineToolTip { get => engineToolTip; set => Set(ref engineToolTip, value); }
+    string delayText;   // e.g. "~42 ms"; null: the engine does not run
+    public string DelayText { get => delayText; set { if (Set(ref delayText, value)) OnPropertyChanged(nameof(BufferToolTip)); } }
+    public string BufferToolTip => "Smaller: less delay, but crackles if computer is too busy (change restarts engine)" +
+                                   (delayText != null ? $"\nDelay measured now (event to sound): {delayText}" : "");
 
     // ---------- Settings of the engine (SoundFontEngineOptions) ----------
     // A list item: its text and its value (string, int or bool).
@@ -74,7 +139,7 @@ public sealed class SoundFontsViewModel : ObservableObject
     public IReadOnlyList<Choice> ReverbEngines { get; } = SoundFontEngineOptions.ReverbEngines.Select(x => new Choice(x.Text, x.Value)).ToList();
     public IReadOnlyList<Choice> Interpolations { get; } = SoundFontEngineOptions.Interpolations.Select(x => new Choice(x.Text, x.Value)).ToList();
     public IReadOnlyList<Choice> Polyphonies { get; } = SoundFontEngineOptions.Polyphonies.Select(n => new Choice($"{n} voices", n)).ToList();
-    public IReadOnlyList<Choice> SampleLoadings { get; } = new[] { new Choice("All at load", false), new Choice("On demand", true) };
+    public IReadOnlyList<Choice> SampleLoadings { get; } = new[] { new Choice("Preload all", false), new Choice("On demand", true) };
     public IReadOnlyList<Choice> Drivers { get; } = SoundFontEngineOptions.Drivers.Select(x => new Choice(x.Text, x.Value)).ToList();
     public IReadOnlyList<Choice> SampleRates { get; } =
         SoundFontEngineOptions.SampleRates.Select(r => new Choice($"{r / 1000.0:0.#} kHz".Replace(',', '.'), r)).ToList();
@@ -147,7 +212,7 @@ public sealed class SoundFontsViewModel : ObservableObject
         if (!updating) engineChanged(restart);
     }
 
-    // ---------- What the chosen file says about itself ----------
+    // ---------- What the file shown says about itself ----------
     string infoName, infoAuthor, infoCopyright, infoDetails, infoComment;
     public string InfoName { get => infoName; private set => Set(ref infoName, value); }
     public string InfoAuthor { get => infoAuthor; private set => Set(ref infoAuthor, value); }
@@ -158,7 +223,7 @@ public sealed class SoundFontsViewModel : ObservableObject
     void ReadInfo()
     {
         InfoName = InfoAuthor = InfoCopyright = InfoDetails = InfoComment = null;
-        if (SelectedPath is not { } path) return;
+        if (selectedItem?.Path is not { } path) return;
         try
         {
             var info = SoundFontInfo.Read(path);
@@ -180,26 +245,16 @@ public sealed class SoundFontsViewModel : ObservableObject
         }
     }
 
-    // ---------- List of files ----------
-    // The .sf2 files of the folder, by name. The chosen one stays chosen if still there, otherwise the remembered one,
-    // otherwise the first. notify: a refresh by hand that changes the file is a choice (the engine loads it).
-    void Refresh(bool notify)
+    // ---------- Files of the folder ----------
+    // The .sf2 files of the folder, by name. The one chosen stays chosen if still there, otherwise the first (the next
+    // tracks without their own play it; the engine keeps the one it plays).
+    void Refresh()
     {
-        var names = Directory.Exists(Folder)
+        folderFiles = Directory.Exists(Folder)
             ? Directory.GetFiles(Folder, "*.sf2").Select(Path.GetFileName).Order(StringComparer.OrdinalIgnoreCase).ToList()
             : new List<string>();
-        var before = selectedFile;
-        var keep = selectedFile ?? savedFile;
-        var choice = names.FirstOrDefault(n => string.Equals(n, keep, StringComparison.OrdinalIgnoreCase)) ?? names.FirstOrDefault();
-        updating = true;
-        try
-        {
-            Files = names;
-            SelectedFile = choice;
-            if (choice == before) ReadInfo();   // same file: its information read again (it may have been replaced)
-        }
-        finally { updating = false; }
-        if (notify && choice != before && choice != null) chosen();
+        defaultFile = folderFiles.FirstOrDefault(n => string.Equals(n, defaultFile, StringComparison.OrdinalIgnoreCase)) ?? folderFiles.FirstOrDefault();
+        Rebuild();
     }
 
     // The folder in the Explorer (created if missing: the place to put .sf2 files).
@@ -223,16 +278,14 @@ public sealed class SoundFontsViewModel : ObservableObject
         updating = true;
         try { Change(SoundFontEngineOptions.Read(ini)); }
         finally { updating = false; }
-        savedFile = ini.Get("SoundFont", "File");
-        if (savedFile == "") savedFile = null;
-        selectedFile = null;   // the remembered file chosen by the refresh
-        Refresh(notify: false);
+        defaultFile = ini.Get("SoundFont", "File");   // kept if the folder has it (see Refresh)
+        Refresh();
     }
 
     public void WriteSettings(IniFile ini)
     {
         ini.Set("SoundFont", "Folder", folderSetting);   // first: the INI is written anew, its keys in this order
-        ini.Set("SoundFont", "File", selectedFile ?? savedFile ?? "");
+        ini.Set("SoundFont", "File", defaultFile ?? "");
         ini.Set("SoundFont", "ReadTag", readTag ? 1 : 0);
         ini.Set("SoundFont", "WriteTag", writeTag ? 1 : 0);
         options.Write(ini);

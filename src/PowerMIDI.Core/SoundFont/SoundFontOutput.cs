@@ -398,6 +398,12 @@ public sealed class SoundFontOutput : IOutputDevice
     // Delay between an event sent and its sound (ms): the lead of the rendering, plus the margin (see Dates).
     public double Delay => lead + Margin;
 
+    // Voices playing now (a note may use several: stereo samples, layers of its preset); at most the polyphony.
+    public int ActiveVoices
+    {
+        get { lock (gate) return synth != IntPtr.Zero ? fluid_synth_get_active_voice_count(synth) : 0; }
+    }
+
     // Audio devices of a driver (e.g. "wasapi"), as FluidSynth names them, "default" first.
     public static IReadOnlyList<string> Devices(string driver)
     {

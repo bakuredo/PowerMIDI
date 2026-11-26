@@ -895,34 +895,40 @@
     </TabItem>
     <!-- SoundFonts: the .sf2 files of the soundfonts folder (Folder in PowerMIDI.ini), the one played by the SoundFont engine
          (MIDI OUT "SoundFont engine (FluidSynth)", remembered in PowerMIDI.ini), what it says about itself, and the state
-         of the engine. -->
+         of the engine. Another MIDI OUT: only a message. -->
     <TabItem Header="SoundFonts" MinWidth="102" DataContext="{Binding SoundFonts}" d:DataContext="{d:DesignInstance vm:SoundFontsViewModel}">
-    <DockPanel>
-      <!-- File, Refresh and Open folder; as the collection row of the Library tab. -->
+    <Grid>
+    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}" Text="SoundFont engine not started">
+      <TextBlock.Style>
+        <Style TargetType="TextBlock">
+          <Setter Property="Visibility" Value="Collapsed"/>
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding IsEngine}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger>
+          </Style.Triggers>
+        </Style>
+      </TextBlock.Style>
+    </TextBlock>
+    <DockPanel Visibility="{Binding IsEngine, Converter={StaticResource BoolToVisibility}}">
+      <!-- The soundfonts folder, Random, Refresh and Open folder (the list of the SoundFonts: in place of the mode, top left). -->
       <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
         <Button DockPanel.Dock="Right" Content="&#xE838;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
                 Command="{Binding OpenFolderCommand}" ToolTip="{Binding FolderToolTip}"/>
         <Button DockPanel.Dock="Right" Content="&#xE72C;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
                 Command="{Binding RefreshCommand}" ToolTip="Refresh list"/>
-        <TextBlock Text="&#xE8D6;" FontFamily="Segoe MDL2 Assets" FontSize="16" VerticalAlignment="Center" Margin="5,0,8,0" UseLayoutRounding="True"
-                   ToolTip="SoundFont" AutomationProperties.Name="SoundFont"/>
-        <ComboBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" IsEnabled="{Binding HasFiles}" Padding="6,2.5,2,3.5"
-                  AutomationProperties.Name="SoundFont file"/>
+        <Button DockPanel.Dock="Right" Content="&#xE8B1;" FontFamily="Segoe MDL2 Assets" FontSize="16" Padding="6,3,5,3" Margin="6,0,0,0" UseLayoutRounding="True"
+                Command="{Binding RandomCommand}" ToolTip="Random SoundFont of folder (played at once)" AutomationProperties.Name="Random SoundFont"/>
+        <TextBlock Text="{Binding Folder, StringFormat=Folder: {0}}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                   Foreground="{DynamicResource TextSoftBrush}" ToolTip="{Binding Folder}"/>
       </DockPanel>
-      <!-- State of the engine, and its delay (event to sound) while it runs. -->
-      <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-        <TextBlock DockPanel.Dock="Right" Margin="8,0,0,0" Foreground="{DynamicResource TextSoftBrush}" Text="{Binding DelayText}"
-                   ToolTip="Delay between an event and its sound (audio buffer and timing)"/>
-        <TextBlock Foreground="{DynamicResource TextSoftBrush}" TextTrimming="CharacterEllipsis"
-                   Text="{Binding EngineState, StringFormat=Engine: {0}}" ToolTip="{Binding EngineState}"/>
-      </DockPanel>
-      <!-- The SF_BANK tag of the MIDI files (SoundFontFinder): read to choose their SoundFont, written by Save MIDI file. -->
-      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,8,0,0">
+      <!-- The SF_BANK tag of the MIDI files (SoundFontFinder): read to choose their SoundFont, written by Save MIDI file;
+           at the bottom, under the settings of the engine. -->
+      <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,4,0,0">
+        <!-- (Padding 4: same gap above the buttons as below them, down to the border of the tab) -->
         <DockPanel>
-          <TextBlock Text="SF_BANK tag" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
-          <ToggleButton Content="Read on play" Padding="10,3" Margin="0,0,6,0" IsChecked="{Binding ReadTag}" HorizontalAlignment="Left"
+          <!-- (SF__BANK: the underscore shown, not taken for an access key) -->
+          <ToggleButton Content="Read SF__BANK tag on play" Padding="10,3" Margin="0,0,6,0" IsChecked="{Binding ReadTag}" HorizontalAlignment="Left"
                         ToolTip="SoundFont named by SF_BANK tag of file played first (next to file, or in soundfonts folder)"/>
-          <ToggleButton Content="Write on save" Padding="10,3" IsChecked="{Binding WriteTag}" HorizontalAlignment="Left"
+          <ToggleButton Content="Write SF__BANK tag on save" Padding="10,3" IsChecked="{Binding WriteTag}" HorizontalAlignment="Left"
                         ToolTip="Save MIDI file in SF2 mode: SoundFont played written in file (SF_BANK tag)"/>
         </DockPanel>
       </Border>
@@ -936,64 +942,59 @@
             <Setter Property="DisplayMemberPath" Value="Text"/>
           </Style>
         </Border.Resources>
+        <!-- One grid for both columns: each row of the Audio output column at the height of the same row of the Engine
+             column (two grids drifted apart, 1 to 5 px). The rows of the settings: 26 px (a list of 22, 4 under it). -->
         <Grid>
           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="14"/>
+            <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
           </Grid.ColumnDefinitions>
-          <Grid>
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto"/>
-              <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <TextBlock Grid.ColumnSpan="2" Text="Engine" FontWeight="SemiBold" Margin="0,0,0,6"/>
-            <TextBlock Grid.Row="1" Text="Reverb" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ReverbEngines}" SelectedValue="{Binding ReverbEngine}"
-                      ToolTip="Reverb engine of FluidSynth (change restarts engine)"/>
-            <TextBlock Grid.Row="2" Text="Interpolation" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Interpolations}" SelectedValue="{Binding Interpolation}"
-                      ToolTip="Quality of sample playback (higher: more CPU)"/>
-            <TextBlock Grid.Row="3" Text="Polyphony" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Polyphonies}" SelectedValue="{Binding Polyphony}"
-                      ToolTip="Notes played at once, at most"/>
-            <TextBlock Grid.Row="4" Text="Samples" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding SampleLoadings}" SelectedValue="{Binding LoadOnDemand}"
-                      ToolTip="All at load: more memory, no delay; on demand: little memory, short delay on first use of instrument (change restarts engine)"/>
-            <TextBlock Grid.Row="5" Text="Gain" Margin="0,0,8,0" Foreground="{DynamicResource TextSoftBrush}"/>
-            <DockPanel Grid.Row="5" Grid.Column="1">
-              <TextBlock DockPanel.Dock="Right" Width="30" TextAlignment="Right" Text="{Binding GainText}"/>
-              <Slider Minimum="0" Maximum="2" SmallChange="0.05" LargeChange="0.25" IsSnapToTickEnabled="True" TickFrequency="0.05"
-                      Value="{Binding Gain}" VerticalAlignment="Center" ToolTip="Volume of engine at full master volume (FluidSynth default: 0.2)"/>
-            </DockPanel>
-          </Grid>
-          <Grid Grid.Column="2">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto"/>
-              <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-              <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <TextBlock Grid.ColumnSpan="2" Text="Audio output" FontWeight="SemiBold" Margin="0,0,0,6"/>
-            <TextBlock Grid.Row="1" Text="Driver" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Drivers}" SelectedValue="{Binding Driver}"
-                      ToolTip="Audio output of Windows used (change restarts engine)"/>
-            <TextBlock Grid.Row="2" Text="Device" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Devices}" SelectedValue="{Binding Device}"
-                      ToolTip="{Binding SelectedItem.Text, RelativeSource={RelativeSource Self}}"/>
-            <TextBlock Grid.Row="3" Text="Rate" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding SampleRates}" SelectedValue="{Binding SampleRate}"
-                      ToolTip="Sample rate of engine (change restarts engine)"/>
-            <TextBlock Grid.Row="4" Text="Buffer" Margin="0,0,8,4" Foreground="{DynamicResource TextSoftBrush}"/>
-            <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding Buffers}" SelectedValue="{Binding Buffer}"
-                      ToolTip="Smaller: less delay, but crackles if computer is too busy (change restarts engine)"/>
-          </Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/><RowDefinition Height="26"/><RowDefinition Height="26"/>
+            <RowDefinition Height="26"/><RowDefinition Height="26"/><RowDefinition Height="26"/>
+          </Grid.RowDefinitions>
+          <TextBlock Grid.ColumnSpan="2" Text="Engine" FontWeight="SemiBold" Margin="0,0,0,6"/>
+          <TextBlock Grid.Row="1" Text="Reverb" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ReverbEngines}" SelectedValue="{Binding ReverbEngine}"
+                    ToolTip="Reverb engine of FluidSynth (change restarts engine)"/>
+          <TextBlock Grid.Row="2" Text="Interpolation" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Interpolations}" SelectedValue="{Binding Interpolation}"
+                    ToolTip="Quality of sample playback (higher: more CPU)"/>
+          <TextBlock Grid.Row="3" Text="Polyphony" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Polyphonies}" SelectedValue="{Binding Polyphony}"
+                    ToolTip="Notes played at once, at most"/>
+          <TextBlock Grid.Row="4" Text="Samples" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{Binding SampleLoadings}" SelectedValue="{Binding LoadOnDemand}"
+                    ToolTip="Preload all: more memory, no delay; on demand: little memory, short delay on first use of instrument (change restarts engine)"/>
+          <!-- The last row (gain; state and delay of the engine) a little lower than a row of lists: 2 above, none under. -->
+          <TextBlock Grid.Row="5" Text="Gain" Margin="0,2,8,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <DockPanel Grid.Row="5" Grid.Column="1" Margin="0,2,0,0">
+            <TextBlock DockPanel.Dock="Right" Width="30" TextAlignment="Right" VerticalAlignment="Center" Text="{Binding GainText}"/>
+            <Slider Minimum="0" Maximum="2" SmallChange="0.05" LargeChange="0.25" IsSnapToTickEnabled="True" TickFrequency="0.05"
+                    Value="{Binding Gain}" VerticalAlignment="Center" ToolTip="Volume of engine at full master volume (FluidSynth default: 0.2)"/>
+          </DockPanel>
+          <!-- The voices playing (state of the engine in the tooltip), beside the gain, as a setting: its value under the
+               text of the lists (7: their inner margin). The delay measured: in the tooltip of Buffer. -->
+          <TextBlock Grid.Row="5" Grid.Column="3" Text="Voices" Margin="0,2,8,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"
+                     ToolTip="{Binding EngineToolTip}"/>
+          <TextBlock Grid.Row="5" Grid.Column="4" Text="{Binding EngineState}" Margin="7,2,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                     ToolTip="{Binding EngineToolTip}"/>
+          <TextBlock Grid.Column="3" Grid.ColumnSpan="2" Text="Audio output" FontWeight="SemiBold" Margin="0,0,0,6"/>
+          <TextBlock Grid.Row="1" Grid.Column="3" Text="Driver" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="1" Grid.Column="4" ItemsSource="{Binding Drivers}" SelectedValue="{Binding Driver}"
+                    ToolTip="Audio output of Windows used (change restarts engine)"/>
+          <TextBlock Grid.Row="2" Grid.Column="3" Text="Device" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="2" Grid.Column="4" ItemsSource="{Binding Devices}" SelectedValue="{Binding Device}"
+                    ToolTip="{Binding SelectedItem.Text, RelativeSource={RelativeSource Self}}"/>
+          <TextBlock Grid.Row="3" Grid.Column="3" Text="Rate" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="3" Grid.Column="4" ItemsSource="{Binding SampleRates}" SelectedValue="{Binding SampleRate}"
+                    ToolTip="Sample rate of engine (change restarts engine)"/>
+          <TextBlock Grid.Row="4" Grid.Column="3" Text="Buffer" Margin="0,0,8,4" VerticalAlignment="Center" Foreground="{DynamicResource TextSoftBrush}"/>
+          <ComboBox Grid.Row="4" Grid.Column="4" ItemsSource="{Binding Buffers}" SelectedValue="{Binding Buffer}"
+                    ToolTip="{Binding BufferToolTip}"/>
         </Grid>
       </Border>
       <Grid>
@@ -1034,6 +1035,7 @@
         </ScrollViewer>
       </Grid>
     </DockPanel>
+    </Grid>
     </TabItem>
     <!-- About: the logo (same drawing as Icon.svg / PowerMIDI.ico, as vectors), the name and the version
          (set in MainWindow.xaml.cs from the version of the program). -->
@@ -1103,8 +1105,8 @@
     </Grid.RowDefinitions>
 
     <!-- Port and mode (wheel step on the port as on the other lists: a change of port stops playback, see
-         MainViewModel.OpenPort). Their top on the top of the right panel. -->
-    <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
+         MainViewModel.OpenPort). Their top on the top of the right panel. The last one (mode, or SoundFonts) to the end. -->
+    <DockPanel Grid.Row="0" Margin="0,0,0,10">
       <!-- MIDI OUT: a MIDI socket (5-pin DIN seen from the front: the pins on an arc, the notch at the bottom), in the
            color of the text of the window; a click refreshes the port list (a module plugged in since). Dimmed under the
            mouse. -->
@@ -1132,10 +1134,10 @@
         </Viewbox>
       </Button>
       <ComboBox Width="260" ItemsSource="{Binding Ports}" SelectedItem="{Binding SelectedPort}" AutomationProperties.Name="MIDI OUT"/>
-      <!-- Mode, right after the port (no label: its tooltip says what it is). The SoundFont engine imposes SF2: a greyed
-           list in its place. -->
-      <Grid Width="120" Margin="6,0,0,0">
-        <ComboBox SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
+      <!-- Mode, right after the port (no label: its tooltip says what it is). The SoundFont engine imposes SF2: the list of
+           the SoundFonts in its place (the one played shown, see SoundFontsViewModel), to the end of the row. -->
+      <Grid Margin="6,0,0,0">
+        <ComboBox Width="120" HorizontalAlignment="Left" SelectedValuePath="Content" SelectedValue="{Binding SelectedMode}"
                   ToolTip="Mode: Auto follows file; other mode forced on it (SysEx of other modes ignored)">
           <ComboBox.Style>
             <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Type ComboBox}}">
@@ -1152,10 +1154,9 @@
           <ComboBoxItem Content="MT-32"
                         ToolTip="Roland MT-32 / CM-32L"/>
         </ComboBox>
-        <ComboBox SelectedIndex="0" IsEnabled="False" ToolTipService.ShowOnDisabled="True" ToolTip="Mode: SF2, imposed by SoundFont engine"
-                  Visibility="{Binding IsSoundFontEngine, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="Mode SF2">
-          <ComboBoxItem Content="SF2"/>
-        </ComboBox>
+        <ComboBox ItemsSource="{Binding SoundFonts.Items}" SelectedItem="{Binding SoundFonts.SelectedItem}" DisplayMemberPath="Text"
+                  IsEnabled="{Binding SoundFonts.HasFiles}" ToolTipService.ShowOnDisabled="True" ToolTip="{Binding SoundFonts.SelectedToolTip}"
+                  Visibility="{Binding IsSoundFontEngine, Converter={StaticResource BoolToVisibility}}" AutomationProperties.Name="SoundFont file"/>
       </Grid>
     </DockPanel>
 

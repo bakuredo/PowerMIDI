@@ -88,6 +88,9 @@ static class FluidSynthNative
     public static extern int fluid_synth_set_polyphony(IntPtr synth, int polyphony);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    public static extern int fluid_synth_get_active_voice_count(IntPtr synth);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     public static extern int fluid_synth_noteon(IntPtr synth, int chan, int key, int vel);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]

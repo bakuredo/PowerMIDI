@@ -16,7 +16,8 @@ public static class SoundFontFinder
     public const string Tag = "SF_BANK";
     static readonly Regex TagText = new(@"^\s*SF_BANK\s*[=:]\s*(.+?)\s*$", RegexOptions.IgnoreCase);
 
-    public enum Source { Tag, SameName, Folder, Default }
+    // Chosen: picked in the list of SoundFonts for the track loaded (not by Find).
+    public enum Source { Tag, SameName, Folder, Default, Chosen }
 
     public sealed record Result(string Path, Source From, string Missing = null)
     {
@@ -26,6 +27,7 @@ public static class SoundFontFinder
             Source.Tag => "SF_BANK tag",
             Source.SameName => "same name as file",
             Source.Folder => "SoundFont of folder",
+            Source.Chosen => "chosen in list",
             _ => "SoundFonts tab",
         };
     }

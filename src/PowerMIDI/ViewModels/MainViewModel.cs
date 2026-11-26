@@ -45,7 +45,7 @@ public sealed partial class MainViewModel : ObservableObject
         Effects = new EffectsViewModel(defs, () => output, view.ShowError);
         Library = new LibraryViewModel(view, Path.Combine(AppContext.BaseDirectory, "library"), s => Status = s,
                                        path => Run(() => PlayFromLibrary(path)), paths => Run(() => AddFiles(paths)));
-        SoundFonts = new SoundFontsViewModel(() => Run(OnSoundFontChosen),
+        SoundFonts = new SoundFontsViewModel(path => Run(() => OnSoundFontChosen(path)),
                                              restart => Run(() => OnEngineSettingChanged(restart)));
 
         AddFilesCommand = Command(AddFilesFromDialog);
@@ -277,8 +277,10 @@ public sealed partial class MainViewModel : ObservableObject
         output = null;
         outputName = null;
         old?.Dispose();
-        SoundFonts.EngineState = "Stopped";
+        SoundFonts.EngineState = "—";
+        SoundFonts.EngineToolTip = "Engine stopped";
         SoundFonts.DelayText = null;
+        SoundFonts.SetUsed(null, null);   // the list shows the one chosen again
     }
 
     void PortOpened()
@@ -290,9 +292,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---------- SoundFont engine ----------
 
-    // The SoundFont engine is the MIDI port: the Mode list shows SF2, greyed (the mode is imposed).
+    // The SoundFont engine is the MIDI port: the list of the SoundFonts in place of the Mode list (the mode is imposed),
+    // the SoundFonts tab shown (otherwise a message there).
     bool isSoundFontEngine;
-    public bool IsSoundFontEngine { get => isSoundFontEngine; private set => Set(ref isSoundFontEngine, value); }
+    public bool IsSoundFontEngine
+    {
+        get => isSoundFontEngine;
+        private set { if (Set(ref isSoundFontEngine, value)) SoundFonts.IsEngine = value; }
+    }
 
     // Standard of the Mixer and Effects tabs: SF2 with the SoundFont engine (the names and lists of its SoundFont's
     // presets), otherwise the mode's (the file's in Auto). The mode still applies inside (ChannelMixer: resets, SysEx
@@ -313,17 +320,37 @@ public sealed partial class MainViewModel : ObservableObject
     string confirmedPath;         // track whose start was confirmed (unsaved settings left) before it waited for the engine
     SoundFontFinder.Result engineSoundFont;   // SoundFont the engine has (or loads), and how it was found
     bool engineLoading;                       // the engine is being created (its SoundFont loading)
+    string engineDetails;                     // FluidSynth version, audio output… (see ShowEngineRunning)
+    (string Track, string SoundFont)? soundFontChoice;   // a SoundFont chosen in the list for the track loaded
 
-    // SoundFont of a track (see SoundFontFinder): its SF_BANK tag (unless not read: SoundFonts tab), a .sf2 next to it,
-    // or the SoundFonts tab's choice. No track: the tab's. midi: the track already read (null: read here, for its tag).
+    // SoundFont of a track: the one chosen in the list for it (see OnSoundFontChosen), otherwise as SoundFontFinder finds
+    // it: its SF_BANK tag (unless not read: SoundFonts tab), a .sf2 next to it, or the one chosen for the files without
+    // their own. No track: the latter. midi: the track already read (null: read here, for its tag).
     SoundFontFinder.Result SoundFontFor(PlaylistItem item, MidiFile midi = null)
     {
-        if (item == null) return new SoundFontFinder.Result(SoundFonts.SelectedPath, SoundFontFinder.Source.Default);
+        if (item == null) return new SoundFontFinder.Result(SoundFonts.DefaultPath, SoundFontFinder.Source.Default);
+        if (soundFontChoice is { } choice && SamePath(choice.Track, item.Path)) return new SoundFontFinder.Result(choice.SoundFont, SoundFontFinder.Source.Chosen);
         if (!SoundFonts.ReadTag) midi = null;
         else if (midi == null)
             try { midi = ReadTrackFile(item.Path); }
             catch (Exception) { }   // unreadable: no tag (its error is shown when it is played)
-        return SoundFontFinder.Find(item.Path, midi, SoundFonts.Folder, SoundFonts.SelectedPath);
+        return SoundFontFinder.Find(item.Path, midi, SoundFonts.Folder, SoundFonts.DefaultPath);
+    }
+
+    // The engine running, for the SoundFonts tab: the voices playing (then every timer tick, see OnTimer), and in the
+    // tooltip its SoundFont, how it was found, and engineDetails.
+    void ShowEngineRunning()
+    {
+        if (engineSoundFont?.Path is not { } path) return;
+        ShowVoices();
+        SoundFonts.EngineToolTip = $"Running: {Path.GetFileName(path)} · {engineSoundFont.FromText} {engineDetails}";
+        SoundFonts.SetUsed(path, engineSoundFont.FromText);
+    }
+
+    // Voices playing now (a note may use several: stereo samples, layers; at most the polyphony).
+    void ShowVoices()
+    {
+        if (output is SoundFontOutput engine) SoundFonts.EngineState = engine.ActiveVoices.ToString();
     }
 
     // SF2 mode, a track about to start: false if its SoundFont is not the engine's. The engine then loads it (playback
@@ -333,7 +360,12 @@ public sealed partial class MainViewModel : ObservableObject
         if (!IsSoundFontEngine) return true;
         var wanted = SoundFontFor(item, midi);
         bool same = SamePath(wanted.Path, engineSoundFont?.Path);
-        if (same && output != null) { engineSoundFont = wanted; return true; }
+        if (same && output != null)
+        {
+            engineSoundFont = wanted;   // the same file, maybe found otherwise (its tag, after a save)
+            ShowEngineRunning();
+            return true;
+        }
         playWhenReady = item;
         playWhenReadyFrom = from;
         confirmedPath = item.Path;
@@ -358,14 +390,17 @@ public sealed partial class MainViewModel : ObservableObject
         var missingText = target.Missing != null ? $" — {SoundFontFinder.Tag} file not found: {target.Missing}" : "";
         if (path == null)
         {
-            SoundFonts.EngineState = "Stopped: no SoundFont";
+            SoundFonts.EngineState = "—";
+            SoundFonts.EngineToolTip = "Engine stopped: no SoundFont";
             Status = $"No SoundFont (.sf2) in {SoundFonts.Folder}{missingText}";
             return;
         }
         int load = ++engineLoad;
         engineLoading = true;
         var file = Path.GetFileName(path);
-        SoundFonts.EngineState = $"Loading {file}…";
+        SoundFonts.EngineState = "—";
+        SoundFonts.EngineToolTip = $"Engine loading {file}…";
+        SoundFonts.SetUsed(path, target.FromText);
         Status = $"Loading SoundFont {file}…";
         SoundFontOutput engine;
         IReadOnlyList<SoundFontPreset> presets;
@@ -375,7 +410,9 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (load != engineLoad) return;
             engineLoading = false;
-            SoundFonts.EngineState = "Stopped: error";
+            SoundFonts.EngineState = "—";
+            SoundFonts.EngineToolTip = $"Engine stopped: {ex.Message}";
+            SoundFonts.SetUsed(null, null);
             Status = ex.Message;
             return;
         }
@@ -391,8 +428,9 @@ public sealed partial class MainViewModel : ObservableObject
             PortOpened();
             var driverName = SoundFontEngineOptions.Drivers.FirstOrDefault(d => d.Value == engine.DriverUsed).Text ?? engine.DriverUsed;
             var reordered = engine.ZonesReordered > 0 ? $" — {engine.ZonesReordered} zones read in SF2 order (key ranges out of place)" : "";
-            SoundFonts.EngineState = $"Running: {file} · {target.FromText} (FluidSynth {SoundFontOutput.Version}, {driverName})" +
-                                     (engine.DriverUsed != options.Driver ? " — chosen output unavailable" : "") + reordered;
+            engineDetails = $"(FluidSynth {SoundFontOutput.Version}, {driverName})" +
+                            (engine.DriverUsed != options.Driver ? " — chosen output unavailable" : "") + reordered;
+            ShowEngineRunning();
             Status = $"SoundFont {file} loaded ({target.FromText}){reordered}{missingText}";
             var pending = playWhenReady;
             playWhenReady = null;
@@ -429,15 +467,17 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    // Another SoundFont chosen in the SoundFonts tab: remembered, and loaded if the engine is the port.
-    void OnSoundFontChosen()
+    // A SoundFont chosen in the list: remembered (the one of the files without their own), and with the engine played at
+    // once, the track loaded included (whatever SoundFont it finds: until another track starts, see StartTrack).
+    void OnSoundFontChosen(string path)
     {
         view.SaveSettings();
+        soundFontChoice = current != null ? (current.Path, path) : null;
         if (!IsSoundFontEngine) return;
-        var name = outputName ?? SoundFontOutput.PortName;
         Stop();
         ClosePort();
-        OpenPort(name);
+        outputName = SoundFontOutput.PortName;
+        OpenSoundFontEngine(new SoundFontFinder.Result(path, SoundFontFinder.Source.Chosen));
     }
 
     // Controllers, chosen instruments and fixed effects (start of track, seek, port change).
@@ -997,6 +1037,8 @@ public sealed partial class MainViewModel : ObservableObject
         // Another file with unsaved settings: ask before losing them (once: not again when it waited for the engine).
         if (settingsFile != null && settingsFile != item.Path && confirmedPath != item.Path && !ConfirmLeaveSettings()) return;
         confirmedPath = null;
+        // A SoundFont chosen in the list for another track: this one finds its own (see SoundFontFor).
+        if (soundFontChoice is { } choice && !SamePath(choice.Track, item.Path)) soundFontChoice = null;
         // Read first: an unreadable file (its error shown) changes nothing, neither the track being played nor its
         // settings.
         var midi = ReadTrackFile(item.Path);   // with its changes (Event Editor: changes, Record)
@@ -1256,7 +1298,11 @@ public sealed partial class MainViewModel : ObservableObject
         Mixer.Refresh();
         CheckKeyboardPort();
         Effects.Refresh();
-        if (output is SoundFontOutput engine) SoundFonts.DelayText = $"Delay ~{engine.Delay:0} ms";   // SoundFonts tab
+        if (output is SoundFontOutput engine)   // SoundFonts tab
+        {
+            SoundFonts.DelayText = $"~{engine.Delay:0} ms";
+            ShowVoices();
+        }
         DisplayText = ModuleDisplay.Text;
         LoadEvents();
         RefreshEventsFixed();

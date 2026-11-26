@@ -22,9 +22,10 @@ public sealed record SoundFontEngineOptions
     // Choices offered (FluidSynth 2.6 names and values).
     public static readonly (string Value, string Text)[] ReverbEngines =
         { ("dat", "Dattorro"), ("fdn", "FDN"), ("free", "Freeverb"), ("lex", "Lexverb"), ("smith", "Signalsmith") };
-    // FluidSynth's sinc of 25th order (7) is too slow to play in real time: not offered.
+    // Shown as a scale of quality, the method in brackets: FluidSynth's 4th order (4) is a cubic interpolation, 5 and 6
+    // sincs of 11th and 17th order. Its sinc of 25th order (7) is too slow to play in real time: not offered.
     public static readonly (int Value, string Text)[] Interpolations =
-        { (0, "None"), (1, "Linear"), (4, "4th order"), (5, "11th order sinc"), (6, "17th order sinc") };
+        { (0, "None"), (1, "Low (linear)"), (4, "Medium (cubic)"), (5, "High (sinc)"), (6, "Best (sinc)") };
     public static readonly int[] Polyphonies = { 64, 128, 256, 512, 1024 };
     public static readonly (string Value, string Text)[] Drivers = { ("wasapi", "WASAPI"), ("dsound", "DirectSound"), ("waveout", "WaveOut") };
     public static readonly int[] SampleRates = { 44100, 48000, 96000 };
